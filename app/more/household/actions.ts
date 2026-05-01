@@ -74,11 +74,10 @@ export async function removeMemberAction(formData: FormData) {
   }
 
   const supabase = createClient();
-  const { error } = await supabase
-    .from("household_members")
-    .delete()
-    .eq("user_id", userId)
-    .eq("household_id", householdId);
+  const { error } = await supabase.rpc("remove_household_member", {
+    h_id: householdId,
+    target_user_id: userId,
+  });
 
   if (error) {
     redirect(

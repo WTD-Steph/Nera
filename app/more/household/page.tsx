@@ -29,13 +29,11 @@ export default async function HouseholdPage({
   const current = await getCurrentHousehold();
   if (!current) redirect("/setup");
 
-  // Lookup members + emails (auth.users tidak accessible by RLS untuk
-  // non-owner, tapi household_members punya semua user_id co-member)
-  const { data: members } = await supabase
-    .from("household_members")
-    .select("user_id, role, joined_at")
-    .eq("household_id", current.household_id)
-    .order("joined_at", { ascending: true });
+  // List members via RPC — household_members SELECT policy adalah self-only
+  // untuk anti-recursion; cross-member listing perlu SECURITY DEFINER.
+  const { data: members } = await supabase.rpc("list_household_members", {
+    h_id: current.household_id,
+  });
 
   // Pending invitations (RLS: owner sees all, non-owner sees own)
   const { data: invitations } = await supabase
@@ -109,7 +107,7 @@ export default async function HouseholdPage({
             >
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium text-gray-800">
-                  {m.user_id === user.id ? user.email : `User ${m.user_id.slice(0, 8)}`}
+                  {m.email ?? `User ${m.user_id.slice(0, 8)}`}
                 </div>
                 <div className="text-[11px] text-gray-400">
                   {m.role === "owner" ? "Owner" : "Member"} · bergabung{" "}

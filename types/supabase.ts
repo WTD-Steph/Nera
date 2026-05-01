@@ -125,12 +125,19 @@ export type Database = {
         Args: { household_name: string };
         Returns: string;
       };
-      is_household_member: { Args: { h_id: string }; Returns: boolean };
-      is_household_member_of_baby: {
-        Args: { b_id: string };
-        Returns: boolean;
+      list_household_members: {
+        Args: { h_id: string };
+        Returns: {
+          email: string;
+          joined_at: string;
+          role: string;
+          user_id: string;
+        }[];
       };
-      is_household_owner: { Args: { h_id: string }; Returns: boolean };
+      remove_household_member: {
+        Args: { h_id: string; target_user_id: string };
+        Returns: undefined;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
