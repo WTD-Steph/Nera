@@ -105,6 +105,83 @@ Sudah dibuat note di [README](../README.md), tapi rekap untuk reference:
 
 Tanpa whitelist → error "Redirect URL not allowed" pasca-klik magic link.
 
+## ⚠️ Pitfall: SECURITY DEFINER function di RLS policy → Postgres SEGV (signal 11)
+
+Di PR #2b saya original-nya pakai SECURITY DEFINER helper functions
+(`is_household_member`, `is_household_owner`, `is_household_member_of_baby`)
+di RLS policy expression. Pattern ini **memicu Postgres backend SEGV**
+setiap kali PostgREST melakukan schema cache introspection di Postgres
+17.6.x. Symptom: postgres logs penuh dengan
+`server process (PID xxxx) was terminated by signal 11: Segmentation fault`,
+dan REST API alternating PGRST001 (no connection) ↔ PGRST002 (schema
+cache rebuild) tanpa pernah stabilize.
+
+Mitigation tidak bisa via NOTIFY pgrst, pg_terminate_backend, atau pause+
+restore project — bug deterministik tied ke schema. Harus drop policy yang
+memakai SECURITY DEFINER helper.
+
+**Don't:**
+```sql
+CREATE FUNCTION public.is_household_member(h uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER ...;
+CREATE POLICY foo ON tbl USING (public.is_household_member(id));
+-- ↑ SEGV pada introspection
+```
+
+**Do — direct EXISTS subquery dalam policy:**
+```sql
+CREATE POLICY foo ON tbl USING (
+  EXISTS (
+    SELECT 1 FROM public.household_members hm
+    WHERE hm.household_id = tbl.id AND hm.user_id = auth.uid()
+  )
+);
+```
+
+**Caveat — recursion**: kalau policy ada di table yang sama dengan
+table di EXISTS, postgres TIDAK auto-disable RLS recursion (kontradiksi
+dengan dokumentasi yang sempat saya asumsikan). `SELECT FROM tbl` di
+dalam policy of `tbl` akan trigger `42P17 infinite recursion`.
+
+Solution untuk self-referencing table: SELECT/DELETE policy dibatasi ke
+self-only (`user_id = auth.uid()`), dan operasi cross-member dilakukan
+via SECURITY DEFINER **RPC** yang dipanggil dari app code (TIDAK
+direferensikan di policy expression). Lihat `list_household_members()`
+dan `remove_household_member()` di [migration](../supabase/migrations/20260501073000_household.sql)
+sebagai contoh.
+
+Pelajaran: **SECURITY DEFINER functions OK di-define dan OK di-call dari
+app, tapi JANGAN dipakai di RLS policy expression.**
+
+## ⚠️ Pitfall: `SET LOCAL ROLE` di Supabase MCP `execute_sql` bisa crash PostgREST
+
+Saat e2e test PR #2b, saya pakai `BEGIN; SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claims = '...'; ... ROLLBACK;` di
+`mcp__supabase__execute_sql` untuk simulasi RLS sebagai user. Query
+return `Connection terminated unexpectedly`.
+
+Setelah itu, **PostgREST instance jadi rusak** — semua REST API call
+(termasuk dari Next.js app via @supabase/ssr) return `503 PGRST001 no
+connection to the server`. Postgres direct (via MCP execute_sql) tetap
+healthy, tapi REST layer tidak bisa pulih sampai trigger ulang.
+
+**Recovery:**
+1. `NOTIFY pgrst, 'reload schema'` + `NOTIFY pgrst, 'reload config'`
+2. Kalau masih stuck: `pg_terminate_backend(pid)` semua koneksi
+   PostgREST → triggers reconnect with fresh state. Setelah itu butuh
+   ~1–3 menit untuk schema cache rebuilt
+3. PGRST002 muncul saat schema cache lagi loading — itu tahap recovery
+   normal, lanjut ke 200/401
+
+**Don't:**
+- `SET LOCAL ROLE authenticated` di execute_sql untuk simulate user — gunakan
+  pendekatan lain (test user real signed-in via Playwright + auth flow)
+- Modifikasi role grants saat connection pool aktif
+
+**Do:**
+- Test RLS via real session: login user di browser, query via app, observe
+- Atau buat dedicated test user dengan service_role di staging env
+
 ## E2E test reference
 
 Test plan PR #2a (semua pass via Playwright MCP + Supabase MCP, lihat
