@@ -2,29 +2,36 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBaby } from "@/lib/household/baby";
 import { deleteLogAction } from "@/app/actions/logs";
-import { LogsRealtime } from "@/components/LogsRealtime";
 import { type LogRow } from "@/lib/compute/stats";
 import { fmtDate, fmtDuration, fmtTime, timeSince } from "@/lib/compute/format";
+import { LogsRealtime } from "@/components/LogsRealtime";
 
-type Filter = "all" | "feeding" | "diaper" | "sleep" | "temp" | "med" | "bath";
+type Filter =
+  | "all"
+  | "feeding"
+  | "pumping"
+  | "diaper"
+  | "sleep"
+  | "temp"
+  | "med"
+  | "bath";
 type SearchParams = { filter?: string; logdeleted?: string };
 
 const FILTERS: { id: Filter; label: string; subtypes: string[] }[] = [
   { id: "all", label: "Semua", subtypes: [] },
-  { id: "feeding", label: "Susu", subtypes: ["sufor", "dbf", "pumping"] },
-  { id: "diaper", label: "Popok", subtypes: ["pipis", "poop"] },
+  { id: "feeding", label: "Feeding", subtypes: ["feeding"] },
+  { id: "pumping", label: "Pumping", subtypes: ["pumping"] },
+  { id: "diaper", label: "Diaper", subtypes: ["diaper"] },
   { id: "sleep", label: "Tidur", subtypes: ["sleep"] },
+  { id: "bath", label: "Mandi", subtypes: ["bath"] },
   { id: "temp", label: "Suhu", subtypes: ["temp"] },
   { id: "med", label: "Obat", subtypes: ["med"] },
-  { id: "bath", label: "Mandi", subtypes: ["bath"] },
 ];
 
 const SUBTYPE_LABEL: Record<string, string> = {
-  sufor: "Sufor",
-  dbf: "DBF",
+  feeding: "Feeding",
   pumping: "Pumping",
-  pipis: "Pipis",
-  poop: "Poop",
+  diaper: "Diaper",
   sleep: "Tidur",
   bath: "Mandi",
   temp: "Suhu",
@@ -32,11 +39,23 @@ const SUBTYPE_LABEL: Record<string, string> = {
 };
 
 function logDetail(l: LogRow): string {
-  if (l.subtype === "sufor") return `${l.amount_ml} ml`;
-  if (l.subtype === "dbf")
-    return `L ${l.duration_l_min ?? 0}m / R ${l.duration_r_min ?? 0}m`;
+  if (l.subtype === "feeding") {
+    if (l.amount_ml != null) return `🍼 ${l.amount_ml} ml`;
+    const lMin = l.duration_l_min ?? 0;
+    const rMin = l.duration_r_min ?? 0;
+    return `🤱 L ${lMin}m / R ${rMin}m`;
+  }
   if (l.subtype === "pumping")
     return `L ${l.amount_l_ml ?? 0} / R ${l.amount_r_ml ?? 0} ml`;
+  if (l.subtype === "diaper") {
+    const parts: string[] = [];
+    if (l.has_pee) parts.push("💛");
+    if (l.has_poop) {
+      const p = [l.poop_color, l.poop_consistency].filter(Boolean).join(" ");
+      parts.push(p ? `💩 ${p}` : "💩");
+    }
+    return parts.join(" + ");
+  }
   if (l.subtype === "sleep") {
     if (!l.end_timestamp) return "sedang tidur";
     const dur = Math.round(
@@ -46,8 +65,6 @@ function logDetail(l: LogRow): string {
     );
     return fmtDuration(dur);
   }
-  if (l.subtype === "poop")
-    return [l.poop_color, l.poop_consistency].filter(Boolean).join(" • ");
   if (l.subtype === "temp") return `${l.temp_celsius}°C`;
   if (l.subtype === "med")
     return [l.med_name, l.med_dose].filter(Boolean).join(" ");
@@ -74,7 +91,7 @@ export default async function HistoryPage({
   let query = supabase
     .from("logs")
     .select(
-      "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, poop_color, poop_consistency, temp_celsius, med_name, med_dose, notes",
+      "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, notes",
     )
     .eq("baby_id", baby.id)
     .order("timestamp", { ascending: false })

@@ -35,11 +35,9 @@ function formatAge(dob: string): string {
 }
 
 const QUICK_PRIMARY: { subtype: LogSubtype; label: string; emoji: string }[] = [
-  { subtype: "sufor", label: "Sufor", emoji: "🍼" },
-  { subtype: "dbf", label: "DBF", emoji: "🤱" },
+  { subtype: "feeding", label: "Feeding", emoji: "🍼" },
   { subtype: "pumping", label: "Pumping", emoji: "💧" },
-  { subtype: "pipis", label: "Pipis", emoji: "💛" },
-  { subtype: "poop", label: "Poop", emoji: "💩" },
+  { subtype: "diaper", label: "Diaper", emoji: "🧷" },
   { subtype: "sleep", label: "Tidur", emoji: "🌙" },
 ];
 const QUICK_SECONDARY: { subtype: LogSubtype; label: string; emoji: string }[] = [
@@ -49,11 +47,9 @@ const QUICK_SECONDARY: { subtype: LogSubtype; label: string; emoji: string }[] =
 ];
 
 const SUBTYPE_LABEL: Record<string, string> = {
-  sufor: "Sufor",
-  dbf: "DBF",
+  feeding: "Feeding",
   pumping: "Pumping",
-  pipis: "Pipis",
-  poop: "Poop",
+  diaper: "Diaper",
   sleep: "Tidur",
   bath: "Mandi",
   temp: "Suhu",
@@ -61,11 +57,23 @@ const SUBTYPE_LABEL: Record<string, string> = {
 };
 
 function logDetail(l: LogRow): string {
-  if (l.subtype === "sufor") return `${l.amount_ml} ml`;
-  if (l.subtype === "dbf")
-    return `L ${l.duration_l_min ?? 0}m / R ${l.duration_r_min ?? 0}m`;
+  if (l.subtype === "feeding") {
+    if (l.amount_ml != null) return `🍼 ${l.amount_ml} ml`;
+    const lMin = l.duration_l_min ?? 0;
+    const rMin = l.duration_r_min ?? 0;
+    return `🤱 L ${lMin}m / R ${rMin}m`;
+  }
   if (l.subtype === "pumping")
     return `L ${l.amount_l_ml ?? 0} / R ${l.amount_r_ml ?? 0} ml`;
+  if (l.subtype === "diaper") {
+    const parts: string[] = [];
+    if (l.has_pee) parts.push("💛");
+    if (l.has_poop) {
+      const p = [l.poop_color, l.poop_consistency].filter(Boolean).join(" ");
+      parts.push(p ? `💩 ${p}` : "💩");
+    }
+    return parts.join(" + ");
+  }
   if (l.subtype === "sleep") {
     if (!l.end_timestamp) return "sedang tidur";
     const dur = Math.round(
@@ -75,8 +83,6 @@ function logDetail(l: LogRow): string {
     );
     return fmtDuration(dur);
   }
-  if (l.subtype === "poop")
-    return [l.poop_color, l.poop_consistency].filter(Boolean).join(" • ");
   if (l.subtype === "temp") return `${l.temp_celsius}°C`;
   if (l.subtype === "med")
     return [l.med_name, l.med_dose].filter(Boolean).join(" ");
@@ -104,7 +110,7 @@ export default async function HomePage({
   const { data: logs } = await supabase
     .from("logs")
     .select(
-      "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, poop_color, poop_consistency, temp_celsius, med_name, med_dose, notes",
+      "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, notes",
     )
     .eq("baby_id", baby.id)
     .gte("timestamp", since)
@@ -175,17 +181,17 @@ export default async function HomePage({
         <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
           Catat Cepat
         </h2>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           {QUICK_PRIMARY.map((q) => (
             <LogModalTrigger
               key={q.subtype}
               subtype={q.subtype}
-              className="flex flex-col items-center gap-1.5 rounded-2xl border border-white bg-rose-50 p-3 shadow-sm transition-transform active:scale-95"
+              className="flex flex-col items-center gap-1 rounded-2xl border border-white bg-rose-50 p-3 shadow-sm transition-transform active:scale-95"
             >
               <span className="text-2xl" aria-hidden>
                 {q.emoji}
               </span>
-              <span className="text-xs font-semibold text-rose-700">
+              <span className="text-[11px] font-semibold text-rose-700">
                 {q.label}
               </span>
             </LogModalTrigger>
@@ -209,45 +215,57 @@ export default async function HomePage({
 
       <section className="mt-5">
         <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
-          Sejak Terakhir
-        </h2>
-        <div className="grid grid-cols-2 gap-2">
-          <SinceCard label="Susu" log={last.milk} />
-          <SinceCard label="Pipis" log={last.pipis} />
-          <SinceCard label="Poop" log={last.poop} />
-          <SinceCard label="Tidur" log={last.sleep} />
-        </div>
-      </section>
-
-      <section className="mt-5">
-        <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
           Total Hari Ini
         </h2>
-        <div className="space-y-2 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="space-y-2.5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <StatRow
-            label="Sufor"
-            value={`${stats.suforML} ml`}
-            sub={stats.suforCount > 0 ? `${stats.suforCount}×` : undefined}
+            label="🍼 Susu"
+            value={`${stats.feedingMlTotal} ml`}
+            sub={
+              stats.feedingMlCount > 0
+                ? `${stats.feedingMlCount}×`
+                : undefined
+            }
           />
           <StatRow
-            label="DBF"
-            value={`${stats.dbfMin} mnt`}
+            label="🤱 DBF"
+            value={fmtDuration(stats.dbfMinTotal)}
             sub={stats.dbfCount > 0 ? `${stats.dbfCount}×` : undefined}
           />
           {stats.pumpML > 0 ? (
             <StatRow
-              label="Pumping"
+              label="💧 Pumping"
               value={`${stats.pumpML} ml`}
               sub={`${stats.pumpCount}×`}
             />
           ) : null}
           <StatRow
-            label="Tidur"
+            label="🌙 Tidur"
             value={fmtDuration(stats.sleepMin)}
-            sub={stats.sleepCount > 0 ? `${stats.sleepCount} sesi` : undefined}
+            sub={
+              stats.sleepCount > 0 ? `${stats.sleepCount} sesi` : undefined
+            }
           />
-          <StatRow label="Pipis" value={`${stats.pipisCount}×`} />
-          <StatRow label="Poop" value={`${stats.poopCount}×`} />
+          <StatRow
+            label="🧷 Diaper"
+            value={`${stats.diaperCount}×`}
+            sub={
+              stats.diaperCount > 0
+                ? `${stats.diaperPeeCount} 💛 · ${stats.diaperPoopCount} 💩`
+                : undefined
+            }
+          />
+        </div>
+      </section>
+
+      <section className="mt-5">
+        <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
+          Sejak Terakhir
+        </h2>
+        <div className="grid grid-cols-3 gap-2">
+          <SinceCard label="Feeding" log={last.feeding} />
+          <SinceCard label="Diaper" log={last.diaper} />
+          <SinceCard label="Tidur" log={last.sleep} />
         </div>
       </section>
 
@@ -340,7 +358,7 @@ function SinceCard({
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
       <div className="text-xs text-gray-500">{label}</div>
-      <div className="mt-0.5 text-base font-bold text-gray-800">
+      <div className="mt-0.5 text-sm font-bold text-gray-800">
         {log ? timeSince(log.timestamp) : "—"}
       </div>
       {log ? (
@@ -364,7 +382,9 @@ function StatRow({
       <span className="flex-1 text-sm text-gray-600">{label}</span>
       <span className="text-sm font-bold text-gray-800">{value}</span>
       {sub ? (
-        <span className="w-16 text-right text-xs text-gray-400">{sub}</span>
+        <span className="w-24 text-right text-[11px] text-gray-400">
+          {sub}
+        </span>
       ) : null}
     </div>
   );
