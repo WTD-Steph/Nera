@@ -17,6 +17,50 @@ export type Database = {
   };
   public: {
     Tables: {
+      babies: {
+        Row: {
+          birth_height_cm: number;
+          birth_weight_kg: number;
+          created_at: string;
+          dob: string;
+          gender: string;
+          household_id: string;
+          id: string;
+          name: string;
+          updated_at: string;
+        };
+        Insert: {
+          birth_height_cm: number;
+          birth_weight_kg: number;
+          created_at?: string;
+          dob: string;
+          gender: string;
+          household_id: string;
+          id?: string;
+          name: string;
+          updated_at?: string;
+        };
+        Update: {
+          birth_height_cm?: number;
+          birth_weight_kg?: number;
+          created_at?: string;
+          dob?: string;
+          gender?: string;
+          household_id?: string;
+          id?: string;
+          name?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "babies_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       household_invitations: {
         Row: {
           accepted_at: string | null;

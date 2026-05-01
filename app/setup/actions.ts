@@ -20,5 +20,5 @@ export async function createHouseholdAction(formData: FormData) {
     );
   }
 
-  redirect("/?welcome=created");
+  redirect("/setup/baby");
 }
