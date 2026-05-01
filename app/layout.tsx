@@ -11,6 +11,15 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Nera — Baby Tracker",
   description: "Track tumbuh kembang anak, multi-user household.",
+  applicationName: "Nera",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Nera",
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export const viewport: Viewport = {
@@ -18,6 +27,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   themeColor: "#f43f5e",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
