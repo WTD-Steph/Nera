@@ -8,9 +8,21 @@ deployed ke Vercel.
 
 **Production live di [nera-jeanne.vercel.app](https://nera-jeanne.vercel.app).**
 
-PR #1–#4 brief sudah merged: scaffold + auth + household + baby profile + logs.
-Auth pakai **email + password** (magic link diganti karena rate-limit
-issue di Supabase built-in SMTP — lihat [docs/auth.md](docs/auth.md) §Switch dari magic link).
+Brief PR #1–#10 done. Multi-user auth (email + password) + household +
+baby profile + log harian + chart pertumbuhan WHO + milestone KPSP +
+imunisasi IDAI + CSV export + AI prompt copier + PWA installable.
+
+## Untuk Claude Code agent
+
+[**CLAUDE.md**](CLAUDE.md) = entry point untuk AI agent. Wajib baca sebelum modify code. Berisi conventions, critical pitfalls, RLS pattern, common commands, file map.
+
+Detail rich di:
+- [PROJECT_BRIEF.md](PROJECT_BRIEF.md) — arsitektur lengkap + PR sequence v2
+- [docs/architecture.md](docs/architecture.md) — high-level overview + ERD + RLS strategy
+- [docs/auth.md](docs/auth.md) — auth flow, magic-link → password switch, edge cases
+- [docs/realtime-sync.md](docs/realtime-sync.md) — Supabase realtime pattern
+- [docs/troubleshooting.md](docs/troubleshooting.md) — known issues + recovery (SEGV, PGRST stuck, MCP scope, env vars)
+- [docs/operations.md](docs/operations.md) — env vars, deploy, Supabase + Vercel config
 
 ## Stack
 
