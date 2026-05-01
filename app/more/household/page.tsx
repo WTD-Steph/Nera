@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentHousehold } from "@/lib/household/current";
+import { SubmitButton } from "@/components/SubmitButton";
 import {
   inviteMemberAction,
   revokeInvitationAction,
@@ -19,14 +22,13 @@ export default async function HouseholdPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect("/login?next=/more/household");
 
   const current = await getCurrentHousehold();
   if (!current) redirect("/setup");
+
+  const supabase = createClient();
 
   // List members via RPC — household_members SELECT policy adalah self-only
   // untuk anti-recursion; cross-member listing perlu SECURITY DEFINER.
@@ -50,13 +52,13 @@ export default async function HouseholdPage({
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl">
       <header className="mb-4 flex items-center gap-3">
-        <a
+        <Link
           href="/"
           className="text-sm text-rose-600 hover:underline"
           aria-label="Kembali"
         >
           ← Kembali
-        </a>
+        </Link>
       </header>
 
       <h1 className="text-base font-bold text-gray-900">
@@ -119,12 +121,12 @@ export default async function HouseholdPage({
                     name="household_id"
                     value={current.household_id}
                   />
-                  <button
-                    type="submit"
+                  <SubmitButton
+                    pendingText="…"
                     className="text-[11px] font-medium text-red-600 hover:underline"
                   >
                     Hapus
-                  </button>
+                  </SubmitButton>
                 </form>
               ) : null}
             </div>
@@ -194,12 +196,12 @@ export default async function HouseholdPage({
                 </label>
               </div>
             </fieldset>
-            <button
-              type="submit"
+            <SubmitButton
+              pendingText="Mengirim…"
               className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-600 active:bg-rose-700"
             >
               Kirim undangan
-            </button>
+            </SubmitButton>
           </form>
         </section>
       ) : null}
@@ -231,12 +233,12 @@ export default async function HouseholdPage({
                   </div>
                   <form action={revokeInvitationAction}>
                     <input type="hidden" name="id" value={inv.id} />
-                    <button
-                      type="submit"
+                    <SubmitButton
+                      pendingText="…"
                       className="text-[11px] font-medium text-red-600 hover:underline"
                     >
                       Cabut
-                    </button>
+                    </SubmitButton>
                   </form>
                 </div>
               );
@@ -253,12 +255,12 @@ export default async function HouseholdPage({
             name="household_id"
             value={current.household_id}
           />
-          <button
-            type="submit"
+          <SubmitButton
+            pendingText="Memproses…"
             className="w-full rounded-xl border border-red-200 bg-white py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
           >
             Keluar dari keluarga ini
-          </button>
+          </SubmitButton>
         </form>
         <p className="mt-2 px-1 text-[11px] leading-relaxed text-gray-400">
           Setelah keluar, Anda kehilangan akses ke semua data keluarga ini.

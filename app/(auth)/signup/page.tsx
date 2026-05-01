@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SubmitButton } from "@/components/SubmitButton";
 import { signUpAction } from "./actions";
 
 type SearchParams = { error?: string; next?: string; email?: string };
@@ -53,12 +54,12 @@ export default function SignupPage({
             className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
           />
         </label>
-        <button
-          type="submit"
+        <SubmitButton
+          pendingText="Membuat akun…"
           className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-600 active:bg-rose-700"
         >
           Buat akun
-        </button>
+        </SubmitButton>
       </form>
 
       {error ? (

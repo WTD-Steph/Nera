@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createLogAction } from "@/app/actions/logs";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export type LogSubtype =
   | "feeding"
@@ -360,12 +361,9 @@ function LogModal({
             />
           </Field>
 
-          <button
-            type="submit"
-            className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
-          >
+          <SubmitButton className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700">
             Simpan
-          </button>
+          </SubmitButton>
         </form>
       </div>
     </div>

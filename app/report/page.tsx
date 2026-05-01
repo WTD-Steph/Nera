@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
 import {
   buildAiContext,
@@ -10,14 +12,13 @@ import {
 import { PromptCopier } from "@/components/PromptCopier";
 
 export default async function ReportPage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect("/login?next=/report");
 
   const baby = await getCurrentBaby();
   if (!baby) redirect("/setup");
+
+  const supabase = createClient();
 
   const [logsRes, growthRes] = await Promise.all([
     supabase
@@ -56,9 +57,9 @@ export default async function ReportPage() {
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl">
       <header className="flex items-center justify-between">
-        <a href="/" className="text-sm text-rose-600 hover:underline">
+        <Link href="/" className="text-sm text-rose-600 hover:underline">
           ← Beranda
-        </a>
+        </Link>
         <h1 className="text-base font-bold text-gray-900">Laporan</h1>
         <span className="w-12" />
       </header>

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHousehold } from "./current";
 
@@ -13,12 +14,10 @@ export type CurrentBaby = {
 
 /**
  * Server-side: ambil baby pertama di household user. v1 single-baby UI;
- * future multi-baby (PR #?) butuh baby switcher.
- *
- * Returns null kalau user tidak punya household, atau household-nya belum
- * punya baby.
+ * future multi-baby (PR #?) butuh baby switcher. Wrapped dengan React
+ * cache() — multi-call per request dedup.
  */
-export async function getCurrentBaby(): Promise<CurrentBaby | null> {
+export const getCurrentBaby = cache(async (): Promise<CurrentBaby | null> => {
   const household = await getCurrentHousehold();
   if (!household) return null;
 
@@ -37,4 +36,4 @@ export async function getCurrentBaby(): Promise<CurrentBaby | null> {
     ...data,
     gender: data.gender as "female" | "male",
   };
-}
+});

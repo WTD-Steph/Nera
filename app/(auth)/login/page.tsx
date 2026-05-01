@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SubmitButton } from "@/components/SubmitButton";
 import { signInAction } from "./actions";
 
 type SearchParams = { error?: string; next?: string };
@@ -49,12 +50,12 @@ export default function LoginPage({
             className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
           />
         </label>
-        <button
-          type="submit"
+        <SubmitButton
+          pendingText="Masuk…"
           className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-600 active:bg-rose-700"
         >
           Masuk
-        </button>
+        </SubmitButton>
       </form>
 
       {error ? (

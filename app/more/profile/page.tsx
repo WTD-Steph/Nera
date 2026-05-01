@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
+import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
+import { SubmitButton } from "@/components/SubmitButton";
 import { updateBabyAction } from "./actions";
 
 type SearchParams = { error?: string; saved?: string };
@@ -10,10 +12,7 @@ export default async function ProfilePage({
 }: {
   searchParams: SearchParams;
 }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect("/login?next=/more/profile");
 
   const baby = await getCurrentBaby();
@@ -25,9 +24,9 @@ export default async function ProfilePage({
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl">
       <header className="mb-4">
-        <a href="/" className="text-sm text-rose-600 hover:underline">
+        <Link href="/" className="text-sm text-rose-600 hover:underline">
           ← Kembali
-        </a>
+        </Link>
       </header>
 
       <h1 className="text-base font-bold text-gray-900">Profil Bayi</h1>
@@ -139,12 +138,12 @@ export default async function ProfilePage({
           </label>
         </div>
 
-        <button
-          type="submit"
+        <SubmitButton
+          pendingText="Menyimpan…"
           className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-600 active:bg-rose-700"
         >
           Simpan perubahan
-        </button>
+        </SubmitButton>
       </form>
     </main>
   );
