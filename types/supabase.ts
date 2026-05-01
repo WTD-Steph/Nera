@@ -152,6 +152,70 @@ export type Database = {
           },
         ];
       };
+      immunization_progress: {
+        Row: {
+          baby_id: string;
+          created_by: string | null;
+          facility: string | null;
+          given_at: string;
+          notes: string | null;
+          vaccine_key: string;
+        };
+        Insert: {
+          baby_id: string;
+          created_by?: string | null;
+          facility?: string | null;
+          given_at: string;
+          notes?: string | null;
+          vaccine_key: string;
+        };
+        Update: {
+          baby_id?: string;
+          created_by?: string | null;
+          facility?: string | null;
+          given_at?: string;
+          notes?: string | null;
+          vaccine_key?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "immunization_progress_baby_id_fkey";
+            columns: ["baby_id"];
+            isOneToOne: false;
+            referencedRelation: "babies";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      milestone_progress: {
+        Row: {
+          achieved_at: string;
+          baby_id: string;
+          created_by: string | null;
+          milestone_key: string;
+        };
+        Insert: {
+          achieved_at?: string;
+          baby_id: string;
+          created_by?: string | null;
+          milestone_key: string;
+        };
+        Update: {
+          achieved_at?: string;
+          baby_id?: string;
+          created_by?: string | null;
+          milestone_key?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "milestone_progress_baby_id_fkey";
+            columns: ["baby_id"];
+            isOneToOne: false;
+            referencedRelation: "babies";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       household_members: {
         Row: {
           household_id: string;

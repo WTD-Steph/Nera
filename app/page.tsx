@@ -324,7 +324,7 @@ export default async function HomePage({
         </a>
       </section>
 
-      <div className="mt-6 grid grid-cols-3 gap-2">
+      <div className="mt-6 grid grid-cols-2 gap-2">
         <a
           href="/growth"
           className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
@@ -332,20 +332,32 @@ export default async function HomePage({
           📈 Tumbuh
         </a>
         <a
+          href="/milestone"
+          className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+        >
+          🎯 Milestone
+        </a>
+        <a
+          href="/imunisasi"
+          className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+        >
+          💉 Imunisasi
+        </a>
+        <a
           href="/more/household"
           className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
         >
           👨‍👩‍👧 Keluarga
         </a>
-        <form action="/auth/signout" method="post">
-          <button
-            type="submit"
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            Keluar
-          </button>
-        </form>
       </div>
+      <form action="/auth/signout" method="post" className="mt-2">
+        <button
+          type="submit"
+          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+        >
+          Keluar
+        </button>
+      </form>
 
       <p className="mt-6 text-center text-[11px] text-gray-400">
         {user.email} · {household.role === "owner" ? "Owner" : "Member"}
