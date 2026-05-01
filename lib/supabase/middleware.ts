@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
+const PUBLIC_AUTH_PATHS = new Set(["/login", "/verify"]);
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -27,10 +29,23 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // PR #1: hanya refresh session, tidak ada gating route.
-  // PR #2a (feature/auth) akan tambahkan redirect logic untuk
-  // /login, /verify, /setup, dan protected routes.
-  await supabase.auth.getUser();
+  // Refresh session — wajib supaya cookies terupdate.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const pathname = request.nextUrl.pathname;
+
+  // Logged-in user mengakses /login atau /verify → redirect ke /
+  if (user && PUBLIC_AUTH_PATHS.has(pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  // PR #2b akan tambah: kalau no household → redirect ke /setup
+  // PR #2a tidak gating route lain (page.tsx /-handle redirect-to-/login sendiri).
 
   return supabaseResponse;
 }

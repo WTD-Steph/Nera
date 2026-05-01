@@ -6,9 +6,10 @@ deployed ke Vercel.
 
 ## Status
 
-**PR #1 — scaffold.** Next.js 14 + Tailwind + Supabase clients + middleware
-session refresh. Belum ada auth flow, schema, atau feature page. Lihat
-[PROJECT_BRIEF.md](PROJECT_BRIEF.md) untuk arsitektur dan PR sequence.
+**PR #2a — magic link auth.** Email-only login (no password) via Supabase
+Auth. Logged-in user landing di `/`, logged-out user otomatis redirect ke
+`/login`. Household + baby profile + invite menyusul di PR #2b dan PR #3.
+Lihat [PROJECT_BRIEF.md](PROJECT_BRIEF.md) untuk arsitektur lengkap.
 
 ## Stack
 
@@ -57,6 +58,22 @@ Import repo di [vercel.com/new](https://vercel.com/new), pilih
 `WTD-Steph/Nera`, set env vars yang sama dengan `.env.local.example`,
 deploy. Branch `main` → production, branch lain → preview otomatis
 per push.
+
+## Supabase Auth — dashboard config
+
+Setelah dev project Supabase aktif (dashboard → Authentication → URL
+Configuration), set:
+
+- **Site URL**: production URL (mis. `https://nera.vercel.app` atau custom domain)
+- **Redirect URLs** (whitelist semua origin yang akan redirect setelah magic link):
+  - `http://localhost:3000/auth/callback`
+  - `https://nera.vercel.app/auth/callback` (production)
+  - `https://nera-*.vercel.app/auth/callback` (preview, wildcard)
+
+Tanpa whitelist ini, Supabase akan tolak redirect setelah verify email.
+
+Optional: Authentication → Email Templates → "Magic Link" — sesuaikan
+copy ke Bahasa Indonesia. Default sudah cukup untuk v1.
 
 ## Branching convention
 
