@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { SubmitButton } from "@/components/SubmitButton";
 import { acceptInviteAction } from "./actions";
 
 type SearchParams = { error?: string };
@@ -73,12 +75,12 @@ export default async function InvitePage({
 
             <form action={acceptInviteAction} className="mt-5 space-y-3">
               <input type="hidden" name="token" value={token} />
-              <button
-                type="submit"
+              <SubmitButton
+                pendingText="Memproses…"
                 className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-600 active:bg-rose-700"
               >
                 Terima undangan
-              </button>
+              </SubmitButton>
             </form>
 
             {error ? (
@@ -102,12 +104,12 @@ export default async function InvitePage({
               dengan email yang diundang.
             </p>
 
-            <a
+            <Link
               href="/"
               className="mt-5 block w-full rounded-xl bg-gray-100 py-3 text-center text-sm font-semibold text-gray-700 hover:bg-gray-200"
             >
               Kembali ke beranda
-            </a>
+            </Link>
           </>
         )}
       </div>

@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
+import { SubmitButton } from "@/components/SubmitButton";
 import { deleteLogAction } from "@/app/actions/logs";
 import { type LogRow } from "@/lib/compute/stats";
 import { fmtDate, fmtDuration, fmtTime, timeSince } from "@/lib/compute/format";
@@ -76,14 +79,13 @@ export default async function HistoryPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect("/login?next=/history");
 
   const baby = await getCurrentBaby();
   if (!baby) redirect("/setup");
+
+  const supabase = createClient();
 
   const activeFilter = (FILTERS.find((f) => f.id === searchParams.filter) ??
     FILTERS[0]!) as (typeof FILTERS)[number];
@@ -116,9 +118,9 @@ export default async function HistoryPage({
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl lg:max-w-3xl">
       <LogsRealtime babyId={baby.id} />
       <header className="flex items-center justify-between">
-        <a href="/" className="text-sm text-rose-600 hover:underline">
+        <Link href="/" className="text-sm text-rose-600 hover:underline">
           ← Beranda
-        </a>
+        </Link>
         <h1 className="text-base font-bold text-gray-900">Riwayat</h1>
         <span className="w-12" />
       </header>
@@ -134,7 +136,7 @@ export default async function HistoryPage({
         style={{ scrollbarWidth: "none" }}
       >
         {FILTERS.map((f) => (
-          <a
+          <Link
             key={f.id}
             href={f.id === "all" ? "/history" : `/history?filter=${f.id}`}
             className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
@@ -144,7 +146,7 @@ export default async function HistoryPage({
             }`}
           >
             {f.label}
-          </a>
+          </Link>
         ))}
       </div>
 
@@ -197,13 +199,12 @@ export default async function HistoryPage({
                               : `/history?filter=${activeFilter.id}`
                           }
                         />
-                        <button
-                          type="submit"
+                        <SubmitButton
+                          pendingText="…"
                           className="text-[11px] text-gray-400 hover:text-red-600"
-                          aria-label="Hapus log"
                         >
                           Hapus
-                        </button>
+                        </SubmitButton>
                       </form>
                     </div>
                   ))}

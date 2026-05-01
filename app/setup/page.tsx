@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
+import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentHousehold } from "@/lib/household/current";
+import { SubmitButton } from "@/components/SubmitButton";
 import { createHouseholdAction } from "./actions";
 
 type SearchParams = { error?: string };
@@ -10,10 +12,7 @@ export default async function SetupPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect("/login?next=/setup");
 
   // Sudah punya household → tidak perlu setup lagi
@@ -59,12 +58,12 @@ export default async function SetupPage({
               className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
             />
           </label>
-          <button
-            type="submit"
+          <SubmitButton
+            pendingText="Membuat keluarga…"
             className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-600 active:bg-rose-700"
           >
             Lanjut
-          </button>
+          </SubmitButton>
         </form>
 
         {error ? (
@@ -76,12 +75,12 @@ export default async function SetupPage({
 
       <p className="mt-6 text-[11px] leading-relaxed text-gray-400">
         Atau{" "}
-        <a
+        <Link
           href="/login"
           className="font-semibold text-rose-600 underline-offset-2 hover:underline"
         >
           masuk dengan email lain
-        </a>{" "}
+        </Link>{" "}
         kalau Anda dapat undangan keluarga lain.
       </p>
     </main>

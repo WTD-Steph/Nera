@@ -5,6 +5,7 @@ import {
   markImmunizationAction,
   unmarkImmunizationAction,
 } from "@/app/actions/imunisasi";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export type ImunisasiRowData = {
   vaccineKey: string;
@@ -161,12 +162,12 @@ function ImunisasiModal({
             />
           </label>
 
-          <button
-            type="submit"
+          <SubmitButton
+            pendingText={given ? "Mengupdate…" : "Menyimpan…"}
             className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
           >
             {given ? "Update" : "Simpan"}
-          </button>
+          </SubmitButton>
         </form>
 
         {given ? (
@@ -176,12 +177,12 @@ function ImunisasiModal({
           >
             <input type="hidden" name="vaccine_key" value={data.vaccineKey} />
             <input type="hidden" name="return_to" value="/imunisasi" />
-            <button
-              type="submit"
+            <SubmitButton
+              pendingText="Menghapus…"
               className="w-full rounded-xl border border-red-200 bg-white py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
             >
               Hapus catatan
-            </button>
+            </SubmitButton>
           </form>
         ) : null}
       </div>

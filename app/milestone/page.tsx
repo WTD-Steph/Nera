@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
 import { MILESTONES_LIST } from "@/lib/constants/milestones";
 import { ageInMonths } from "@/lib/constants/who-percentiles";
@@ -8,14 +10,13 @@ import { toggleMilestoneAction } from "@/app/actions/milestone";
 import { ProgressRealtime } from "@/components/ProgressRealtime";
 
 export default async function MilestonePage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect("/login?next=/milestone");
 
   const baby = await getCurrentBaby();
   if (!baby) redirect("/setup");
+
+  const supabase = createClient();
 
   const { data: progress } = await supabase
     .from("milestone_progress")
@@ -44,9 +45,9 @@ export default async function MilestonePage() {
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl lg:max-w-3xl">
       <ProgressRealtime babyId={baby.id} table="milestone_progress" />
       <header className="flex items-center justify-between">
-        <a href="/" className="text-sm text-rose-600 hover:underline">
+        <Link href="/" className="text-sm text-rose-600 hover:underline">
           ← Beranda
-        </a>
+        </Link>
         <h1 className="text-base font-bold text-gray-900">Milestone</h1>
         <span className="w-12" />
       </header>

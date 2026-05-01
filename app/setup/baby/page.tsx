@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentHousehold } from "@/lib/household/current";
 import { getCurrentBaby } from "@/lib/household/baby";
+import { SubmitButton } from "@/components/SubmitButton";
 import { createBabyAction } from "./actions";
 
 type SearchParams = { error?: string };
@@ -11,10 +12,7 @@ export default async function SetupBabyPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect("/login?next=/setup/baby");
 
   const household = await getCurrentHousehold();
@@ -122,12 +120,12 @@ export default async function SetupBabyPage({
             </label>
           </div>
 
-          <button
-            type="submit"
+          <SubmitButton
+            pendingText="Menyimpan…"
             className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-600 active:bg-rose-700"
           >
             Simpan dan masuk
-          </button>
+          </SubmitButton>
         </form>
 
         {error ? (

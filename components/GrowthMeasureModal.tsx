@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createGrowthAction } from "@/app/actions/growth";
+import { SubmitButton } from "@/components/SubmitButton";
 
 function nowDatetimeLocal(): string {
   const d = new Date();
@@ -155,12 +156,9 @@ function Modal({
             />
           </label>
 
-          <button
-            type="submit"
-            className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
-          >
+          <SubmitButton className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700">
             Simpan
-          </button>
+          </SubmitButton>
         </form>
       </div>
     </div>

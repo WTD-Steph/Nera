@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentHousehold } from "@/lib/household/current";
 import { getCurrentBaby } from "@/lib/household/baby";
 import { LogModalTrigger, type LogSubtype } from "@/components/LogModal";
 import { LogsRealtime } from "@/components/LogsRealtime";
+import { SubmitButton } from "@/components/SubmitButton";
 import { deleteLogAction } from "@/app/actions/logs";
 import {
   computeTodayStats,
@@ -94,10 +97,7 @@ export default async function HomePage({
 }: {
   searchParams: SearchParams;
 }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect("/login");
 
   const household = await getCurrentHousehold();
@@ -105,6 +105,8 @@ export default async function HomePage({
 
   const baby = await getCurrentBaby();
   if (!baby) redirect("/setup/baby");
+
+  const supabase = createClient();
 
   const since = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
   const { data: logs } = await supabase
@@ -148,12 +150,12 @@ export default async function HomePage({
             {household.household_name}
           </div>
         </div>
-        <a
+        <Link
           href="/more/profile"
           className="text-xs text-rose-600 hover:underline"
         >
           Edit
-        </a>
+        </Link>
       </header>
 
       {welcomeMsg ? (
@@ -303,66 +305,65 @@ export default async function HomePage({
                   <form action={deleteLogAction}>
                     <input type="hidden" name="id" value={l.id} />
                     <input type="hidden" name="return_to" value="/" />
-                    <button
-                      type="submit"
+                    <SubmitButton
+                      pendingText="…"
                       className="text-[11px] text-gray-400 hover:text-red-600"
-                      aria-label="Hapus log"
                     >
                       Hapus
-                    </button>
+                    </SubmitButton>
                   </form>
                 </div>
               ))}
             </div>
           )}
         </div>
-        <a
+        <Link
           href="/history"
           className="mt-2 block text-center text-xs font-semibold text-rose-600 hover:underline"
         >
           Lihat semua riwayat →
-        </a>
+        </Link>
       </section>
 
       <div className="mt-6 grid grid-cols-2 gap-2">
-        <a
+        <Link
           href="/growth"
           className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
         >
           📈 Tumbuh
-        </a>
-        <a
+        </Link>
+        <Link
           href="/milestone"
           className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
         >
           🎯 Milestone
-        </a>
-        <a
+        </Link>
+        <Link
           href="/imunisasi"
           className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
         >
           💉 Imunisasi
-        </a>
-        <a
+        </Link>
+        <Link
           href="/report"
           className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
         >
           📥 Laporan
-        </a>
-        <a
+        </Link>
+        <Link
           href="/more/household"
           className="col-span-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
         >
           👨‍👩‍👧 Keluarga
-        </a>
+        </Link>
       </div>
       <form action="/auth/signout" method="post" className="mt-2">
-        <button
-          type="submit"
+        <SubmitButton
+          pendingText="Keluar…"
           className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
         >
           Keluar
-        </button>
+        </SubmitButton>
       </form>
 
       <p className="mt-6 text-center text-[11px] text-gray-400">
