@@ -3,6 +3,43 @@
 Catatan teknis tentang flow auth Supabase di Nera. Mendukung
 [PROJECT_BRIEF.md](../PROJECT_BRIEF.md) §6 (Auth & Onboarding Flow).
 
+## ⚠️ Switch dari magic link → email + password (2026-05-01)
+
+Brief v2 awalnya pilih magic link (no password) via Supabase built-in
+SMTP. Setelah testing PR #2a–#4, dua issue muncul:
+
+1. **Rate limit Supabase built-in SMTP** — ~30 email/jam per project di Pro
+   tier. Saat testing intensif (kirim ~10 magic link untuk berbagai email
+   dalam <1 jam), quota habis. User-side: `429 over_email_send_rate_limit`.
+2. **Site URL / redirect_to brittle** — trailing space di Site URL config
+   menyebabkan `parse "...vercel.app ": invalid character " " in host name`
+   error path selama 50+ menit downtime sebelum di-diagnose.
+
+Akhirnya keputusan **switch ke email + password** untuk v1:
+- `supabase.auth.signUp({email, password})` di /signup
+- `supabase.auth.signInWithPassword({email, password})` di /login
+- Email confirmation **disabled** di Supabase Auth → Settings agar signup
+  langsung dapat session
+- Tidak ada email yang dikirim Supabase = tidak ada rate limit + tidak
+  ada Site URL/redirect_to validation issue
+- Magic link infrastructure (`/auth/callback`, PKCE token) tetap ada
+  sebagai legacy fallback untuk recovery flow future
+
+**Trade-off yang diterima:**
+- User wajib remember password (no "passwordless" UX seperti magic link)
+- Reset password flow belum diintegrasikan di v1 — kalau lupa password,
+  reset manual via Supabase dashboard atau pakai Supabase email reset
+  (butuh re-enable email confirmation)
+- Invite flow: owner copy URL invite manual (via WA/SMS) — tidak ada
+  auto-email dispatch via Supabase
+
+**Future PR follow-up (kalau email reliability worth-it):**
+- Resend SMTP integration (free tier 3000 email/bulan, no aggressive
+  hourly limit) untuk:
+  - Magic link sebagai opsi login alternatif (bukan replace)
+  - Password reset email
+  - Invite email auto-dispatch (currently manual share URL)
+
 ## Stack
 
 - Magic link only — email + cookie session, tidak ada password

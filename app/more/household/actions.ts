@@ -35,7 +35,6 @@ export async function inviteMemberAction(formData: FormData) {
   const params = new URLSearchParams({
     invited: email,
     url: result.inviteUrl,
-    sent: result.emailSent ? "1" : "0",
   });
   redirect(`/more/household?${params.toString()}`);
 }

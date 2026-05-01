@@ -2,34 +2,36 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getOrigin } from "@/lib/utils/origin";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export async function requestMagicLink(formData: FormData) {
+export async function signInAction(formData: FormData) {
   const email = String(formData.get("email") ?? "")
     .trim()
     .toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const next = String(formData.get("next") ?? "/");
 
   if (!email || !EMAIL_RE.test(email)) {
     redirect(`/login?error=${encodeURIComponent("Format email tidak valid.")}`);
   }
+  if (!password || password.length < 6) {
+    redirect(
+      `/login?error=${encodeURIComponent("Password minimal 6 karakter.")}`,
+    );
+  }
 
   const supabase = createClient();
-  const origin = getOrigin();
-
-  const { error } = await supabase.auth.signInWithOtp({
+  const { error } = await supabase.auth.signInWithPassword({
     email,
-    options: {
-      emailRedirectTo: `${origin}/auth/callback`,
-    },
+    password,
   });
 
   if (error) {
     redirect(
-      `/login?error=${encodeURIComponent("Gagal mengirim magic link. Coba lagi sebentar.")}`,
+      `/login?error=${encodeURIComponent("Email atau password salah.")}`,
     );
   }
 
-  redirect(`/verify?email=${encodeURIComponent(email)}`);
+  redirect(next);
 }
