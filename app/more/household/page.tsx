@@ -48,7 +48,7 @@ export default async function HouseholdPage({
   const inviteUrl = searchParams.url;
 
   return (
-    <main className="mx-auto min-h-dvh max-w-md px-4 py-6">
+    <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl">
       <header className="mb-4 flex items-center gap-3">
         <a
           href="/"

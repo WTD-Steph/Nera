@@ -113,7 +113,7 @@ export default async function HistoryPage({
   }
 
   return (
-    <main className="mx-auto min-h-dvh max-w-md px-4 py-6">
+    <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl lg:max-w-3xl">
       <LogsRealtime babyId={baby.id} />
       <header className="flex items-center justify-between">
         <a href="/" className="text-sm text-rose-600 hover:underline">

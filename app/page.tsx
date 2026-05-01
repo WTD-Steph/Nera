@@ -134,7 +134,7 @@ export default async function HomePage({
   const logerror = searchParams.logerror;
 
   return (
-    <main className="mx-auto min-h-dvh max-w-md px-4 py-6">
+    <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl lg:max-w-3xl">
       <LogsRealtime babyId={baby.id} />
       <header className="flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-rose-300 to-pink-400 text-2xl shadow-sm">

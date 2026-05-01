@@ -23,7 +23,7 @@ export default async function ProfilePage({
   const saved = searchParams.saved === "1";
 
   return (
-    <main className="mx-auto min-h-dvh max-w-md px-4 py-6">
+    <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl">
       <header className="mb-4">
         <a href="/" className="text-sm text-rose-600 hover:underline">
           ← Kembali
