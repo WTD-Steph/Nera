@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBaby } from "@/lib/household/baby";
 import { deleteLogAction } from "@/app/actions/logs";
+import { LogsRealtime } from "@/components/LogsRealtime";
 import { type LogRow } from "@/lib/compute/stats";
 import { fmtDate, fmtDuration, fmtTime, timeSince } from "@/lib/compute/format";
 
@@ -96,6 +97,7 @@ export default async function HistoryPage({
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6">
+      <LogsRealtime babyId={baby.id} />
       <header className="flex items-center justify-between">
         <a href="/" className="text-sm text-rose-600 hover:underline">
           ← Beranda

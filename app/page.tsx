@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentHousehold } from "@/lib/household/current";
 import { getCurrentBaby } from "@/lib/household/baby";
 import { LogModalTrigger, type LogSubtype } from "@/components/LogModal";
+import { LogsRealtime } from "@/components/LogsRealtime";
 import { deleteLogAction } from "@/app/actions/logs";
 import {
   computeTodayStats,
@@ -128,6 +129,7 @@ export default async function HomePage({
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6">
+      <LogsRealtime babyId={baby.id} />
       <header className="flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-rose-300 to-pink-400 text-2xl shadow-sm">
           <span aria-hidden>👶</span>
