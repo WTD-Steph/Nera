@@ -20,22 +20,27 @@ export async function getCurrentHousehold(): Promise<CurrentHousehold | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data, error } = await supabase
+  const { data: member, error: memberError } = await supabase
     .from("household_members")
-    .select("household_id, role, households(name)")
+    .select("household_id, role")
     .eq("user_id", user.id)
     .order("joined_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (memberError || !member) return null;
 
-  // Supabase typed-relation: households join return typed object
-  const householdName = (data.households as { name: string } | null)?.name ?? "";
+  const { data: household, error: householdError } = await supabase
+    .from("households")
+    .select("name")
+    .eq("id", member.household_id)
+    .maybeSingle();
+
+  if (householdError || !household) return null;
 
   return {
-    household_id: data.household_id,
-    role: data.role as "owner" | "member",
-    household_name: householdName,
+    household_id: member.household_id,
+    role: member.role as "owner" | "member",
+    household_name: household.name,
   };
 }

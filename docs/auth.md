@@ -105,6 +105,35 @@ Sudah dibuat note di [README](../README.md), tapi rekap untuk reference:
 
 Tanpa whitelist → error "Redirect URL not allowed" pasca-klik magic link.
 
+## ⚠️ Pitfall: `SET LOCAL ROLE` di Supabase MCP `execute_sql` bisa crash PostgREST
+
+Saat e2e test PR #2b, saya pakai `BEGIN; SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claims = '...'; ... ROLLBACK;` di
+`mcp__supabase__execute_sql` untuk simulasi RLS sebagai user. Query
+return `Connection terminated unexpectedly`.
+
+Setelah itu, **PostgREST instance jadi rusak** — semua REST API call
+(termasuk dari Next.js app via @supabase/ssr) return `503 PGRST001 no
+connection to the server`. Postgres direct (via MCP execute_sql) tetap
+healthy, tapi REST layer tidak bisa pulih sampai trigger ulang.
+
+**Recovery:**
+1. `NOTIFY pgrst, 'reload schema'` + `NOTIFY pgrst, 'reload config'`
+2. Kalau masih stuck: `pg_terminate_backend(pid)` semua koneksi
+   PostgREST → triggers reconnect with fresh state. Setelah itu butuh
+   ~1–3 menit untuk schema cache rebuilt
+3. PGRST002 muncul saat schema cache lagi loading — itu tahap recovery
+   normal, lanjut ke 200/401
+
+**Don't:**
+- `SET LOCAL ROLE authenticated` di execute_sql untuk simulate user — gunakan
+  pendekatan lain (test user real signed-in via Playwright + auth flow)
+- Modifikasi role grants saat connection pool aktif
+
+**Do:**
+- Test RLS via real session: login user di browser, query via app, observe
+- Atau buat dedicated test user dengan service_role di staging env
+
 ## E2E test reference
 
 Test plan PR #2a (semua pass via Playwright MCP + Supabase MCP, lihat
