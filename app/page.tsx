@@ -344,8 +344,14 @@ export default async function HomePage({
           💉 Imunisasi
         </a>
         <a
-          href="/more/household"
+          href="/report"
           className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+        >
+          📥 Laporan
+        </a>
+        <a
+          href="/more/household"
+          className="col-span-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
         >
           👨‍👩‍👧 Keluarga
         </a>
