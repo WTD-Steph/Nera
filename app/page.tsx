@@ -2,8 +2,21 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHousehold } from "@/lib/household/current";
 import { getCurrentBaby } from "@/lib/household/baby";
+import { LogModalTrigger, type LogSubtype } from "@/components/LogModal";
+import { deleteLogAction } from "@/app/actions/logs";
+import {
+  computeTodayStats,
+  computeLastByType,
+  type LogRow,
+} from "@/lib/compute/stats";
+import { fmtDuration, fmtTime, timeSince } from "@/lib/compute/format";
 
-type SearchParams = { welcome?: string };
+type SearchParams = {
+  welcome?: string;
+  logsaved?: string;
+  logdeleted?: string;
+  logerror?: string;
+};
 
 function formatAge(dob: string): string {
   const days = Math.floor((Date.now() - new Date(dob).getTime()) / 86400000);
@@ -18,6 +31,55 @@ function formatAge(dob: string): string {
   const months = days / 30.44;
   if (months < 12) return `${months.toFixed(1)} bulan`;
   return `${(months / 12).toFixed(1)} tahun`;
+}
+
+const QUICK_PRIMARY: { subtype: LogSubtype; label: string; emoji: string }[] = [
+  { subtype: "sufor", label: "Sufor", emoji: "🍼" },
+  { subtype: "dbf", label: "DBF", emoji: "🤱" },
+  { subtype: "pumping", label: "Pumping", emoji: "💧" },
+  { subtype: "pipis", label: "Pipis", emoji: "💛" },
+  { subtype: "poop", label: "Poop", emoji: "💩" },
+  { subtype: "sleep", label: "Tidur", emoji: "🌙" },
+];
+const QUICK_SECONDARY: { subtype: LogSubtype; label: string; emoji: string }[] = [
+  { subtype: "bath", label: "Mandi", emoji: "🛁" },
+  { subtype: "temp", label: "Suhu", emoji: "🌡️" },
+  { subtype: "med", label: "Obat", emoji: "💊" },
+];
+
+const SUBTYPE_LABEL: Record<string, string> = {
+  sufor: "Sufor",
+  dbf: "DBF",
+  pumping: "Pumping",
+  pipis: "Pipis",
+  poop: "Poop",
+  sleep: "Tidur",
+  bath: "Mandi",
+  temp: "Suhu",
+  med: "Obat",
+};
+
+function logDetail(l: LogRow): string {
+  if (l.subtype === "sufor") return `${l.amount_ml} ml`;
+  if (l.subtype === "dbf")
+    return `L ${l.duration_l_min ?? 0}m / R ${l.duration_r_min ?? 0}m`;
+  if (l.subtype === "pumping")
+    return `L ${l.amount_l_ml ?? 0} / R ${l.amount_r_ml ?? 0} ml`;
+  if (l.subtype === "sleep") {
+    if (!l.end_timestamp) return "sedang tidur";
+    const dur = Math.round(
+      (new Date(l.end_timestamp).getTime() -
+        new Date(l.timestamp).getTime()) /
+        60000,
+    );
+    return fmtDuration(dur);
+  }
+  if (l.subtype === "poop")
+    return [l.poop_color, l.poop_consistency].filter(Boolean).join(" • ");
+  if (l.subtype === "temp") return `${l.temp_celsius}°C`;
+  if (l.subtype === "med")
+    return [l.med_name, l.med_dose].filter(Boolean).join(" ");
+  return "";
 }
 
 export default async function HomePage({
@@ -37,78 +99,271 @@ export default async function HomePage({
   const baby = await getCurrentBaby();
   if (!baby) redirect("/setup/baby");
 
+  const since = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
+  const { data: logs } = await supabase
+    .from("logs")
+    .select(
+      "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, poop_color, poop_consistency, temp_celsius, med_name, med_dose, notes",
+    )
+    .eq("baby_id", baby.id)
+    .gte("timestamp", since)
+    .order("timestamp", { ascending: false });
+
+  const logsArray: LogRow[] = (logs ?? []) as LogRow[];
+  const stats = computeTodayStats(logsArray);
+  const last = computeLastByType(logsArray);
+  const recent = logsArray.slice(0, 6);
+
   const welcome = searchParams.welcome;
   const welcomeMsg =
     welcome === "baby"
-      ? `Profil ${baby.name} tersimpan. Quick log + chart pertumbuhan menyusul di PR #4–#5.`
+      ? `Profil ${baby.name} tersimpan.`
       : welcome === "joined"
         ? `Selamat datang ke keluarga ${household.household_name}!`
         : null;
 
+  const logsaved = searchParams.logsaved;
+  const logdeleted = searchParams.logdeleted;
+  const logerror = searchParams.logerror;
+
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-6 py-16 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-rose-300 to-pink-400 text-3xl shadow-md">
-        <span aria-hidden>👶</span>
-      </div>
-      <h1 className="mt-6 text-2xl font-bold text-gray-900">{baby.name}</h1>
-      <p className="mt-1 text-sm text-gray-600">
-        {formatAge(baby.dob)} ·{" "}
-        {baby.gender === "female" ? "Perempuan" : "Laki-laki"}
-      </p>
-      <p className="mt-1 text-xs text-gray-500">
-        {household.household_name} · Anda{" "}
-        {household.role === "owner" ? "Owner" : "Member"} ({user.email})
-      </p>
+    <main className="mx-auto min-h-dvh max-w-md px-4 py-6">
+      <header className="flex items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-rose-300 to-pink-400 text-2xl shadow-sm">
+          <span aria-hidden>👶</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-lg font-bold text-gray-900">{baby.name}</div>
+          <div className="text-xs text-gray-500">
+            {formatAge(baby.dob)} ·{" "}
+            {baby.gender === "female" ? "Perempuan" : "Laki-laki"} ·{" "}
+            {household.household_name}
+          </div>
+        </div>
+        <a
+          href="/more/profile"
+          className="text-xs text-rose-600 hover:underline"
+        >
+          Edit
+        </a>
+      </header>
 
       {welcomeMsg ? (
-        <div className="mt-4 w-full rounded-2xl border border-rose-100 bg-rose-50 p-3 text-sm text-rose-800">
+        <div className="mt-3 rounded-2xl border border-rose-100 bg-rose-50 p-3 text-sm text-rose-800">
           {welcomeMsg}
         </div>
       ) : null}
+      {logsaved ? (
+        <div className="mt-3 rounded-2xl border border-green-100 bg-green-50 p-3 text-xs text-green-800">
+          {SUBTYPE_LABEL[logsaved] ?? "Log"} tersimpan.
+        </div>
+      ) : null}
+      {logdeleted ? (
+        <div className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+          Log dihapus.
+        </div>
+      ) : null}
+      {logerror ? (
+        <div className="mt-3 rounded-2xl border border-red-100 bg-red-50 p-3 text-xs text-red-700">
+          {logerror}
+        </div>
+      ) : null}
 
-      <div className="mt-6 w-full rounded-2xl border border-gray-100 bg-white p-5 text-left shadow-sm">
-        <h2 className="text-sm font-bold text-gray-800">
-          Logging belum aktif
+      <section className="mt-5">
+        <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
+          Catat Cepat
         </h2>
-        <p className="mt-1 text-xs leading-relaxed text-gray-600">
-          Profil bayi sudah tersimpan (PR #3). Quick log harian (sufor, DBF,
-          pumping, popok, tidur, dll), chart pertumbuhan WHO, dan analisis AI
-          menyusul di PR #4 onwards.
-        </p>
-      </div>
+        <div className="grid grid-cols-3 gap-2">
+          {QUICK_PRIMARY.map((q) => (
+            <LogModalTrigger
+              key={q.subtype}
+              subtype={q.subtype}
+              className="flex flex-col items-center gap-1.5 rounded-2xl border border-white bg-rose-50 p-3 shadow-sm transition-transform active:scale-95"
+            >
+              <span className="text-2xl" aria-hidden>
+                {q.emoji}
+              </span>
+              <span className="text-xs font-semibold text-rose-700">
+                {q.label}
+              </span>
+            </LogModalTrigger>
+          ))}
+        </div>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          {QUICK_SECONDARY.map((q) => (
+            <LogModalTrigger
+              key={q.subtype}
+              subtype={q.subtype}
+              className="flex items-center justify-center gap-1.5 rounded-2xl border border-gray-100 bg-white px-2 py-2 shadow-sm transition-transform active:scale-95"
+            >
+              <span aria-hidden>{q.emoji}</span>
+              <span className="text-xs font-medium text-gray-700">
+                {q.label}
+              </span>
+            </LogModalTrigger>
+          ))}
+        </div>
+      </section>
 
-      <div className="mt-4 grid w-full grid-cols-2 gap-2">
+      <section className="mt-5">
+        <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
+          Sejak Terakhir
+        </h2>
+        <div className="grid grid-cols-2 gap-2">
+          <SinceCard label="Susu" log={last.milk} />
+          <SinceCard label="Pipis" log={last.pipis} />
+          <SinceCard label="Poop" log={last.poop} />
+          <SinceCard label="Tidur" log={last.sleep} />
+        </div>
+      </section>
+
+      <section className="mt-5">
+        <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
+          Total Hari Ini
+        </h2>
+        <div className="space-y-2 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <StatRow
+            label="Sufor"
+            value={`${stats.suforML} ml`}
+            sub={stats.suforCount > 0 ? `${stats.suforCount}×` : undefined}
+          />
+          <StatRow
+            label="DBF"
+            value={`${stats.dbfMin} mnt`}
+            sub={stats.dbfCount > 0 ? `${stats.dbfCount}×` : undefined}
+          />
+          {stats.pumpML > 0 ? (
+            <StatRow
+              label="Pumping"
+              value={`${stats.pumpML} ml`}
+              sub={`${stats.pumpCount}×`}
+            />
+          ) : null}
+          <StatRow
+            label="Tidur"
+            value={fmtDuration(stats.sleepMin)}
+            sub={stats.sleepCount > 0 ? `${stats.sleepCount} sesi` : undefined}
+          />
+          <StatRow label="Pipis" value={`${stats.pipisCount}×`} />
+          <StatRow label="Poop" value={`${stats.poopCount}×`} />
+        </div>
+      </section>
+
+      <section className="mt-5">
+        <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
+          Aktivitas Terbaru
+        </h2>
+        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+          {recent.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-gray-400">
+              Belum ada catatan. Tap tombol di atas untuk mulai.
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {recent.map((l) => (
+                <div
+                  key={l.id}
+                  className="flex items-center gap-3 px-4 py-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-semibold text-gray-800">
+                        {SUBTYPE_LABEL[l.subtype] ?? l.subtype}
+                      </span>
+                      {logDetail(l) ? (
+                        <span className="truncate text-xs text-gray-500">
+                          • {logDetail(l)}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="text-[11px] text-gray-400">
+                      {fmtTime(l.timestamp)} · {timeSince(l.timestamp)}
+                    </div>
+                  </div>
+                  <form action={deleteLogAction}>
+                    <input type="hidden" name="id" value={l.id} />
+                    <input type="hidden" name="return_to" value="/" />
+                    <button
+                      type="submit"
+                      className="text-[11px] text-gray-400 hover:text-red-600"
+                      aria-label="Hapus log"
+                    >
+                      Hapus
+                    </button>
+                  </form>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <a
-          href="/more/profile"
-          className="rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-600"
+          href="/history"
+          className="mt-2 block text-center text-xs font-semibold text-rose-600 hover:underline"
         >
-          Edit profil bayi
+          Lihat semua riwayat →
         </a>
+      </section>
+
+      <div className="mt-6 flex gap-2">
         <a
           href="/more/household"
-          className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
         >
           Atur keluarga
         </a>
+        <form action="/auth/signout" method="post" className="flex-1">
+          <button
+            type="submit"
+            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Keluar
+          </button>
+        </form>
       </div>
 
-      <form action="/auth/signout" method="post" className="mt-3">
-        <button
-          type="submit"
-          className="text-xs font-semibold text-gray-500 underline-offset-2 hover:text-rose-600 hover:underline"
-        >
-          Keluar
-        </button>
-      </form>
-
-      <a
-        href="https://github.com/WTD-Steph/Nera/blob/main/PROJECT_BRIEF.md"
-        className="mt-6 text-[11px] text-gray-400 underline-offset-2 hover:underline"
-        target="_blank"
-        rel="noreferrer"
-      >
-        PROJECT_BRIEF.md
-      </a>
+      <p className="mt-6 text-center text-[11px] text-gray-400">
+        {user.email} · {household.role === "owner" ? "Owner" : "Member"}
+      </p>
     </main>
+  );
+}
+
+function SinceCard({
+  label,
+  log,
+}: {
+  label: string;
+  log: LogRow | null;
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+      <div className="text-xs text-gray-500">{label}</div>
+      <div className="mt-0.5 text-base font-bold text-gray-800">
+        {log ? timeSince(log.timestamp) : "—"}
+      </div>
+      {log ? (
+        <div className="text-[11px] text-gray-400">{fmtTime(log.timestamp)}</div>
+      ) : null}
+    </div>
+  );
+}
+
+function StatRow({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex-1 text-sm text-gray-600">{label}</span>
+      <span className="text-sm font-bold text-gray-800">{value}</span>
+      {sub ? (
+        <span className="w-16 text-right text-xs text-gray-400">{sub}</span>
+      ) : null}
+    </div>
   );
 }

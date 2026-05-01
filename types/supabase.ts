@@ -158,6 +158,80 @@ export type Database = {
         };
         Relationships: [];
       };
+      logs: {
+        Row: {
+          amount_l_ml: number | null;
+          amount_ml: number | null;
+          amount_r_ml: number | null;
+          baby_id: string;
+          created_at: string;
+          created_by: string | null;
+          duration_l_min: number | null;
+          duration_r_min: number | null;
+          end_timestamp: string | null;
+          id: string;
+          med_dose: string | null;
+          med_name: string | null;
+          notes: string | null;
+          poop_color: string | null;
+          poop_consistency: string | null;
+          subtype: string;
+          temp_celsius: number | null;
+          timestamp: string;
+          updated_at: string;
+        };
+        Insert: {
+          amount_l_ml?: number | null;
+          amount_ml?: number | null;
+          amount_r_ml?: number | null;
+          baby_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          duration_l_min?: number | null;
+          duration_r_min?: number | null;
+          end_timestamp?: string | null;
+          id?: string;
+          med_dose?: string | null;
+          med_name?: string | null;
+          notes?: string | null;
+          poop_color?: string | null;
+          poop_consistency?: string | null;
+          subtype: string;
+          temp_celsius?: number | null;
+          timestamp: string;
+          updated_at?: string;
+        };
+        Update: {
+          amount_l_ml?: number | null;
+          amount_ml?: number | null;
+          amount_r_ml?: number | null;
+          baby_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          duration_l_min?: number | null;
+          duration_r_min?: number | null;
+          end_timestamp?: string | null;
+          id?: string;
+          med_dose?: string | null;
+          med_name?: string | null;
+          notes?: string | null;
+          poop_color?: string | null;
+          poop_consistency?: string | null;
+          subtype?: string;
+          temp_celsius?: number | null;
+          timestamp?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "logs_baby_id_fkey";
+            columns: ["baby_id"];
+            isOneToOne: false;
+            referencedRelation: "babies";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
