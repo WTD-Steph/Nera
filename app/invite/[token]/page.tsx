@@ -20,7 +20,10 @@ export default async function InvitePage({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect(`/login?next=${encodeURIComponent(`/invite/${token}`)}`);
+    // Tidak login — arahkan ke signup. Kita tidak bisa lookup invitation.invited_email
+    // di sini (RLS blokir untuk anonymous), jadi user harus daftar email yang
+    // sama dengan yang diundang manual.
+    redirect(`/signup?next=${encodeURIComponent(`/invite/${token}`)}`);
   }
 
   // Lookup invitation. RLS allows kalau invited_email = auth.email.

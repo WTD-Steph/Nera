@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
-const PUBLIC_AUTH_PATHS = new Set(["/login", "/verify"]);
+const PUBLIC_AUTH_PATHS = new Set(["/login", "/signup"]);
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -36,7 +36,7 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Logged-in user mengakses /login atau /verify → redirect ke /
+  // Logged-in user mengakses /login atau /signup → redirect ke /
   if (user && PUBLIC_AUTH_PATHS.has(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/";

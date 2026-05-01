@@ -6,10 +6,11 @@ deployed ke Vercel.
 
 ## Status
 
-**PR #2a — magic link auth.** Email-only login (no password) via Supabase
-Auth. Logged-in user landing di `/`, logged-out user otomatis redirect ke
-`/login`. Household + baby profile + invite menyusul di PR #2b dan PR #3.
-Lihat [PROJECT_BRIEF.md](PROJECT_BRIEF.md) untuk arsitektur lengkap.
+**Production live di [nera-jeanne.vercel.app](https://nera-jeanne.vercel.app).**
+
+PR #1–#4 brief sudah merged: scaffold + auth + household + baby profile + logs.
+Auth pakai **email + password** (magic link diganti karena rate-limit
+issue di Supabase built-in SMTP — lihat [docs/auth.md](docs/auth.md) §Switch dari magic link).
 
 ## Stack
 
@@ -61,19 +62,14 @@ per push.
 
 ## Supabase Auth — dashboard config
 
-Setelah dev project Supabase aktif (dashboard → Authentication → URL
-Configuration), set:
+**Authentication → Sign In / Up Settings:**
+- "Enable email signup" — ON (signup pakai email + password)
+- "Confirm email" — **DISABLE** (signup langsung dapat session, no email round-trip)
 
-- **Site URL**: production URL (mis. `https://nera.vercel.app` atau custom domain)
-- **Redirect URLs** (whitelist semua origin yang akan redirect setelah magic link):
-  - `http://localhost:3000/auth/callback`
-  - `https://nera.vercel.app/auth/callback` (production)
-  - `https://nera-*.vercel.app/auth/callback` (preview, wildcard)
+**URL Configuration** (legacy magic-link callback compat saja, tidak kritis):
+- Site URL: `https://nera-jeanne.vercel.app` (jangan ada trailing space)
+- Redirect URLs: tidak strict-required karena auth flow tidak pakai email link lagi
 
-Tanpa whitelist ini, Supabase akan tolak redirect setelah verify email.
-
-Optional: Authentication → Email Templates → "Magic Link" — sesuaikan
-copy ke Bahasa Indonesia. Default sudah cukup untuk v1.
 
 ## Branching convention
 

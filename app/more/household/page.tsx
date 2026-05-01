@@ -12,7 +12,6 @@ type SearchParams = {
   error?: string;
   invited?: string;
   url?: string;
-  sent?: string;
 };
 
 export default async function HouseholdPage({
@@ -47,7 +46,6 @@ export default async function HouseholdPage({
   const error = searchParams.error;
   const invitedEmail = searchParams.invited;
   const inviteUrl = searchParams.url;
-  const emailSent = searchParams.sent === "1";
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6">
@@ -75,12 +73,11 @@ export default async function HouseholdPage({
       {invitedEmail && inviteUrl ? (
         <div className="mt-4 rounded-2xl border border-green-100 bg-green-50 p-4">
           <p className="text-sm font-semibold text-green-800">
-            Undangan dikirim ke {invitedEmail}
+            Undangan dibuat untuk {invitedEmail}
           </p>
           <p className="mt-1 text-xs text-green-700">
-            {emailSent
-              ? "Magic link sudah dikirim ke email mereka. Sebagai backup, share link berikut juga via WhatsApp / pesan lain:"
-              : "Email gagal dikirim (rate limit?). Share link ini secara manual:"}
+            Share link berikut via WhatsApp / pesan lain. Mereka daftar dengan
+            email yang sama untuk terima:
           </p>
           <code className="mt-2 block break-all rounded-lg bg-white px-2 py-1.5 text-[11px] text-gray-800">
             {inviteUrl}

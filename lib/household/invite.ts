@@ -8,7 +8,7 @@ const INVITE_TTL_DAYS = 7;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type InviteResult =
-  | { ok: true; inviteUrl: string; emailSent: boolean }
+  | { ok: true; inviteUrl: string }
   | { ok: false; error: string };
 
 export async function createInvitation(
@@ -29,8 +29,7 @@ export async function createInvitation(
     return { ok: false, error: "Sesi habis. Silakan masuk lagi." };
   }
 
-  // RLS verify owner-of-household enforced di INSERT policy.
-  // Token: 122-bit UUID, cukup untuk anti-guessing.
+  // Token: 122-bit UUID hex, anti-guessing. Dipakai sebagai path /invite/{token}.
   const token = randomUUID().replace(/-/g, "");
   const expiresAt = new Date(
     Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000,
@@ -58,20 +57,10 @@ export async function createInvitation(
   }
 
   const origin = getOrigin();
-  const inviteUrl = `${origin}/invite/${token}`;
-
-  // Kirim magic link ke email tersebut. emailRedirectTo akan bawa user
-  // melalui /auth/callback → /invite/[token] sebagai logged-in.
-  const { error: otpError } = await supabase.auth.signInWithOtp({
-    email: cleanedEmail,
-    options: {
-      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(
-        `/invite/${token}`,
-      )}`,
-    },
-  });
-
-  // Kalau OTP gagal kirim (rate limit dll), invitation tetap valid —
-  // owner bisa share inviteUrl manual via WhatsApp/etc.
-  return { ok: true, inviteUrl, emailSent: !otpError };
+  // Owner share URL ini manual via WhatsApp / SMS / pesan lain.
+  // Email otomatis dihilangkan di v1 untuk hindari magic-link rate limit.
+  return {
+    ok: true,
+    inviteUrl: `${origin}/invite/${token}`,
+  };
 }
