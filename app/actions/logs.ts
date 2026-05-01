@@ -6,11 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentBaby } from "@/lib/household/baby";
 
 const SUBTYPES = [
-  "sufor",
-  "dbf",
+  "feeding",
   "pumping",
-  "pipis",
-  "poop",
+  "diaper",
   "sleep",
   "bath",
   "temp",
@@ -32,6 +30,10 @@ function num(formData: FormData, key: string): number | null {
 function str(formData: FormData, key: string): string | null {
   const raw = String(formData.get(key) ?? "").trim();
   return raw === "" ? null : raw;
+}
+
+function bool(formData: FormData, key: string): boolean {
+  return String(formData.get(key) ?? "") === "1";
 }
 
 function isoOrNull(formData: FormData, key: string): string | null {
@@ -65,7 +67,6 @@ export async function createLogAction(formData: FormData) {
   const timestamp =
     isoOrNull(formData, "timestamp") ?? new Date().toISOString();
 
-  // Build payload with only fields relevant to subtype.
   const payload: Record<string, unknown> = {
     baby_id: baby.id,
     subtype,
@@ -74,24 +75,27 @@ export async function createLogAction(formData: FormData) {
     notes: str(formData, "notes"),
   };
 
-  if (subtype === "sufor") {
-    const amount = num(formData, "amount_ml");
-    if (amount === null || amount <= 0) {
-      redirect(
-        `${returnTo}?logerror=${encodeURIComponent("Jumlah sufor harus diisi.")}`,
-      );
+  if (subtype === "feeding") {
+    const mode = String(formData.get("feeding_mode") ?? "sufor");
+    if (mode === "sufor") {
+      const amount = num(formData, "amount_ml");
+      if (amount === null || amount <= 0) {
+        redirect(
+          `${returnTo}?logerror=${encodeURIComponent("Jumlah susu harus diisi.")}`,
+        );
+      }
+      payload.amount_ml = amount;
+    } else {
+      const l = num(formData, "duration_l_min");
+      const r = num(formData, "duration_r_min");
+      if ((l === null || l <= 0) && (r === null || r <= 0)) {
+        redirect(
+          `${returnTo}?logerror=${encodeURIComponent("Isi durasi DBF kiri atau kanan.")}`,
+        );
+      }
+      payload.duration_l_min = l;
+      payload.duration_r_min = r;
     }
-    payload.amount_ml = amount;
-  } else if (subtype === "dbf") {
-    const l = num(formData, "duration_l_min");
-    const r = num(formData, "duration_r_min");
-    if ((l === null || l <= 0) && (r === null || r <= 0)) {
-      redirect(
-        `${returnTo}?logerror=${encodeURIComponent("Isi durasi DBF kiri atau kanan.")}`,
-      );
-    }
-    payload.duration_l_min = l;
-    payload.duration_r_min = r;
   } else if (subtype === "pumping") {
     const l = num(formData, "amount_l_ml");
     const r = num(formData, "amount_r_ml");
@@ -102,9 +106,20 @@ export async function createLogAction(formData: FormData) {
     }
     payload.amount_l_ml = l;
     payload.amount_r_ml = r;
-  } else if (subtype === "poop") {
-    payload.poop_color = str(formData, "poop_color");
-    payload.poop_consistency = str(formData, "poop_consistency");
+  } else if (subtype === "diaper") {
+    const hasPee = bool(formData, "has_pee");
+    const hasPoop = bool(formData, "has_poop");
+    if (!hasPee && !hasPoop) {
+      redirect(
+        `${returnTo}?logerror=${encodeURIComponent("Pilih minimal pipis atau BAB.")}`,
+      );
+    }
+    payload.has_pee = hasPee;
+    payload.has_poop = hasPoop;
+    if (hasPoop) {
+      payload.poop_color = str(formData, "poop_color");
+      payload.poop_consistency = str(formData, "poop_consistency");
+    }
   } else if (subtype === "sleep") {
     payload.end_timestamp = isoOrNull(formData, "end_timestamp");
   } else if (subtype === "temp") {
@@ -125,7 +140,7 @@ export async function createLogAction(formData: FormData) {
     payload.med_name = name;
     payload.med_dose = str(formData, "med_dose");
   }
-  // pipis, bath: no extra fields
+  // bath: no extra fields
 
   const { error } = await supabase.from("logs").insert(payload as never);
 

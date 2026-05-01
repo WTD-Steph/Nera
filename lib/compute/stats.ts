@@ -10,6 +10,8 @@ export type LogRow = {
   amount_r_ml: number | null;
   duration_l_min: number | null;
   duration_r_min: number | null;
+  has_pee: boolean | null;
+  has_poop: boolean | null;
   poop_color: string | null;
   poop_consistency: string | null;
   temp_celsius: number | null;
@@ -19,14 +21,22 @@ export type LogRow = {
 };
 
 export type TodayStats = {
-  suforML: number;
-  suforCount: number;
-  dbfMin: number;
+  /** Total ml dari feeding entries (sufor portion). DBF tidak masuk sini. */
+  feedingMlTotal: number;
+  /** Jumlah feeding entry yang punya amount_ml (sufor). */
+  feedingMlCount: number;
+  /** Total menit DBF. */
+  dbfMinTotal: number;
+  /** Jumlah feeding entry yang punya durasi DBF. */
   dbfCount: number;
+  /** Pumping ml total + count. */
   pumpML: number;
   pumpCount: number;
-  pipisCount: number;
-  poopCount: number;
+  /** Diaper changes — total + breakdown. */
+  diaperCount: number;
+  diaperPeeCount: number;
+  diaperPoopCount: number;
+  /** Tidur durasi total (menit dari sleep entries dengan end_timestamp). */
   sleepMin: number;
   sleepCount: number;
 };
@@ -41,31 +51,37 @@ export function computeTodayStats(logs: LogRow[]): TodayStats {
   const start = todayStartMs();
   const today = logs.filter((l) => new Date(l.timestamp).getTime() >= start);
   const s: TodayStats = {
-    suforML: 0,
-    suforCount: 0,
-    dbfMin: 0,
+    feedingMlTotal: 0,
+    feedingMlCount: 0,
+    dbfMinTotal: 0,
     dbfCount: 0,
     pumpML: 0,
     pumpCount: 0,
-    pipisCount: 0,
-    poopCount: 0,
+    diaperCount: 0,
+    diaperPeeCount: 0,
+    diaperPoopCount: 0,
     sleepMin: 0,
     sleepCount: 0,
   };
   for (const l of today) {
-    if (l.subtype === "sufor") {
-      s.suforML += l.amount_ml ?? 0;
-      s.suforCount += 1;
-    } else if (l.subtype === "dbf") {
-      s.dbfMin += (l.duration_l_min ?? 0) + (l.duration_r_min ?? 0);
-      s.dbfCount += 1;
+    if (l.subtype === "feeding") {
+      if (l.amount_ml != null) {
+        s.feedingMlTotal += l.amount_ml;
+        s.feedingMlCount += 1;
+      }
+      const lMin = l.duration_l_min ?? 0;
+      const rMin = l.duration_r_min ?? 0;
+      if (lMin > 0 || rMin > 0) {
+        s.dbfMinTotal += lMin + rMin;
+        s.dbfCount += 1;
+      }
     } else if (l.subtype === "pumping") {
       s.pumpML += (l.amount_l_ml ?? 0) + (l.amount_r_ml ?? 0);
       s.pumpCount += 1;
-    } else if (l.subtype === "pipis") {
-      s.pipisCount += 1;
-    } else if (l.subtype === "poop") {
-      s.poopCount += 1;
+    } else if (l.subtype === "diaper") {
+      s.diaperCount += 1;
+      if (l.has_pee) s.diaperPeeCount += 1;
+      if (l.has_poop) s.diaperPoopCount += 1;
     } else if (l.subtype === "sleep") {
       if (l.end_timestamp) {
         s.sleepMin +=
@@ -76,30 +92,26 @@ export function computeTodayStats(logs: LogRow[]): TodayStats {
       s.sleepCount += 1;
     }
   }
-  s.suforML = Math.round(s.suforML);
-  s.dbfMin = Math.round(s.dbfMin);
+  s.feedingMlTotal = Math.round(s.feedingMlTotal);
+  s.dbfMinTotal = Math.round(s.dbfMinTotal);
   s.pumpML = Math.round(s.pumpML);
   s.sleepMin = Math.round(s.sleepMin);
   return s;
 }
 
 export type LastByType = {
-  milk: LogRow | null;
-  pipis: LogRow | null;
-  poop: LogRow | null;
+  feeding: LogRow | null;
+  diaper: LogRow | null;
   sleep: LogRow | null;
 };
 
 export function computeLastByType(logs: LogRow[]): LastByType {
-  // logs sudah di-sort DESC dari query — kita reuse asumsi itu, tapi tetap
-  // safe-find dengan iterasi.
   const sorted = [...logs].sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
   );
   return {
-    milk: sorted.find((l) => l.subtype === "sufor" || l.subtype === "dbf") ?? null,
-    pipis: sorted.find((l) => l.subtype === "pipis") ?? null,
-    poop: sorted.find((l) => l.subtype === "poop") ?? null,
+    feeding: sorted.find((l) => l.subtype === "feeding") ?? null,
+    diaper: sorted.find((l) => l.subtype === "diaper") ?? null,
     sleep: sorted.find((l) => l.subtype === "sleep") ?? null,
   };
 }

@@ -4,22 +4,18 @@ import { useEffect, useState } from "react";
 import { createLogAction } from "@/app/actions/logs";
 
 export type LogSubtype =
-  | "sufor"
-  | "dbf"
+  | "feeding"
   | "pumping"
-  | "pipis"
-  | "poop"
+  | "diaper"
   | "sleep"
   | "bath"
   | "temp"
   | "med";
 
 const SUBTYPE_LABEL: Record<LogSubtype, string> = {
-  sufor: "Sufor",
-  dbf: "DBF",
+  feeding: "Feeding",
   pumping: "Pumping",
-  pipis: "Pipis",
-  poop: "Poop",
+  diaper: "Ganti Diaper",
   sleep: "Tidur",
   bath: "Mandi",
   temp: "Suhu",
@@ -84,6 +80,14 @@ function LogModal({
     return () => window.removeEventListener("keydown", onEsc);
   }, [onClose]);
 
+  // Feeding sub-mode: 'sufor' (botol) atau 'dbf' (langsung)
+  const [feedingMode, setFeedingMode] = useState<"sufor" | "dbf">("sufor");
+
+  // Diaper toggles
+  const [hasPee, setHasPee] = useState(false);
+  const [hasPoop, setHasPoop] = useState(false);
+
+  // Poop sub-fields (chips)
   const [poopColor, setPoopColor] = useState<string>("");
   const [poopCons, setPoopCons] = useState<string>("");
 
@@ -114,8 +118,21 @@ function LogModal({
         <form action={createLogAction} className="space-y-4 p-4">
           <input type="hidden" name="subtype" value={subtype} />
           <input type="hidden" name="return_to" value={returnTo} />
-          <input type="hidden" name="poop_color" value={poopColor} />
-          <input type="hidden" name="poop_consistency" value={poopCons} />
+          {subtype === "feeding" ? (
+            <input type="hidden" name="feeding_mode" value={feedingMode} />
+          ) : null}
+          {subtype === "diaper" ? (
+            <>
+              <input type="hidden" name="has_pee" value={hasPee ? "1" : "0"} />
+              <input type="hidden" name="has_poop" value={hasPoop ? "1" : "0"} />
+              <input type="hidden" name="poop_color" value={poopColor} />
+              <input
+                type="hidden"
+                name="poop_consistency"
+                value={poopCons}
+              />
+            </>
+          ) : null}
 
           <Field label="Waktu">
             <input
@@ -127,50 +144,79 @@ function LogModal({
             />
           </Field>
 
-          {subtype === "sufor" ? (
-            <Field label="Jumlah (ml)">
-              <input
-                type="number"
-                name="amount_ml"
-                step="1"
-                min="1"
-                max="500"
-                required
-                inputMode="numeric"
-                placeholder="60"
-                autoFocus
-                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
-              />
-            </Field>
-          ) : null}
+          {subtype === "feeding" ? (
+            <>
+              <Field label="Jenis">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFeedingMode("sufor")}
+                    className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
+                      feedingMode === "sufor"
+                        ? "border-rose-400 bg-rose-50 text-rose-700"
+                        : "border-gray-200 bg-white text-gray-700"
+                    }`}
+                  >
+                    🍼 Susu (botol)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFeedingMode("dbf")}
+                    className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
+                      feedingMode === "dbf"
+                        ? "border-rose-400 bg-rose-50 text-rose-700"
+                        : "border-gray-200 bg-white text-gray-700"
+                    }`}
+                  >
+                    🤱 DBF (langsung)
+                  </button>
+                </div>
+              </Field>
 
-          {subtype === "dbf" ? (
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Kiri (menit)">
-                <input
-                  type="number"
-                  name="duration_l_min"
-                  step="1"
-                  min="0"
-                  max="180"
-                  inputMode="numeric"
-                  placeholder="0"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
-                />
-              </Field>
-              <Field label="Kanan (menit)">
-                <input
-                  type="number"
-                  name="duration_r_min"
-                  step="1"
-                  min="0"
-                  max="180"
-                  inputMode="numeric"
-                  placeholder="0"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
-                />
-              </Field>
-            </div>
+              {feedingMode === "sufor" ? (
+                <Field label="Jumlah (ml)">
+                  <input
+                    type="number"
+                    name="amount_ml"
+                    step="1"
+                    min="1"
+                    max="500"
+                    required
+                    inputMode="numeric"
+                    placeholder="60"
+                    autoFocus
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                  />
+                </Field>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Kiri (menit)">
+                    <input
+                      type="number"
+                      name="duration_l_min"
+                      step="1"
+                      min="0"
+                      max="180"
+                      inputMode="numeric"
+                      placeholder="0"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                    />
+                  </Field>
+                  <Field label="Kanan (menit)">
+                    <input
+                      type="number"
+                      name="duration_r_min"
+                      step="1"
+                      min="0"
+                      max="180"
+                      inputMode="numeric"
+                      placeholder="0"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                    />
+                  </Field>
+                </div>
+              )}
+            </>
           ) : null}
 
           {subtype === "pumping" ? (
@@ -200,22 +246,56 @@ function LogModal({
             </div>
           ) : null}
 
-          {subtype === "poop" ? (
+          {subtype === "diaper" ? (
             <>
-              <Field label="Warna">
-                <Chips
-                  options={POOP_COLORS}
-                  value={poopColor}
-                  onChange={setPoopColor}
-                />
+              <Field label="Apa yang ada di diaper?">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setHasPee(!hasPee)}
+                    className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
+                      hasPee
+                        ? "border-rose-400 bg-rose-50 text-rose-700"
+                        : "border-gray-200 bg-white text-gray-700"
+                    }`}
+                  >
+                    💛 Pipis {hasPee ? "✓" : ""}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHasPoop(!hasPoop)}
+                    className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
+                      hasPoop
+                        ? "border-rose-400 bg-rose-50 text-rose-700"
+                        : "border-gray-200 bg-white text-gray-700"
+                    }`}
+                  >
+                    💩 BAB {hasPoop ? "✓" : ""}
+                  </button>
+                </div>
+                <p className="mt-1 text-[11px] text-gray-400">
+                  Pilih satu atau dua-duanya.
+                </p>
               </Field>
-              <Field label="Konsistensi">
-                <Chips
-                  options={POOP_CONSISTENCY}
-                  value={poopCons}
-                  onChange={setPoopCons}
-                />
-              </Field>
+
+              {hasPoop ? (
+                <>
+                  <Field label="Warna BAB">
+                    <Chips
+                      options={POOP_COLORS}
+                      value={poopColor}
+                      onChange={setPoopColor}
+                    />
+                  </Field>
+                  <Field label="Konsistensi BAB">
+                    <Chips
+                      options={POOP_CONSISTENCY}
+                      value={poopCons}
+                      onChange={setPoopCons}
+                    />
+                  </Field>
+                </>
+              ) : null}
             </>
           ) : null}
 

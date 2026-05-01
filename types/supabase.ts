@@ -169,6 +169,8 @@ export type Database = {
           duration_l_min: number | null;
           duration_r_min: number | null;
           end_timestamp: string | null;
+          has_pee: boolean | null;
+          has_poop: boolean | null;
           id: string;
           med_dose: string | null;
           med_name: string | null;
@@ -190,6 +192,8 @@ export type Database = {
           duration_l_min?: number | null;
           duration_r_min?: number | null;
           end_timestamp?: string | null;
+          has_pee?: boolean | null;
+          has_poop?: boolean | null;
           id?: string;
           med_dose?: string | null;
           med_name?: string | null;
@@ -211,6 +215,8 @@ export type Database = {
           duration_l_min?: number | null;
           duration_r_min?: number | null;
           end_timestamp?: string | null;
+          has_pee?: boolean | null;
+          has_poop?: boolean | null;
           id?: string;
           med_dose?: string | null;
           med_name?: string | null;
