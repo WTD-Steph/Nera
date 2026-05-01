@@ -1,16 +1,18 @@
 # Nera — Baby Tracker, Project Brief
 
-> Phase 1 deliverable. Belum ada code production yang ditulis. Dokumen ini
-> wajib di-approve sebelum lanjut Phase 2 (PR #1 scaffold).
+> **Status:** v2 — approved 2026-05-01 dengan modifikasi dari Stephanus.
+> v1 disusun 2026-04-30. Diff v1→v2 ada di §16.
 >
-> **Status:** Draft v1 — disusun 2026-04-30 setelah review prototype artifact
-> dan brief Anda. Source artifact ada di [_reference/baby-tracker-artifact.tsx](_reference/baby-tracker-artifact.tsx)
-> (paste-nya ter-truncate menjelang akhir; tidak menghalangi Phase 1, akan
-> di-refine PR-by-PR jika ada gap).
+> **Phase 1 deliverable.** PR #1 (feature/scaffold) di-kick-off setelah
+> commit v2 ini mendarat di main.
 >
-> **Convention:** Brief Anda diadopsi sebagai default. Bagian di mana saya
-> menyimpang atau memperhalus diberi label **[REFINEMENT]** dengan reasoning.
-> Pertanyaan yang masih perlu jawaban Anda dikumpulkan di §11.
+> Source artifact prototype ada di
+> [_reference/baby-tracker-artifact.tsx](_reference/baby-tracker-artifact.tsx)
+> (paste ter-truncate; tidak blocking).
+>
+> **Convention:** Bagian di mana saya menyimpang dari spec awal Anda
+> diberi label **[REFINEMENT]** dengan reasoning. Bagian yang berubah di
+> v2 diberi label **[v2]**.
 
 ---
 
@@ -172,6 +174,7 @@ CREATE TABLE household_invitations (
   household_id uuid NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   invited_email text NOT NULL,
   invited_by   uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  role         text NOT NULL DEFAULT 'member' CHECK (role IN ('owner','member')),
   token        text UNIQUE NOT NULL,
   expires_at   timestamptz NOT NULL,
   accepted_at  timestamptz,
@@ -179,6 +182,15 @@ CREATE TABLE household_invitations (
 );
 CREATE INDEX household_invitations_email_idx ON household_invitations(invited_email)
   WHERE accepted_at IS NULL;
+```
+
+**[v2 — invite role]** Kolom `role` dipilih saat owner kirim invite.
+Saat invite di-accept, `household_members.role` di-set sesuai
+`household_invitations.role`. UX default: invite pertama (untuk istri /
+co-parent) di-default ke `'owner'`; invite untuk caregiver future
+(mertua, nanny) default `'member'`.
+
+```sql
 ```
 
 ### 4.2 Babies
@@ -241,6 +253,7 @@ CREATE TABLE logs (
   CONSTRAINT logs_dbf_chk     CHECK (subtype <> 'dbf'     OR (duration_l_min IS NOT NULL OR duration_r_min IS NOT NULL)),
   CONSTRAINT logs_pumping_chk CHECK (subtype <> 'pumping' OR (amount_l_ml IS NOT NULL OR amount_r_ml IS NOT NULL)),
   CONSTRAINT logs_temp_chk    CHECK (subtype <> 'temp'    OR temp_celsius IS NOT NULL),
+  CONSTRAINT logs_temp_range_chk CHECK (temp_celsius IS NULL OR (temp_celsius BETWEEN 30 AND 45)),
   CONSTRAINT logs_med_chk     CHECK (subtype <> 'med'     OR med_name IS NOT NULL),
   CONSTRAINT logs_sleep_end_chk CHECK (end_timestamp IS NULL OR end_timestamp >= timestamp)
 );
@@ -279,7 +292,7 @@ CREATE TABLE milestone_progress (
   baby_id       uuid NOT NULL REFERENCES babies(id) ON DELETE CASCADE,
   milestone_key text NOT NULL,
   achieved_at   timestamptz NOT NULL DEFAULT now(),
-  noted_by      uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_by    uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   PRIMARY KEY (baby_id, milestone_key)
 );
 
@@ -289,10 +302,15 @@ CREATE TABLE immunization_progress (
   given_at    date NOT NULL,
   facility    text,
   notes       text,
-  noted_by    uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_by  uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   PRIMARY KEY (baby_id, vaccine_key)
 );
 ```
+
+**[v2 — audit consistency]** Kolom audit di-rename dari `noted_by` ke
+`created_by` untuk konsisten dengan `logs.created_by` dan
+`growth_measurements.created_by`. Satu nama, satu artinya: "user yang
+membuat row ini".
 
 ### 4.6 `updated_at` Trigger
 
@@ -449,11 +467,17 @@ RootLayout
    │
    └─ More (/more)
       ├─ SettingItem → /more/profile (ProfileForm)
-      ├─ SettingItem → /more/household (MembersList + InviteForm)
+      ├─ SettingItem → /more/household (MembersList + InviteForm with role select)
       ├─ SettingItem → /more/imunisasi (ImunisasiChecklist)
       ├─ SettingItem → ExportCSVButton
-      ├─ SettingItem → ResetDataButton (owner-only, double confirm)
       └─ LogoutButton
+
+   [future, v2 of UI] /more/babies/new (AddBabyForm) untuk anak ke-2 — tidak
+   trigger /setup ulang, tinggal insert babies row ke household existing.
+
+   [v2] WelcomeToast: ditampilkan satu kali pasca-accept invite —
+   "Selamat datang ke keluarga {babyName}". State persisted di localStorage
+   key `nera:welcomed:{userId}` agar tidak muncul lagi di session berikut.
 
 LogModal (kondisional rendering per subtype)
 ├─ shared: Field timestamp, Field notes
@@ -488,17 +512,34 @@ Hanya tiga endpoint server-side. Semua CRUD lain via Supabase client + RLS.
 - **Process**:
   1. Server fetch baby + 7-day log summary + growth history (server Supabase client honoring RLS)
   2. Build prompt context (`lib/ai/build-context.ts`)
-  3. Call Anthropic API dengan `claude-sonnet-4-6` (atau model terbaru saat implement) with `stream: true`
+  3. Call Anthropic API dengan model dari env var `AI_MODEL` (default
+     `claude-opus-4-7`) dengan `stream: true`
   4. Pipe SSE chunks ke client via `text/event-stream`
-- **Env**: `ANTHROPIC_API_KEY` (Vercel env var, server-only)
+- **Env**:
+  - `ANTHROPIC_API_KEY` (Vercel env var, server-only)
+  - `AI_MODEL` (server-only, default `claude-opus-4-7`; downgrade ke
+    `claude-sonnet-4-6` kalau cost spike)
 - **Rate limit**: simple in-memory token bucket per user (3 req/menit) untuk v1; Upstash kalau perlu lebih kuat
+
+**[v2 — Opus default]** Anda pilih Opus 4.7 untuk depth analisis growth +
+behavioral pattern, dengan toleransi latency streaming yang sedikit lebih
+lambat. Volume diestimasi ~5–10 req/hari, cost differential vs Sonnet
+diperkirakan <$5/bulan. Env var `AI_MODEL` membiarkan rapid downgrade
+tanpa code change kalau bill ternyata membesar.
 
 ### `POST /api/invite`
 
-- **Body**: `{ email: string }`
+- **Body**: `{ email: string, role: 'owner' | 'member' }`
 - **Auth**: must be owner of `household_id` (derived from session)
-- **Process**: generate cryptographic token, insert `household_invitations`, dispatch email via Supabase admin auth (sebagai magic link variant) atau template email manual
+- **Process**: generate cryptographic token, insert `household_invitations`
+  with chosen role, dispatch email via Supabase built-in SMTP (magic link
+  variant) atau template manual. Resend integration di-defer ke PR
+  follow-up — kalau magic link masuk spam folder, prioritas swap.
 - **Response**: `{ inviteUrl: string }`
+
+**[v2 — invite role param]** Body sekarang include `role`. UI form di
+`/more/household` punya radio: "Co-parent (akses penuh, bisa undang
+member)" / "Caregiver (hanya CRUD data)". Default radio = member.
 
 ### `GET /api/export`
 
@@ -514,6 +555,8 @@ Kalau Anda preferensi tetap client (no roundtrip), bisa kita revert.
 ---
 
 ## 9. AI Analysis — Detail
+
+**Default model**: `claude-opus-4-7` (overridable via `AI_MODEL` env var).
 
 **Prompt template versi 1** (file: `docs/ai-prompt.md`, code: `lib/ai/prompt.ts`):
 
@@ -585,17 +628,22 @@ tinggi.
 bottom-sheet modals + bottom nav 5-tab → port apa adanya. Tailwind classes
 copy paste dari artifact, tidak perlu redesign.
 
+**[v2] Reset Data button dihapus dari prototype.** Di multi-user setup,
+bulk reset dari satu user akan menghancurkan data yang istri Anda input
+juga. Tetap ada per-row delete (tap log → tombol Hapus di edit modal)
+untuk error correction granular.
+
 **Bug yang saya temukan di prototype** (akan saya fix di production, tidak
 diport apa adanya):
 1. `LogRow` tidak handle subtype `pipis`/`bath` di `detail` builder — fine,
    karena field `detail` opsional. Tapi UI bisa lebih ramah dengan label
-   "—" ketimbang string kosong. **Status**: minor, fix di PR #4.
+   "—" ketimbang string kosong. **Status**: minor, fix di PR #4 (logs).
 2. `formatAge` precision drift di edge case (>12 bulan: tampil "1.0 tahun"
    sampai 1.083 tahun). **Status**: keep behavior, sufficient for v1.
 3. `computeTodayStats` pakai `+l.amount || 0` yang gagal kalau `amount = 0`
    string vs number, tapi `+'0' || 0` → 0 jadi safe. **Status**: no fix.
-4. AI fetch tanpa abort/timeout. **Status**: fix di PR #7 — add `AbortController`
-   on unmount + 60s timeout.
+4. AI fetch tanpa abort/timeout. **Status**: fix di PR #8 (ai-analysis) —
+   add `AbortController` on unmount + 60s timeout.
 
 ---
 
@@ -709,76 +757,64 @@ add Sentry (free tier cukup).
 
 ---
 
-## 12. PR Sequence — Confirmed
+## 12. PR Sequence — v2
 
-Saya konfirmasi sequence Anda. Tambahan: tiap PR akan punya verification
-checklist + commit message format konsisten.
+**[v2 — restructure]** Dua perubahan dari v1:
+1. PR #2 dipecah → PR #2a `feature/auth` + PR #2b `feature/household`
+   (review lebih cepat, revert lebih aman).
+2. Old PR #10 `feature/realtime` digantikan PR #5 baru
+   `feature/realtime-foundation` — disisipkan setelah logs landing,
+   sebelum growth. Logs (PR #4) didelivery tanpa realtime; PR #5
+   retrofit realtime ke logs hooks dan menetapkan pattern (subscription,
+   optimistic insert, dedup) yang dipakai di PR #6+ (growth, milestone,
+   imunisasi). Reasoning: multi-user adalah core requirement; lebih
+   baik tested dari awal di logs (entity paling sering ditulis) sebelum
+   feature lain dibangun di atasnya.
 
-| #   | Branch                         | Scope                                                                  | Verification                                  |
-|-----|--------------------------------|------------------------------------------------------------------------|-----------------------------------------------|
-| 1   | `feature/scaffold`             | Next.js init, Tailwind, Supabase client stubs, env, Vercel deploy, README | `next build` pass, deploy berhasil, env stub |
-| 2   | `feature/auth-household`       | Migrations households + invitations + RLS, magic link flow, `/setup`, `/invite/[token]`, member mgmt | Test: signup/login, invite-accept, RLS denial |
-| 3   | `feature/baby-profile`         | Migrations babies, onboarding baby creation, profile edit              | Test: create baby, edit, RLS                  |
-| 4   | `feature/logs`                 | Migrations logs, LogModal per subtype, dashboard quick log, today stats, since-last cards, recent activity, history view + filter | Test: insert all 9 subtypes, filter accuracy  |
-| 5   | `feature/growth`               | Migrations growth, ChartCard with WHO ref (girl & boy), measurement form, history list | Visual check chart, percentile alignment      |
-| 6   | `feature/milestone-imunisasi`  | Migrations milestone + imunisasi progress, checklist views             | Toggle checks persisted, current-month highlight |
-| 7   | `feature/ai-analysis`          | API route `/api/ai-analysis` (SSE), `lib/ai/build-context`, AIAnalysisModal | Test: 4 preset prompts, custom prompt, abort  |
-| 8   | `feature/csv-export`           | API route `/api/export`, button di More                                | Download CSV, validasi format                 |
-| 9   | `feature/pwa`                  | manifest, service worker via next-pwa, install prompt, offline read    | Lighthouse PWA audit ≥90, mobile install      |
-| 10  | `feature/realtime`             | Realtime subscription per baby, optimistic insert, dedup, reconcile    | Two-tab test: insert one, see in other        |
+| #   | Branch                            | Scope                                                                  | Verification                                  |
+|-----|-----------------------------------|------------------------------------------------------------------------|-----------------------------------------------|
+| 1   | `feature/scaffold`                | Next.js init, Tailwind, Supabase client (browser/server/middleware), env stub, Vercel preview deploy, README | `next build` pass, deploy preview hidup, env template terisi |
+| 2a  | `feature/auth`                    | Magic link flow, middleware session check, `/login`, `/verify`, redirect logic untuk no-household | Test: signup → magic link → session aktif; protected route redirect |
+| 2b  | `feature/household`               | Migrations households + household_members + household_invitations (with role) + RLS, `/setup`, `/invite/[token]`, `/more/household` (members + invite form with role select) | Test: create h/h, invite-accept dengan kedua role, RLS denial cross-household, owner-only delete |
+| 3   | `feature/baby-profile`            | Migration babies, onboarding baby creation di `/setup` step 2, `/more/profile` edit | Test: create baby, edit field, RLS via household membership |
+| 4   | `feature/logs`                    | Migrations logs (dengan partial CHECK + temp range), LogModal per subtype, dashboard quick log + today stats + since-last cards + recent activity, `/history` view + filter chips | Test: insert semua 9 subtype, CHECK constraint reject invalid, filter accuracy |
+| 5   | `feature/realtime-foundation`     | **[NEW v2]** Supabase channel pattern (`lib/realtime/`), optimistic insert helper dengan client-generated UUID, dedup via realtime echo skip, retrofit ke `use-logs` hook, dokumentasi pattern di `docs/realtime-sync.md` | Two-device test: insert log dari device A → muncul di device B <2s tanpa refresh; rapid double-insert tidak dedup |
+| 6   | `feature/growth`                  | Migration growth_measurements, ChartCard dengan WHO ref (boy & girl), measurement form, history list, realtime via foundation | Visual check chart percentile, multi-user sync ukur baru |
+| 7   | `feature/milestone-imunisasi`     | Migrations milestone_progress + immunization_progress (dengan `created_by`), checklist views, current-month highlight, realtime via foundation | Toggle persisted, sync antar device, current-month highlight akurat |
+| 8   | `feature/ai-analysis`             | API route `/api/ai-analysis` (SSE stream), `lib/ai/build-context`, AIAnalysisModal dengan 4 preset + custom, abort on unmount, model dari `AI_MODEL` env | Test: 4 preset prompts run, custom prompt run, abort, rate limit (3/min) reject ke-4 |
+| 9   | `feature/csv-export`              | API route `/api/export`, button di More, format profile + logs + milestones + imunisasi UTF-8 BOM | Download, buka di Excel ID, validasi semua section terisi |
+| 10  | `feature/pwa`                     | manifest, next-pwa config, app icons, install prompt, offline read fallback | Lighthouse PWA audit ≥90, install di Android/iOS Safari |
 
-**Setiap PR deliverable report**: state migration applied/committed/pushed,
-branch + remote, verification output, screenshot kalau UI.
+**Setiap PR deliverable report**: state migration (applied/committed/pushed),
+branch + remote, verification output, screenshot kalau UI berubah.
 
 ---
 
-## 13. Open Questions untuk Anda
+## 13. Open Questions — Resolved (v2)
 
-Mohon konfirmasi/jawab sebelum saya kick off PR #1:
+Semua dijawab oleh Stephanus pada 2026-05-01.
 
-1. **Project path lokal**: saya pakai `C:\Users\steph\Nera` (mencocokkan
-   pola `C:\Users\steph\ERP-2.0`). OK atau Anda preferensi lain?
+| #   | Pertanyaan                          | Keputusan                                                                |
+|-----|-------------------------------------|--------------------------------------------------------------------------|
+| 1   | Project path lokal                  | `C:\Users\steph\Nera` ✓                                                  |
+| 2   | Owner-only destructive ops          | Approved + invite role param: istri di-invite sebagai owner (co-owner); caregiver future default member |
+| 3   | Server-side CSV export              | Approved                                                                 |
+| 4   | Supabase project split              | 2 projects (dev + prod) — wajib untuk multi-user 12-bulan project       |
+| 5   | Email delivery                      | Supabase built-in SMTP untuk v1; Resend integration di-prep sebagai PR follow-up post-launch |
+| 6   | AI model                            | **Opus 4.7** (`claude-opus-4-7`) sebagai default, env var `AI_MODEL` untuk override |
+| 7   | Reset Data button                   | Hilangkan. Per-row delete cukup.                                         |
+| 8   | First login pasca-invite            | Direct redirect ke Beranda + welcome toast satu kali ("Selamat datang ke keluarga {babyName}") |
+| 9   | Bayi ke-2 future                    | Single-baby UI v1; future flow di `/more/babies/new`, tidak via `/setup` |
+| 10  | Artifact paste truncated            | Tidak blocking. Request paste ulang hanya kalau gap muncul saat PR #4/#7 |
 
-2. **Owner-only destructive ops** (§5 footnote): saya restrict delete baby,
-   delete household, dan manage members ke owner. Member biasa tetap bisa
-   CRUD logs/growth/milestone/imunisasi. Setuju?
-
-3. **Server-side CSV export** (§8): saya pindah dari client ke server. Setuju
-   atau revert ke client-only?
-
-4. **Supabase project**: punya 1 project untuk dev + 1 untuk prod, atau pakai
-   1 project saja untuk hemat? Kalau 1 saja, brief saya akan ganti — pakai
-   `WHERE` filter di policy untuk env separation, tidak ideal tapi cukup.
-   **Default saya: 2 projects.**
-
-5. **Email delivery untuk magic link & invite**: Supabase built-in SMTP
-   (free tier, low rate limit) cukup untuk start, atau langsung integrate
-   Resend dari awal? **Default saya: Supabase built-in untuk v1.**
-
-6. **AI model**: saya tulis Sonnet 4.6 sebagai default (latest at brief
-   time). Anda mau tetap Sonnet, atau coba Opus 4.7 untuk analisis lebih
-   detail dengan biaya lebih tinggi? **Default saya: Sonnet 4.6.**
-
-7. **Reset Data button**: prototype punya tombol "Hapus semua catatan
-   (profil tetap)". Untuk multi-user, ini destructive untuk istri Anda
-   juga. **Saran saya: hilangkan tombol ini di v1, ganti dengan per-row
-   delete saja.** Setuju?
-
-8. **Onboarding deep-link untuk istri**: saat istri pertama login (lewat
-   invite), apa landing page-nya — Beranda dengan baby yang sudah ada,
-   atau ada welcome screen "Selamat datang ke household X"? **Default
-   saya: redirect langsung ke Beranda.**
-
-9. **Bayi ke-2 di future**: brief Anda bilang "siapkan untuk anak ke-2
-   nanti, tapi UI v1 cukup single-baby". Schema sudah support multi-baby
-   per household. **UI v1 akan: pilih baby pertama otomatis, no baby
-   switcher di nav.** Setuju?
-
-10. **Artifact paste truncated**: saya berhasil ekstrak 95% dari paste
-    Anda — yang hilang hanya AIAnalysisModal render UI + LogModal form +
-    main App component routing. Brief saya cover semua itu via spec.
-    Apakah Anda mau paste ulang ekor file untuk lengkapnya disimpan di
-    `_reference/`? Tidak blocking — saya bisa lanjut tanpa.
+Aksi yang ter-baked ke schema/code dari jawaban-jawaban di atas:
+- §4.1: kolom `role` di `household_invitations`
+- §4.3: CHECK constraint `temp_celsius BETWEEN 30 AND 45`
+- §4.5: rename `noted_by` → `created_by` di milestone_progress + immunization_progress
+- §8: invite API body include `role`
+- §9: model default `claude-opus-4-7` + env var `AI_MODEL`
+- §10: Reset Data dihapus dari spec
+- §12: PR sequence direvisi — split #2, insert realtime-foundation di #5
 
 ---
 
@@ -798,9 +834,39 @@ Mohon konfirmasi/jawab sebelum saya kick off PR #1:
 
 ## 15. Setelah Brief Approved
 
-Begitu Anda approve dokumen ini (atau request revisi), saya kick off PR #1
-`feature/scaffold`. Ekspektasi: scaffold selesai dalam 1 sesi kerja dengan
-deliverable Vercel preview URL + basic Supabase client setup + smoke test
-landing page.
+Brief v2 di-approve 2026-05-01. PR #1 `feature/scaffold` di-kick-off
+mengikuti commit ini ke main. Ekspektasi PR #1: Next.js init + Tailwind +
+Supabase client (browser/server/middleware) + env stub + landing page,
+verified `next build` green, branch ter-push, deploy preview Vercel
+hidup (manual import dari GitHub kalau project Vercel belum connected).
 
-— ditulis oleh Claude (Opus 4.7), 2026-04-30, untuk Stephanus.
+---
+
+## 16. Changelog v1 → v2
+
+**Schema:**
+- `household_invitations.role` ditambah (CHECK 'owner' | 'member', default 'member') — invite flow sekarang support pilih role
+- `logs.temp_celsius` mendapat range CHECK BETWEEN 30 AND 45 — catch typo input
+- `milestone_progress` & `immunization_progress` rename `noted_by` → `created_by` — konsistensi audit dengan tabel logs/growth
+
+**API:**
+- `POST /api/invite` body sekarang require `role: 'owner' | 'member'`
+- `/api/ai-analysis` default model `claude-opus-4-7` (was Sonnet 4.6); env var `AI_MODEL` untuk override
+
+**UX:**
+- Reset Data button dihilangkan (destructive di multi-user setup)
+- Welcome toast satu kali pasca-accept invite ("Selamat datang ke keluarga {babyName}")
+- Future bayi ke-2: flow di `/more/babies/new`, bukan via `/setup`
+
+**PR sequence:**
+- PR #2 dipecah → PR #2a `feature/auth` + PR #2b `feature/household`
+- Old PR #10 `feature/realtime` dihapus, diganti PR #5 baru
+  `feature/realtime-foundation` (insert antara logs dan growth) — multi-user
+  ditest sejak awal di logs sebelum diatas-bangunkan ke entity lain
+
+**Tidak berubah dari v1:** stack pilihan, RLS strategy, household model,
+schema babies/logs/growth_measurements core, LWW conflict resolution, test
+strategy, monitoring strategy, deployment strategy.
+
+— v1 ditulis 2026-04-30, v2 di-finalize 2026-05-01 setelah review
+Stephanus. Author: Claude (Opus 4.7).
