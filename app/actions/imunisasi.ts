@@ -5,12 +5,19 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBaby } from "@/lib/household/baby";
 
-export async function toggleImmunizationAction(formData: FormData) {
+export async function markImmunizationAction(formData: FormData) {
   const vaccineKey = String(formData.get("vaccine_key") ?? "");
-  const currentlyGiven = String(formData.get("given") ?? "") === "1";
+  const givenAt = String(formData.get("given_at") ?? "").trim();
+  const facility = String(formData.get("facility") ?? "").trim() || null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
   const returnTo = String(formData.get("return_to") ?? "/imunisasi");
 
   if (!vaccineKey) redirect(returnTo);
+  if (!givenAt || isNaN(new Date(givenAt).getTime())) {
+    redirect(
+      `${returnTo}?imuerror=${encodeURIComponent("Tanggal pemberian harus diisi.")}`,
+    );
+  }
 
   const baby = await getCurrentBaby();
   if (!baby) redirect("/setup");
@@ -21,21 +28,71 @@ export async function toggleImmunizationAction(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  if (currentlyGiven) {
-    await supabase
+  // Upsert: kalau sudah ada (re-mark), update; kalau belum, insert.
+  const { data: existing } = await supabase
+    .from("immunization_progress")
+    .select("baby_id")
+    .eq("baby_id", baby.id)
+    .eq("vaccine_key", vaccineKey)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
       .from("immunization_progress")
-      .delete()
+      .update({
+        given_at: givenAt,
+        facility,
+        notes,
+      })
       .eq("baby_id", baby.id)
       .eq("vaccine_key", vaccineKey);
+    if (error) {
+      redirect(
+        `${returnTo}?imuerror=${encodeURIComponent(`Gagal update: ${error.message}`)}`,
+      );
+    }
   } else {
-    await supabase.from("immunization_progress").insert({
+    const { error } = await supabase.from("immunization_progress").insert({
       baby_id: baby.id,
       vaccine_key: vaccineKey,
-      given_at: new Date().toISOString().slice(0, 10),
+      given_at: givenAt,
+      facility,
+      notes,
       created_by: user.id,
     });
+    if (error) {
+      redirect(
+        `${returnTo}?imuerror=${encodeURIComponent(`Gagal simpan: ${error.message}`)}`,
+      );
+    }
   }
 
   revalidatePath("/imunisasi");
-  redirect(returnTo);
+  redirect(`${returnTo}?imusaved=1`);
+}
+
+export async function unmarkImmunizationAction(formData: FormData) {
+  const vaccineKey = String(formData.get("vaccine_key") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/imunisasi");
+
+  if (!vaccineKey) redirect(returnTo);
+
+  const baby = await getCurrentBaby();
+  if (!baby) redirect("/setup");
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("immunization_progress")
+    .delete()
+    .eq("baby_id", baby.id)
+    .eq("vaccine_key", vaccineKey);
+
+  if (error) {
+    redirect(
+      `${returnTo}?imuerror=${encodeURIComponent("Gagal hapus.")}`,
+    );
+  }
+
+  revalidatePath("/imunisasi");
+  redirect(`${returnTo}?imudeleted=1`);
 }

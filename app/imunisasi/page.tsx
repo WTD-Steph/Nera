@@ -3,11 +3,20 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentBaby } from "@/lib/household/baby";
 import { IMUNISASI_LIST } from "@/lib/constants/imunisasi";
 import { ageInMonths } from "@/lib/constants/who-percentiles";
-import { fmtDate } from "@/lib/compute/format";
-import { toggleImmunizationAction } from "@/app/actions/imunisasi";
 import { ProgressRealtime } from "@/components/ProgressRealtime";
+import { ImunisasiRow } from "@/components/ImunisasiRow";
 
-export default async function ImunisasiPage() {
+type SearchParams = {
+  imusaved?: string;
+  imudeleted?: string;
+  imuerror?: string;
+};
+
+export default async function ImunisasiPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const supabase = createClient();
   const {
     data: { user },
@@ -19,12 +28,19 @@ export default async function ImunisasiPage() {
 
   const { data: progress } = await supabase
     .from("immunization_progress")
-    .select("vaccine_key, given_at")
+    .select("vaccine_key, given_at, facility, notes")
     .eq("baby_id", baby.id);
 
-  const givenMap = new Map<string, string>();
+  const givenMap = new Map<
+    string,
+    { given_at: string; facility: string | null; notes: string | null }
+  >();
   for (const p of progress ?? []) {
-    givenMap.set(p.vaccine_key, p.given_at);
+    givenMap.set(p.vaccine_key, {
+      given_at: p.given_at,
+      facility: p.facility,
+      notes: p.notes,
+    });
   }
 
   const currentMonth = ageInMonths(baby.dob);
@@ -50,6 +66,22 @@ export default async function ImunisasiPage() {
         <span className="w-12" />
       </header>
 
+      {searchParams.imusaved ? (
+        <div className="mt-3 rounded-2xl border border-green-100 bg-green-50 p-3 text-xs text-green-800">
+          Catatan tersimpan.
+        </div>
+      ) : null}
+      {searchParams.imudeleted ? (
+        <div className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+          Catatan dihapus.
+        </div>
+      ) : null}
+      {searchParams.imuerror ? (
+        <div className="mt-3 rounded-2xl border border-red-100 bg-red-50 p-3 text-xs text-red-700">
+          {searchParams.imuerror}
+        </div>
+      ) : null}
+
       <section className="mt-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
@@ -69,8 +101,9 @@ export default async function ImunisasiPage() {
       </section>
 
       <p className="mt-3 px-1 text-[11px] leading-relaxed text-gray-500">
-        Berdasarkan rekomendasi IDAI 0–12 bulan. Diskusikan jadwal aktual
-        dengan dokter anak.
+        Berdasarkan rekomendasi IDAI 0–12 bulan. Tap row untuk catat tanggal,
+        rumah sakit, dan catatan dokter. Diskusikan jadwal aktual dengan
+        dokter anak.
       </p>
 
       <section className="mt-3 space-y-3">
@@ -100,66 +133,18 @@ export default async function ImunisasiPage() {
               </div>
               <div className="divide-y divide-gray-100">
                 {items.map((item) => {
-                  const givenAt = givenMap.get(item.id);
-                  const given = !!givenAt;
+                  const detail = givenMap.get(item.id) ?? null;
                   return (
-                    <form
+                    <ImunisasiRow
                       key={item.id}
-                      action={toggleImmunizationAction}
-                      className="hover:bg-gray-50 active:bg-gray-100"
-                    >
-                      <input
-                        type="hidden"
-                        name="vaccine_key"
-                        value={item.id}
-                      />
-                      <input
-                        type="hidden"
-                        name="given"
-                        value={given ? "1" : "0"}
-                      />
-                      <input
-                        type="hidden"
-                        name="return_to"
-                        value="/imunisasi"
-                      />
-                      <button
-                        type="submit"
-                        className="flex w-full items-start gap-3 px-4 py-3 text-left"
-                      >
-                        <div
-                          className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
-                            given
-                              ? "border-green-500 bg-green-500 text-white"
-                              : "border-gray-300"
-                          }`}
-                        >
-                          {given ? (
-                            <svg
-                              className="h-3 w-3"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                          ) : null}
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-sm font-medium text-gray-800">
-                            {item.name}
-                          </div>
-                          {givenAt ? (
-                            <div className="mt-0.5 text-[11px] text-green-600">
-                              diberikan {fmtDate(givenAt)}
-                            </div>
-                          ) : null}
-                        </div>
-                      </button>
-                    </form>
+                      data={{
+                        vaccineKey: item.id,
+                        vaccineName: item.name,
+                        givenAt: detail?.given_at ?? null,
+                        facility: detail?.facility ?? null,
+                        notes: detail?.notes ?? null,
+                      }}
+                    />
                   );
                 })}
               </div>
