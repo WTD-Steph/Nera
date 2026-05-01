@@ -324,17 +324,23 @@ export default async function HomePage({
         </a>
       </section>
 
-      <div className="mt-6 flex gap-2">
+      <div className="mt-6 grid grid-cols-3 gap-2">
+        <a
+          href="/growth"
+          className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+        >
+          📈 Tumbuh
+        </a>
         <a
           href="/more/household"
-          className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
         >
-          Atur keluarga
+          👨‍👩‍👧 Keluarga
         </a>
-        <form action="/auth/signout" method="post" className="flex-1">
+        <form action="/auth/signout" method="post">
           <button
             type="submit"
-            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
           >
             Keluar
           </button>

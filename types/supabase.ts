@@ -61,6 +61,53 @@ export type Database = {
           },
         ];
       };
+      growth_measurements: {
+        Row: {
+          baby_id: string;
+          created_at: string;
+          created_by: string | null;
+          head_circ_cm: number | null;
+          height_cm: number;
+          id: string;
+          measured_at: string;
+          notes: string | null;
+          updated_at: string;
+          weight_kg: number;
+        };
+        Insert: {
+          baby_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          head_circ_cm?: number | null;
+          height_cm: number;
+          id?: string;
+          measured_at: string;
+          notes?: string | null;
+          updated_at?: string;
+          weight_kg: number;
+        };
+        Update: {
+          baby_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          head_circ_cm?: number | null;
+          height_cm?: number;
+          id?: string;
+          measured_at?: string;
+          notes?: string | null;
+          updated_at?: string;
+          weight_kg?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "growth_measurements_baby_id_fkey";
+            columns: ["baby_id"];
+            isOneToOne: false;
+            referencedRelation: "babies";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       household_invitations: {
         Row: {
           accepted_at: string | null;
