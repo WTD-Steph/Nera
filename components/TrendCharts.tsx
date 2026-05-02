@@ -100,6 +100,7 @@ export function TrendCharts({
         title="🍼 Susu / hari"
         subtitle="Target naik seiring usia bayi"
         unit="ml"
+        anchorId="susu"
       >
         <ResponsiveContainer width="100%" height={200}>
           <ComposedChart data={daily} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
@@ -162,6 +163,7 @@ export function TrendCharts({
         title="🌙 Tidur / hari"
         subtitle="Target naik seiring usia · cross-day di-split"
         unit="jam"
+        anchorId="tidur"
       >
         <ResponsiveContainer width="100%" height={200}>
           <ComposedChart
@@ -215,6 +217,7 @@ export function TrendCharts({
         title="💧 Pumping / hari"
         subtitle="Stacked Kiri (bawah) + Kanan (atas)"
         unit="ml"
+        anchorId="pumping"
       >
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={daily} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
@@ -249,6 +252,7 @@ export function TrendCharts({
         title="🧷 Diaper / hari"
         subtitle={`Pipis target ${targets.peeMin}+, BAB ${targets.poopMin}–${targets.poopMax}`}
         unit="×"
+        anchorId="diaper"
       >
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={daily} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
@@ -420,15 +424,20 @@ function ChartCard({
   title,
   subtitle,
   unit,
+  anchorId,
   children,
 }: {
   title: string;
   subtitle?: string;
   unit: string;
+  anchorId?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+    <div
+      id={anchorId}
+      className="scroll-mt-4 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm"
+    >
       <div className="mb-1 flex items-baseline justify-between">
         <span className="text-sm font-semibold text-gray-700">{title}</span>
         <span className="text-xs font-normal text-gray-400">({unit})</span>
