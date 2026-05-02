@@ -5,11 +5,11 @@ import { startOngoingLogAction } from "@/app/actions/logs";
 import { SubmitButton } from "@/components/SubmitButton";
 
 const OFFSET_OPTIONS: { value: number; label: string }[] = [
-  { value: 0, label: "Sekarang" },
+  { value: 1, label: "1 menit lalu" },
+  { value: 3, label: "3 menit lalu" },
   { value: 5, label: "5 menit lalu" },
+  { value: 7, label: "7 menit lalu" },
   { value: 10, label: "10 menit lalu" },
-  { value: 15, label: "15 menit lalu" },
-  { value: 30, label: "30 menit lalu" },
 ];
 
 export function StartOngoingButton({
@@ -22,7 +22,7 @@ export function StartOngoingButton({
   emoji: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [offsetMin, setOffsetMin] = useState(0);
+  const [offsetMin, setOffsetMin] = useState(1);
 
   if (!open) {
     return (
@@ -49,7 +49,7 @@ export function StartOngoingButton({
           type="button"
           onClick={() => {
             setOpen(false);
-            setOffsetMin(0);
+            setOffsetMin(1);
           }}
           className="text-[11px] text-gray-400 hover:text-gray-600"
           aria-label="Batal"
