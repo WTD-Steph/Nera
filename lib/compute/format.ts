@@ -35,6 +35,18 @@ export function fmtDuration(mins: number): string {
   return rem ? `${h}j ${rem}m` : `${h}j`;
 }
 
+export function pumpDur(
+  startIso: string | null,
+  endIso: string | null,
+): number | null {
+  if (!startIso || !endIso) return null;
+  const start = new Date(startIso).getTime();
+  const end = new Date(endIso).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start)
+    return null;
+  return Math.round((end - start) / 60000);
+}
+
 export function fmtSleepRange(
   startIso: string,
   endIso: string | null,

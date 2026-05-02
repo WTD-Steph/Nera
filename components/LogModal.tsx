@@ -276,30 +276,74 @@ function LogModal({
           ) : null}
 
           {subtype === "pumping" ? (
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Kiri (ml)">
-                <input
-                  type="number"
-                  name="amount_l_ml"
-                  step="1"
-                  min="0"
-                  max="500"
-                  inputMode="numeric"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
-                />
-              </Field>
-              <Field label="Kanan (ml)">
-                <input
-                  type="number"
-                  name="amount_r_ml"
-                  step="1"
-                  min="0"
-                  max="500"
-                  inputMode="numeric"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
-                />
-              </Field>
-            </div>
+            <>
+              <div className="rounded-2xl border border-gray-100 bg-gray-50/40 p-3">
+                <div className="mb-2 text-xs font-semibold text-gray-700">
+                  🤱 Kiri
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Mulai">
+                    <input
+                      type="datetime-local"
+                      name="start_l_at"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                    />
+                  </Field>
+                  <Field label="Selesai">
+                    <input
+                      type="datetime-local"
+                      name="end_l_at"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                    />
+                  </Field>
+                </div>
+                <Field label="Jumlah (ml)">
+                  <input
+                    type="number"
+                    name="amount_l_ml"
+                    step="1"
+                    min="0"
+                    max="500"
+                    inputMode="numeric"
+                    placeholder="0"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                  />
+                </Field>
+              </div>
+              <div className="rounded-2xl border border-gray-100 bg-gray-50/40 p-3">
+                <div className="mb-2 text-xs font-semibold text-gray-700">
+                  🤱 Kanan
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Mulai">
+                    <input
+                      type="datetime-local"
+                      name="start_r_at"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                    />
+                  </Field>
+                  <Field label="Selesai">
+                    <input
+                      type="datetime-local"
+                      name="end_r_at"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                    />
+                  </Field>
+                </div>
+                <Field label="Jumlah (ml)">
+                  <input
+                    type="number"
+                    name="amount_r_ml"
+                    step="1"
+                    min="0"
+                    max="500"
+                    inputMode="numeric"
+                    placeholder="0"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                  />
+                </Field>
+              </div>
+            </>
           ) : null}
 
           {subtype === "diaper" ? (
