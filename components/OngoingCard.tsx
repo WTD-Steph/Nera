@@ -155,6 +155,23 @@ function NightLamp({
     return () => window.removeEventListener("keydown", onEsc);
   }, [onClose]);
 
+  // Request fullscreen so the browser chrome (URL bar, tabs) hides on
+  // tablet/desktop, leaving only the dim night-lamp surface. Browsers
+  // require a user gesture; the click that opened this modal counts.
+  // iOS Safari ignores fullscreen on web pages — installing as PWA
+  // (Add to Home Screen) gives the same effect natively.
+  useEffect(() => {
+    const el = document.documentElement;
+    if (el.requestFullscreen && !document.fullscreenElement) {
+      el.requestFullscreen().catch(() => {});
+    }
+    return () => {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    };
+  }, []);
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black"

@@ -38,7 +38,7 @@ const SUBTYPE_LABEL: Record<string, string> = {
   sleep: "Tidur",
   bath: "Mandi",
   temp: "Suhu",
-  med: "Obat",
+  med: "Obat / Suplemen",
 };
 
 function logDetail(l: LogRow): string {
