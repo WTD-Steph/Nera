@@ -21,6 +21,11 @@ const EMOJIS: Record<Subtype, string> = {
   pumping: "💧",
 };
 
+// Official Spotify "Baby Sleep" playlist (Spotify editorial, ~777K saves).
+// Universal link: opens Spotify app on mobile, web player on desktop.
+const SLEEP_PLAYLIST_URL =
+  "https://open.spotify.com/playlist/37i9dQZF1DX0DxcHtn4Hwo";
+
 function fmtClock(iso: string): string {
   // Locked to Asia/Jakarta with en-GB locale (uses colon) so server
   // and client render identically as "HH:MM" — no hydration mismatch.
@@ -86,20 +91,31 @@ export function OngoingCard({
         </button>
 
         {subtype === "sleep" ? (
-          <form
-            action={endOngoingSleepAction}
-            onSubmit={() => setTimeout(() => setShowLamp(false), 0)}
-            className="mt-3"
-          >
-            <input type="hidden" name="id" value={id} />
-            <input type="hidden" name="return_to" value="/" />
-            <SubmitButton
-              pendingText="Menyimpan…"
-              className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
+          <>
+            <a
+              href={SLEEP_PLAYLIST_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 active:bg-emerald-100"
             >
-              Bangun · Stop
-            </SubmitButton>
-          </form>
+              <span aria-hidden>🎵</span>
+              <span>Putar musik tidur · Spotify</span>
+            </a>
+            <form
+              action={endOngoingSleepAction}
+              onSubmit={() => setTimeout(() => setShowLamp(false), 0)}
+              className="mt-2"
+            >
+              <input type="hidden" name="id" value={id} />
+              <input type="hidden" name="return_to" value="/" />
+              <SubmitButton
+                pendingText="Menyimpan…"
+                className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
+              >
+                Bangun · Stop
+              </SubmitButton>
+            </form>
+          </>
         ) : (
           <button
             type="button"
@@ -197,7 +213,17 @@ function NightLamp({
         Sejak {fmtClock(startIso)}
       </div>
 
-      <div className="mt-12 w-full max-w-xs px-6">
+      <div className="mt-12 w-full max-w-xs space-y-3 px-6">
+        {subtype === "sleep" ? (
+          <a
+            href={SLEEP_PLAYLIST_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full rounded-2xl border border-red-900/40 bg-transparent py-3 text-center text-sm font-medium text-red-700/80 hover:bg-red-950/30 active:bg-red-950/50"
+          >
+            🎵 Musik tidur · Spotify
+          </a>
+        ) : null}
         {subtype === "sleep" ? (
           <form
             action={endOngoingSleepAction}
