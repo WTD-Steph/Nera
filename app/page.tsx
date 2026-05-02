@@ -779,7 +779,14 @@ export default async function HomePage({
                       </div>
                     ) : null}
                     <div className="mt-0.5 text-[11px] text-gray-400">
-                      {fmtTime(l.timestamp)} · {timeSince(l.timestamp)}
+                      {fmtTime(l.timestamp)} ·{" "}
+                      {ongoing ? (
+                        <span className="font-semibold text-rose-600">
+                          {paused ? "dijeda" : "sedang berjalan"}
+                        </span>
+                      ) : (
+                        timeSince(l.timestamp)
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
