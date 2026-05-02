@@ -37,7 +37,49 @@ type SearchParams = {
   logsaved?: string;
   logerror?: string;
   ongoingstarted?: string;
+  act?: string;
 };
+
+type ActFilter = "bottle" | "dbf" | "pumping" | "sleep" | "diaper";
+const ACT_LABEL: Record<ActFilter, string> = {
+  bottle: "🍼 Susu",
+  dbf: "🤱 DBF",
+  pumping: "💧 Pumping",
+  sleep: "🌙 Tidur",
+  diaper: "🧷 Diaper",
+};
+function parseAct(s: string | undefined): ActFilter | null {
+  if (
+    s === "bottle" ||
+    s === "dbf" ||
+    s === "pumping" ||
+    s === "sleep" ||
+    s === "diaper"
+  ) {
+    return s;
+  }
+  return null;
+}
+function matchesAct(l: LogRow, act: ActFilter): boolean {
+  switch (act) {
+    case "bottle":
+      return l.subtype === "feeding" && l.amount_ml != null;
+    case "dbf":
+      return (
+        l.subtype === "feeding" &&
+        (l.duration_l_min != null ||
+          l.duration_r_min != null ||
+          l.start_l_at != null ||
+          l.start_r_at != null)
+      );
+    case "pumping":
+      return l.subtype === "pumping";
+    case "sleep":
+      return l.subtype === "sleep";
+    case "diaper":
+      return l.subtype === "diaper";
+  }
+}
 
 function formatAge(dob: string): string {
   const days = Math.floor((Date.now() - new Date(dob).getTime()) / 86400000);
@@ -229,7 +271,11 @@ export default async function HomePage({
   );
   const stats = computeTodayStats(logsArray);
   const last = computeLastByType(logsArray);
-  const recent = logsArray.slice(0, 6);
+  const activeAct = parseAct(searchParams.act);
+  const filteredLogs = activeAct
+    ? logsArray.filter((l) => matchesAct(l, activeAct))
+    : logsArray;
+  const recent = filteredLogs.slice(0, activeAct ? 20 : 6);
 
   const welcome = searchParams.welcome;
   const welcomeMsg =
@@ -439,11 +485,15 @@ export default async function HomePage({
                 ? `${stats.feedingMlCount}×`
                 : undefined
             }
+            href="/?act=bottle#aktivitas"
+            active={activeAct === "bottle"}
           />
           <StatRow
             label="🤱 DBF"
             value={fmtDuration(stats.dbfMinTotal)}
             sub={stats.dbfCount > 0 ? `${stats.dbfCount}×` : undefined}
+            href="/?act=dbf#aktivitas"
+            active={activeAct === "dbf"}
           />
           {stats.dbfCount > 0 &&
           (stats.dbfMinL > 0 || stats.dbfMinR > 0) ? (
@@ -458,6 +508,8 @@ export default async function HomePage({
                 label="💧 Pumping"
                 value={`${stats.pumpML} ml`}
                 sub={`${stats.pumpCount} batch · ${fmtDuration(stats.pumpMinL + stats.pumpMinR)}`}
+                href="/?act=pumping#aktivitas"
+                active={activeAct === "pumping"}
               />
               <div className="-mt-1 ml-6 text-[11px] text-gray-500">
                 Kiri {stats.pumpMlL} ml
@@ -473,6 +525,8 @@ export default async function HomePage({
             sub={
               stats.sleepCount > 0 ? `${stats.sleepCount} sesi` : undefined
             }
+            href="/?act=sleep#aktivitas"
+            active={activeAct === "sleep"}
           />
           <StatRow
             label="🧷 Diaper"
@@ -482,6 +536,8 @@ export default async function HomePage({
                 ? `${stats.diaperPeeCount} 💛 · ${stats.diaperPoopCount} 💩`
                 : undefined
             }
+            href="/?act=diaper#aktivitas"
+            active={activeAct === "diaper"}
           />
         </div>
       </section>
@@ -497,14 +553,26 @@ export default async function HomePage({
         </div>
       </section>
 
-      <section className="mt-5">
-        <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
-          Aktivitas Terbaru
-        </h2>
+      <section id="aktivitas" className="mt-5 scroll-mt-4">
+        <div className="mb-2 flex items-center justify-between px-1">
+          <h2 className="text-sm font-semibold text-gray-700">
+            Aktivitas Terbaru
+          </h2>
+          {activeAct ? (
+            <Link
+              href="/#aktivitas"
+              className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-200"
+            >
+              {ACT_LABEL[activeAct]} <span aria-hidden>✕</span>
+            </Link>
+          ) : null}
+        </div>
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           {recent.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-gray-400">
-              Belum ada catatan. Tap tombol di atas untuk mulai.
+              {activeAct
+                ? `Belum ada catatan ${ACT_LABEL[activeAct]} hari ini.`
+                : "Belum ada catatan. Tap tombol di atas untuk mulai."}
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
@@ -707,13 +775,17 @@ function StatRow({
   label,
   value,
   sub,
+  href,
+  active,
 }: {
   label: string;
   value: string;
   sub?: string;
+  href?: string;
+  active?: boolean;
 }) {
-  return (
-    <div className="flex items-center gap-3">
+  const inner = (
+    <>
       <span className="flex-1 text-sm text-gray-600">{label}</span>
       <span className="text-sm font-bold text-gray-800">{value}</span>
       {sub ? (
@@ -721,6 +793,19 @@ function StatRow({
           {sub}
         </span>
       ) : null}
-    </div>
+    </>
+  );
+  if (!href) {
+    return <div className="flex items-center gap-3">{inner}</div>;
+  }
+  return (
+    <Link
+      href={href}
+      className={`-mx-2 flex items-center gap-3 rounded-lg px-2 py-1 transition-colors ${
+        active ? "bg-rose-50 ring-1 ring-rose-200" : "hover:bg-gray-50"
+      }`}
+    >
+      {inner}
+    </Link>
   );
 }
