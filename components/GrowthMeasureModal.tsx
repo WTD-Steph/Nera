@@ -76,7 +76,11 @@ function Modal({
           <span className="w-6" />
         </div>
 
-        <form action={createGrowthAction} className="space-y-4 p-4">
+        <form
+          action={createGrowthAction}
+          onSubmit={() => setTimeout(onClose, 0)}
+          className="space-y-4 p-4"
+        >
           <FormCloser onClose={onClose} />
           <input type="hidden" name="return_to" value={returnTo} />
 

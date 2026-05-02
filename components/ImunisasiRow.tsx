@@ -117,7 +117,11 @@ function ImunisasiModal({
           <span className="w-6" />
         </div>
 
-        <form action={markImmunizationAction} className="space-y-4 p-4">
+        <form
+          action={markImmunizationAction}
+          onSubmit={() => setTimeout(onClose, 0)}
+          className="space-y-4 p-4"
+        >
           <FormCloser onClose={onClose} />
           <input type="hidden" name="vaccine_key" value={data.vaccineKey} />
           <input type="hidden" name="return_to" value="/imunisasi" />
@@ -175,6 +179,7 @@ function ImunisasiModal({
         {given ? (
           <form
             action={unmarkImmunizationAction}
+            onSubmit={() => setTimeout(onClose, 0)}
             className="border-t border-gray-100 px-4 pb-4 pt-3"
           >
             <FormCloser onClose={onClose} />

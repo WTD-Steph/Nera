@@ -117,7 +117,11 @@ function LogModal({
           <span className="w-6" />
         </div>
 
-        <form action={createLogAction} className="space-y-4 p-4">
+        <form
+          action={createLogAction}
+          onSubmit={() => setTimeout(onClose, 0)}
+          className="space-y-4 p-4"
+        >
           <FormCloser onClose={onClose} />
           <input type="hidden" name="subtype" value={subtype} />
           <input type="hidden" name="return_to" value={returnTo} />
