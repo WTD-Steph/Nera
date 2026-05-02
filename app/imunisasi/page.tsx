@@ -86,11 +86,6 @@ export default async function ImunisasiPage({
         <span className="w-12" />
       </header>
 
-      {searchParams.imusaved ? (
-        <div className="mt-3 rounded-2xl border border-green-100 bg-green-50 p-3 text-xs text-green-800">
-          Catatan tersimpan.
-        </div>
-      ) : null}
       {searchParams.imuerror ? (
         <div className="mt-3 rounded-2xl border border-red-100 bg-red-50 p-3 text-xs text-red-700">
           {searchParams.imuerror}

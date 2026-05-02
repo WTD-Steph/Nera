@@ -57,10 +57,27 @@ export function pumpingMlPerMin(logs: LogRow[]): number | null {
   return null;
 }
 
+/**
+ * @param override Per-baby manual override (from babies.dbf_ml_per_min).
+ *   When set, takes precedence over pumping-derived rate. Null/undefined
+ *   = use auto chain (pumping → literature default).
+ */
 export function dbfEstimateMl(
   dbfMinutes: number,
   logs: LogRow[],
-): { ml: number; mlPerMin: number; source: "pumping" | "default" } {
+  override?: number | null,
+): {
+  ml: number;
+  mlPerMin: number;
+  source: "manual" | "pumping" | "default";
+} {
+  if (typeof override === "number" && override > 0) {
+    return {
+      ml: Math.round(dbfMinutes * override),
+      mlPerMin: override,
+      source: "manual",
+    };
+  }
   const fromPump = pumpingMlPerMin(logs);
   const rate = fromPump ?? DEFAULT_DBF_ML_PER_MIN;
   return {

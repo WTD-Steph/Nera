@@ -115,11 +115,6 @@ export default async function GrowthPage({
         </GrowthMeasureTrigger>
       </header>
 
-      {searchParams.growthsaved ? (
-        <div className="mt-3 rounded-2xl border border-green-100 bg-green-50 p-3 text-xs text-green-800">
-          Pengukuran tersimpan.
-        </div>
-      ) : null}
       {searchParams.growtherror ? (
         <div className="mt-3 rounded-2xl border border-red-100 bg-red-50 p-3 text-xs text-red-700">
           {searchParams.growtherror}

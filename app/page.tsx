@@ -31,7 +31,10 @@ import {
   pumpDur,
   timeSince,
 } from "@/lib/compute/format";
-import { getTargetForAge } from "@/lib/constants/daily-targets";
+import {
+  getTargetForAge,
+  computeMilkTarget,
+} from "@/lib/constants/daily-targets";
 import { dbfEstimateMl } from "@/lib/compute/dbf-estimate";
 
 type SearchParams = {
@@ -210,8 +213,12 @@ export default async function HomePage({
   const supabase = createClient();
 
   const since = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
-  const [{ data: logs }, { data: medsData }, { data: stockData }] =
-    await Promise.all([
+  const [
+    { data: logs },
+    { data: medsData },
+    { data: stockData },
+    { data: latestWeightData },
+  ] = await Promise.all([
       supabase
         .from("logs")
         .select(
@@ -234,6 +241,13 @@ export default async function HomePage({
         .eq("subtype", "pumping")
         .not("end_timestamp", "is", null)
         .order("timestamp", { ascending: true }),
+      supabase
+        .from("growth_measurements")
+        .select("weight_kg")
+        .eq("baby_id", baby.id)
+        .order("measured_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
   const medications = (medsData ?? []) as Medication[];
   const stockBatches = (stockData ?? []).map((b) => {
@@ -275,7 +289,14 @@ export default async function HomePage({
   const stats = computeTodayStats(logsArray);
   const last = computeLastByType(logsArray);
   const target = getTargetForAge(baby.dob);
-  const dbfEst = dbfEstimateMl(stats.dbfMinTotal, logsArray);
+  const currentWeightKg =
+    latestWeightData?.weight_kg ?? baby.birth_weight_kg ?? null;
+  const milkTarget = computeMilkTarget(target, currentWeightKg);
+  const dbfEst = dbfEstimateMl(
+    stats.dbfMinTotal,
+    logsArray,
+    baby.dbf_ml_per_min,
+  );
   const milkTotalMl = stats.feedingMlTotal + dbfEst.ml;
   const milkBreakdownParts: string[] = [];
   if (stats.feedingMlCount > 0) {
@@ -304,7 +325,6 @@ export default async function HomePage({
         ? `Selamat datang ke keluarga ${household.household_name}!`
         : null;
 
-  const logsaved = searchParams.logsaved;
   const logerror = searchParams.logerror;
 
   return (
@@ -333,11 +353,6 @@ export default async function HomePage({
       {welcomeMsg ? (
         <div className="mt-3 rounded-2xl border border-rose-100 bg-rose-50 p-3 text-sm text-rose-800">
           {welcomeMsg}
-        </div>
-      ) : null}
-      {logsaved ? (
-        <div className="mt-3 rounded-2xl border border-green-100 bg-green-50 p-3 text-xs text-green-800">
-          {SUBTYPE_LABEL[logsaved] ?? "Log"} tersimpan.
         </div>
       ) : null}
       {logerror ? (
@@ -517,8 +532,8 @@ export default async function HomePage({
           <StatRow
             label="🍼 Susu"
             value={`${milkTotalMl} ml`}
-            sub={`${target.milkMlMin}–${target.milkMlMax} ml`}
-            progress={milkTotalMl / target.milkMlMin}
+            sub={`${milkTarget.min}–${milkTarget.max} ml`}
+            progress={milkTotalMl / milkTarget.min}
             detail={milkBreakdown}
             href="/?act=bottle#aktivitas"
             active={activeAct === "bottle"}
@@ -571,10 +586,16 @@ export default async function HomePage({
             {Math.floor(
               (Date.now() - new Date(baby.dob).getTime()) / 86400000,
             )}{" "}
-            hari. DBF dihitung sebagai estimasi
-            {dbfEst.source === "pumping"
-              ? ` (${dbfEst.mlPerMin.toFixed(1)} ml/menit dari pumping terakhir)`
-              : ` (default ${dbfEst.mlPerMin} ml/menit)`}{" "}
+            hari
+            {milkTarget.source === "weight"
+              ? `, susu ${target.milkMlPerKgMin}–${target.milkMlPerKgMax} ml/kg/hari × ${currentWeightKg} kg`
+              : ""}
+            . DBF estimasi{" "}
+            {dbfEst.source === "manual"
+              ? `${dbfEst.mlPerMin} ml/menit (override manual)`
+              : dbfEst.source === "pumping"
+                ? `${dbfEst.mlPerMin.toFixed(1)} ml/menit dari pumping terakhir`
+                : `default ${dbfEst.mlPerMin} ml/menit`}{" "}
             — bukan ukuran pasti. Selalu konsultasi DSA untuk evaluasi medis.
           </p>
         </div>
@@ -634,7 +655,8 @@ export default async function HomePage({
                     ? "bg-rose-50/50 border-l-4 border-l-rose-300"
                     : "";
                 const flash =
-                  idx === 0 && (logsaved || searchParams.ongoingstarted)
+                  idx === 0 &&
+                  (searchParams.logsaved || searchParams.ongoingstarted)
                     ? " flash-in"
                     : "";
                 return (
