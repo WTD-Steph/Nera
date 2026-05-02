@@ -16,7 +16,9 @@ function num(formData: FormData, key: string): number | null {
 function isoOrNull(formData: FormData, key: string): string | null {
   const raw = String(formData.get(key) ?? "").trim();
   if (raw === "") return null;
-  const d = new Date(raw);
+  // datetime-local has no TZ; Vercel is UTC. Treat the input as Jakarta.
+  const withTz = /[+-]\d{2}:\d{2}$|Z$/i.test(raw) ? raw : `${raw}:00+07:00`;
+  const d = new Date(withTz);
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 

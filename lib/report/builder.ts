@@ -137,8 +137,13 @@ export function buildCsvReport({
     const d = new Date(l.timestamp);
     lines.push(
       csvRow([
-        d.toLocaleDateString("id-ID"),
-        `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
+        d.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" }),
+        d.toLocaleTimeString("id-ID", {
+          timeZone: "Asia/Jakarta",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }),
         l.subtype,
         logDetailCsv(l),
         l.notes ?? "",
