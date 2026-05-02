@@ -31,6 +31,8 @@ import {
   pumpDur,
   timeSince,
 } from "@/lib/compute/format";
+import { getTargetForAge } from "@/lib/constants/daily-targets";
+import { dbfEstimateMl } from "@/lib/compute/dbf-estimate";
 
 type SearchParams = {
   welcome?: string;
@@ -272,6 +274,22 @@ export default async function HomePage({
   );
   const stats = computeTodayStats(logsArray);
   const last = computeLastByType(logsArray);
+  const target = getTargetForAge(baby.dob);
+  const dbfEst = dbfEstimateMl(stats.dbfMinTotal, logsArray);
+  const milkTotalMl = stats.feedingMlTotal + dbfEst.ml;
+  const milkBreakdownParts: string[] = [];
+  if (stats.feedingMlCount > 0) {
+    milkBreakdownParts.push(
+      `${stats.feedingMlTotal} ml botol (${stats.feedingMlCount}×)`,
+    );
+  }
+  if (stats.dbfCount > 0) {
+    milkBreakdownParts.push(
+      `≈${dbfEst.ml} ml dari ${fmtDuration(stats.dbfMinTotal)} DBF`,
+    );
+  }
+  const milkBreakdown =
+    milkBreakdownParts.length > 0 ? milkBreakdownParts.join(" · ") : undefined;
   const activeAct = parseAct(searchParams.act);
   const filteredLogs = activeAct
     ? logsArray.filter((l) => matchesAct(l, activeAct))
@@ -495,69 +513,70 @@ export default async function HomePage({
         <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
           Total Hari Ini
         </h2>
-        <div className="space-y-2.5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="space-y-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <StatRow
             label="🍼 Susu"
-            value={`${stats.feedingMlTotal} ml`}
-            sub={
-              stats.feedingMlCount > 0
-                ? `${stats.feedingMlCount}×`
-                : undefined
-            }
+            value={`${milkTotalMl} ml`}
+            sub={`${target.milkMlMin}–${target.milkMlMax} ml`}
+            progress={milkTotalMl / target.milkMlMin}
+            detail={milkBreakdown}
             href="/?act=bottle#aktivitas"
             active={activeAct === "bottle"}
           />
           <StatRow
-            label="🤱 DBF"
-            value={fmtDuration(stats.dbfMinTotal)}
-            sub={stats.dbfCount > 0 ? `${stats.dbfCount}×` : undefined}
-            href="/?act=dbf#aktivitas"
-            active={activeAct === "dbf"}
-          />
-          {stats.dbfCount > 0 &&
-          (stats.dbfMinL > 0 || stats.dbfMinR > 0) ? (
-            <div className="-mt-1 ml-6 text-[11px] text-gray-500">
-              Kiri {fmtDuration(stats.dbfMinL)} · Kanan{" "}
-              {fmtDuration(stats.dbfMinR)}
-            </div>
-          ) : null}
-          {stats.pumpCount > 0 ? (
-            <>
-              <StatRow
-                label="💧 Pumping"
-                value={`${stats.pumpML} ml`}
-                sub={`${stats.pumpCount} batch · ${fmtDuration(stats.pumpMinL + stats.pumpMinR)}`}
-                href="/?act=pumping#aktivitas"
-                active={activeAct === "pumping"}
-              />
-              <div className="-mt-1 ml-6 text-[11px] text-gray-500">
-                Kiri {stats.pumpMlL} ml
-                {stats.pumpMinL > 0 ? ` / ${fmtDuration(stats.pumpMinL)}` : ""}{" "}
-                · Kanan {stats.pumpMlR} ml
-                {stats.pumpMinR > 0 ? ` / ${fmtDuration(stats.pumpMinR)}` : ""}
-              </div>
-            </>
-          ) : null}
-          <StatRow
             label="🌙 Tidur"
             value={fmtDuration(stats.sleepMin)}
-            sub={
+            sub={`${target.sleepHoursMin}–${target.sleepHoursMax} jam`}
+            progress={stats.sleepMin / 60 / target.sleepHoursMin}
+            detail={
               stats.sleepCount > 0 ? `${stats.sleepCount} sesi` : undefined
             }
             href="/?act=sleep#aktivitas"
             active={activeAct === "sleep"}
           />
           <StatRow
-            label="🧷 Diaper"
-            value={`${stats.diaperCount}×`}
-            sub={
-              stats.diaperCount > 0
-                ? `${stats.diaperPeeCount} 💛 · ${stats.diaperPoopCount} 💩`
-                : undefined
-            }
+            label="💛 Pipis"
+            value={`${stats.diaperPeeCount}×`}
+            sub={`${target.peeMin}–${target.peeMax}×`}
+            progress={stats.diaperPeeCount / target.peeMin}
             href="/?act=diaper#aktivitas"
             active={activeAct === "diaper"}
           />
+          <StatRow
+            label="💩 BAB"
+            value={`${stats.diaperPoopCount}×`}
+            sub={`${target.poopMin}–${target.poopMax}×`}
+            progress={stats.diaperPoopCount / target.poopMin}
+            href="/?act=diaper#aktivitas"
+            active={activeAct === "diaper"}
+          />
+          {stats.pumpCount > 0 ? (
+            <div className="border-t border-gray-100 pt-3">
+              <StatRow
+                label="💧 Pumping"
+                value={`${stats.pumpML} ml`}
+                sub={`${stats.pumpCount} batch`}
+                detail={`Kiri ${stats.pumpMlL} ml${
+                  stats.pumpMinL > 0 ? ` / ${fmtDuration(stats.pumpMinL)}` : ""
+                } · Kanan ${stats.pumpMlR} ml${
+                  stats.pumpMinR > 0 ? ` / ${fmtDuration(stats.pumpMinR)}` : ""
+                }`}
+                href="/?act=pumping#aktivitas"
+                active={activeAct === "pumping"}
+              />
+            </div>
+          ) : null}
+          <p className="border-t border-gray-100 pt-2 text-[10px] leading-snug text-gray-400">
+            Target referensi WHO/IDAI/AAP usia{" "}
+            {Math.floor(
+              (Date.now() - new Date(baby.dob).getTime()) / 86400000,
+            )}{" "}
+            hari. DBF dihitung sebagai estimasi
+            {dbfEst.source === "pumping"
+              ? ` (${dbfEst.mlPerMin.toFixed(1)} ml/menit dari pumping terakhir)`
+              : ` (default ${dbfEst.mlPerMin} ml/menit)`}{" "}
+            — bukan ukuran pasti. Selalu konsultasi DSA untuk evaluasi medis.
+          </p>
         </div>
       </section>
 
@@ -794,33 +813,62 @@ function StatRow({
   label,
   value,
   sub,
+  progress,
+  detail,
   href,
   active,
 }: {
   label: string;
   value: string;
+  /** Target text shown right of value (e.g. "600–800 ml"). */
   sub?: string;
+  /** 0..1+ progress against target min. Renders progress bar when set. */
+  progress?: number;
+  /** Optional small line below the row (breakdown, per-side detail). */
+  detail?: string;
   href?: string;
   active?: boolean;
 }) {
+  const pct = progress != null ? Math.min(1, Math.max(0, progress)) : null;
+  const barColor =
+    progress == null
+      ? "bg-gray-300"
+      : progress >= 1
+        ? "bg-emerald-500"
+        : progress >= 0.6
+          ? "bg-amber-400"
+          : "bg-rose-400";
   const inner = (
-    <>
-      <span className="flex-1 text-sm text-gray-600">{label}</span>
-      <span className="text-sm font-bold text-gray-800">{value}</span>
-      {sub ? (
-        <span className="w-24 text-right text-[11px] text-gray-400">
-          {sub}
-        </span>
+    <div className="w-full">
+      <div className="flex items-baseline gap-3">
+        <span className="flex-1 truncate text-sm text-gray-600">{label}</span>
+        <span className="text-sm font-bold text-gray-800">{value}</span>
+        {sub ? (
+          <span className="w-24 text-right text-[11px] text-gray-400">
+            / {sub}
+          </span>
+        ) : null}
+      </div>
+      {pct != null ? (
+        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+          <div
+            className={`h-full rounded-full ${barColor} transition-[width]`}
+            style={{ width: `${Math.round(pct * 100)}%` }}
+          />
+        </div>
       ) : null}
-    </>
+      {detail ? (
+        <div className="mt-0.5 text-[11px] text-gray-500">{detail}</div>
+      ) : null}
+    </div>
   );
   if (!href) {
-    return <div className="flex items-center gap-3">{inner}</div>;
+    return <div>{inner}</div>;
   }
   return (
     <Link
       href={href}
-      className={`-mx-2 flex items-center gap-3 rounded-lg px-2 py-1 transition-colors ${
+      className={`-mx-2 block rounded-lg px-2 py-1 transition-colors ${
         active ? "bg-rose-50 ring-1 ring-rose-200" : "hover:bg-gray-50"
       }`}
     >
