@@ -9,6 +9,7 @@ import {
   type SleepHeatmapRow,
   type FeedingIntervalBucket,
 } from "@/components/TrendCharts";
+import { TrendHighlights } from "@/components/TrendHighlights";
 import { getTargetForAge } from "@/lib/constants/daily-targets";
 import { dbfEstimateMl } from "@/lib/compute/dbf-estimate";
 import { type LogRow } from "@/lib/compute/stats";
@@ -172,10 +173,22 @@ export default async function TrendPage() {
   }));
 
   // === Feeding interval histogram ===
-  const feedings = logsArray
+  // Cluster-feeding dedup: feedings within CLUSTER_DEDUP_MIN of each other
+  // count as one session (e.g. ASI bottle + sufor top-up at same time).
+  // Without this, the "<1 jam" bucket gets inflated by data-entry artifacts
+  // and the median collapses unrealistically low.
+  const CLUSTER_DEDUP_MIN = 5;
+  const feedingsRaw = logsArray
     .filter((l) => l.subtype === "feeding")
     .map((l) => new Date(l.timestamp).getTime())
     .sort((a, b) => a - b);
+  const feedings: number[] = [];
+  for (const t of feedingsRaw) {
+    const last = feedings[feedings.length - 1];
+    if (last === undefined || (t - last) / 60000 >= CLUSTER_DEDUP_MIN) {
+      feedings.push(t);
+    }
+  }
   const intervals: number[] = [];
   for (let i = 1; i < feedings.length; i++) {
     const a = feedings[i - 1];
@@ -211,6 +224,64 @@ export default async function TrendPage() {
 
   const target = getTargetForAge(baby.dob);
 
+  // === Today's stats for highlights ===
+  const todayKey = dayKey(new Date());
+  const todayAgg = dayIndex.get(todayKey);
+  const todaySleep = logsArray.filter((l) => {
+    if (l.subtype !== "sleep" || !l.end_timestamp) return false;
+    return dayKey(new Date(l.timestamp)) === todayKey;
+  });
+  const sleepDurations = todaySleep.map(
+    (l) =>
+      (new Date(l.end_timestamp!).getTime() -
+        new Date(l.timestamp).getTime()) /
+      60000,
+  );
+  const sleepLongestMin = sleepDurations.length
+    ? Math.max(...sleepDurations)
+    : 0;
+  const sleepCount = todaySleep.length;
+
+  // Today's feedings (after dedup) for highlights count
+  const todayFeedings = feedings.filter(
+    (t) => dayKey(new Date(t)) === todayKey,
+  );
+  const todayFeedingCount = logsArray.filter(
+    (l) =>
+      l.subtype === "feeding" && dayKey(new Date(l.timestamp)) === todayKey,
+  ).length;
+
+  // 7-day milk avg (excluding today, only days with non-zero data)
+  const last7 = days.slice(-8, -1).filter((d) => d.milkTotalMl > 0);
+  const milk7dAvg =
+    last7.length > 0
+      ? last7.reduce((s, d) => s + d.milkTotalMl, 0) / last7.length
+      : null;
+  const sleepDays7 = days.slice(-8, -1).filter((d) => d.sleepMin > 0);
+  const sleep7dAvgMin =
+    sleepDays7.length > 0
+      ? sleepDays7.reduce((s, d) => s + d.sleepMin, 0) / sleepDays7.length
+      : null;
+
+  // DBF rate used (re-compute once for caption)
+  const todayDbfMin = todayAgg
+    ? todayFeedings.reduce((sum, _t) => sum, 0) // placeholder; we'll compute from logs
+    : 0;
+  // Compute today's DBF minutes from logsArray
+  const dbfMinToday = logsArray
+    .filter((l) => {
+      if (l.subtype !== "feeding") return false;
+      return dayKey(new Date(l.timestamp)) === todayKey;
+    })
+    .reduce(
+      (sum, l) => sum + (l.duration_l_min ?? 0) + (l.duration_r_min ?? 0),
+      0,
+    );
+  const dbfEstToday = dbfEstimateMl(dbfMinToday, logsArray, {
+    fixedMlPerMin: baby.dbf_ml_per_min,
+    pumpingMultiplier: baby.dbf_pumping_multiplier,
+  });
+
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl lg:max-w-3xl">
       <header className="flex items-center justify-between">
@@ -220,6 +291,35 @@ export default async function TrendPage() {
         <h1 className="text-base font-bold text-gray-900">Trend 14 hari</h1>
         <span className="w-12" />
       </header>
+
+      <div className="mt-4">
+        <TrendHighlights
+          data={{
+            milkTotalMl: todayAgg?.milkTotalMl ?? 0,
+            milkTargetMin: target.milkMlMin,
+            milkTargetMax: target.milkMlMax,
+            bottleMl: todayAgg?.bottleMl ?? 0,
+            dbfMin: dbfMinToday,
+            dbfEstimateMl: dbfEstToday.ml,
+            dbfRate: dbfEstToday.mlPerMin,
+            dbfRateSource: dbfEstToday.source,
+            sleepMin: todayAgg?.sleepMin ?? 0,
+            sleepTargetHoursMin: target.sleepHoursMin,
+            sleepTargetHoursMax: target.sleepHoursMax,
+            sleepLongestMin: Math.round(sleepLongestMin),
+            sleepCount,
+            peeCount: todayAgg?.peeCount ?? 0,
+            peeTargetMin: target.peeMin,
+            poopCount: todayAgg?.poopCount ?? 0,
+            poopTargetMin: target.poopMin,
+            feedingCount: todayFeedingCount,
+            feedingSessionCount: todayFeedings.length,
+            feedingMedianMin,
+            milk7dAvg,
+            sleep7dAvgMin,
+          }}
+        />
+      </div>
 
       <div className="mt-4">
         <TrendCharts
