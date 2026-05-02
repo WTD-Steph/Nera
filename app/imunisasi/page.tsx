@@ -10,7 +10,6 @@ import { ImunisasiRow } from "@/components/ImunisasiRow";
 
 type SearchParams = {
   imusaved?: string;
-  imudeleted?: string;
   imuerror?: string;
 };
 
@@ -90,11 +89,6 @@ export default async function ImunisasiPage({
       {searchParams.imusaved ? (
         <div className="mt-3 rounded-2xl border border-green-100 bg-green-50 p-3 text-xs text-green-800">
           Catatan tersimpan.
-        </div>
-      ) : null}
-      {searchParams.imudeleted ? (
-        <div className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
-          Catatan dihapus.
         </div>
       ) : null}
       {searchParams.imuerror ? (

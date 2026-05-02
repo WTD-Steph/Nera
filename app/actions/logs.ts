@@ -729,5 +729,5 @@ export async function deleteLogAction(formData: FormData) {
 
   revalidatePath("/");
   revalidatePath("/history");
-  redirect(`${returnTo}?logdeleted=1`);
+  redirect(returnTo);
 }

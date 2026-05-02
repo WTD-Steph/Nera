@@ -19,7 +19,6 @@ import { deleteGrowthAction } from "@/app/actions/growth";
 
 type SearchParams = {
   growthsaved?: string;
-  growthdeleted?: string;
   growtherror?: string;
 };
 
@@ -119,11 +118,6 @@ export default async function GrowthPage({
       {searchParams.growthsaved ? (
         <div className="mt-3 rounded-2xl border border-green-100 bg-green-50 p-3 text-xs text-green-800">
           Pengukuran tersimpan.
-        </div>
-      ) : null}
-      {searchParams.growthdeleted ? (
-        <div className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
-          Pengukuran dihapus.
         </div>
       ) : null}
       {searchParams.growtherror ? (

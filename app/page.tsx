@@ -31,7 +31,6 @@ import {
 type SearchParams = {
   welcome?: string;
   logsaved?: string;
-  logdeleted?: string;
   logerror?: string;
   ongoingstarted?: string;
 };
@@ -237,7 +236,6 @@ export default async function HomePage({
         : null;
 
   const logsaved = searchParams.logsaved;
-  const logdeleted = searchParams.logdeleted;
   const logerror = searchParams.logerror;
 
   return (
@@ -271,11 +269,6 @@ export default async function HomePage({
       {logsaved ? (
         <div className="mt-3 rounded-2xl border border-green-100 bg-green-50 p-3 text-xs text-green-800">
           {SUBTYPE_LABEL[logsaved] ?? "Log"} tersimpan.
-        </div>
-      ) : null}
-      {logdeleted ? (
-        <div className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
-          Log dihapus.
         </div>
       ) : null}
       {logerror ? (

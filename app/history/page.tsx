@@ -24,7 +24,7 @@ type Filter =
   | "temp"
   | "med"
   | "bath";
-type SearchParams = { filter?: string; logdeleted?: string };
+type SearchParams = { filter?: string };
 
 const FILTERS: { id: Filter; label: string; subtypes: string[] }[] = [
   { id: "all", label: "Semua", subtypes: [] },
@@ -146,12 +146,6 @@ export default async function HistoryPage({
         <h1 className="text-base font-bold text-gray-900">Riwayat</h1>
         <span className="w-12" />
       </header>
-
-      {searchParams.logdeleted ? (
-        <div className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
-          Log dihapus.
-        </div>
-      ) : null}
 
       <div
         className="mt-4 -mx-4 flex gap-2 overflow-x-auto px-4 pb-1"
