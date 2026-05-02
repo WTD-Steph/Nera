@@ -216,12 +216,15 @@ function ImunisasiModal({
             />
           </label>
 
-          <SubmitButton
-            pendingText={given ? "Mengupdate…" : "Menyimpan…"}
-            className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
-          >
-            {given ? "Update" : "Simpan"}
-          </SubmitButton>
+          <div className="sticky bottom-0 -mx-4 -mb-4 mt-2 border-t border-gray-100 bg-white/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+            <SubmitButton
+              pendingText={given ? "Mengupdate…" : "Menyimpan…"}
+              className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
+            >
+              {given ? "Update" : "Simpan"}
+            </SubmitButton>
+            {given ? null : null}
+          </div>
         </form>
 
         {given ? (

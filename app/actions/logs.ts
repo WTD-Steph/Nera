@@ -174,16 +174,17 @@ export async function createLogAction(formData: FormData) {
   }
 
   // ASI stock allocation: when an ASI bottle feed is logged, deduct the
-  // ml from the oldest pumping batches (FIFO). Multiple batches if the
-  // feed exceeds one batch's remaining stock. If total stock is short,
-  // we still allow the feed (parent might be feeding from a batch we
-  // haven't recorded yet) — just don't go negative anywhere.
+  // ml from pumping batches. Default policy: oldest first (FIFO).
+  // If the user picked a specific batch via the modal, allocate from
+  // that batch first, then fall back to FIFO across the rest if the
+  // feed exceeds the picked batch's remaining stock.
   if (
     subtype === "feeding" &&
     payload.bottle_content === "asi" &&
     typeof payload.amount_ml === "number" &&
     payload.amount_ml > 0
   ) {
+    const pickedBatchId = String(formData.get("asi_batch_id") ?? "").trim();
     const { data: batches } = await supabase
       .from("logs")
       .select("id, amount_l_ml, amount_r_ml, consumed_ml")
@@ -192,8 +193,17 @@ export async function createLogAction(formData: FormData) {
       .not("end_timestamp", "is", null)
       .order("timestamp", { ascending: true });
 
+    type Batch = NonNullable<typeof batches>[number];
+    const all: Batch[] = batches ?? [];
+    const ordered: Batch[] = pickedBatchId
+      ? [
+          ...all.filter((b) => b.id === pickedBatchId),
+          ...all.filter((b) => b.id !== pickedBatchId),
+        ]
+      : all;
+
     let remaining = payload.amount_ml;
-    for (const b of batches ?? []) {
+    for (const b of ordered) {
       if (remaining <= 0) break;
       const produced = (b.amount_l_ml ?? 0) + (b.amount_r_ml ?? 0);
       const consumed = b.consumed_ml ?? 0;
