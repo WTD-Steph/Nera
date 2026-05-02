@@ -6,7 +6,7 @@ import { getCurrentBaby } from "@/lib/household/baby";
 import { SubmitButton } from "@/components/SubmitButton";
 import { deleteLogAction } from "@/app/actions/logs";
 import { type LogRow } from "@/lib/compute/stats";
-import { fmtDate, fmtDuration, fmtTime, timeSince } from "@/lib/compute/format";
+import { fmtDate, fmtSleepRange, fmtTime, timeSince } from "@/lib/compute/format";
 import { LogsRealtime } from "@/components/LogsRealtime";
 
 type Filter =
@@ -60,13 +60,7 @@ function logDetail(l: LogRow): string {
     return parts.join(" + ");
   }
   if (l.subtype === "sleep") {
-    if (!l.end_timestamp) return "sedang tidur";
-    const dur = Math.round(
-      (new Date(l.end_timestamp).getTime() -
-        new Date(l.timestamp).getTime()) /
-        60000,
-    );
-    return fmtDuration(dur);
+    return fmtSleepRange(l.timestamp, l.end_timestamp);
   }
   if (l.subtype === "temp") return `${l.temp_celsius}°C`;
   if (l.subtype === "med")

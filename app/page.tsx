@@ -15,7 +15,12 @@ import {
   computeLastByType,
   type LogRow,
 } from "@/lib/compute/stats";
-import { fmtDuration, fmtTime, timeSince } from "@/lib/compute/format";
+import {
+  fmtDuration,
+  fmtSleepRange,
+  fmtTime,
+  timeSince,
+} from "@/lib/compute/format";
 
 type SearchParams = {
   welcome?: string;
@@ -81,13 +86,7 @@ function logDetail(l: LogRow): string {
     return parts.join(" + ");
   }
   if (l.subtype === "sleep") {
-    if (!l.end_timestamp) return "sedang tidur";
-    const dur = Math.round(
-      (new Date(l.end_timestamp).getTime() -
-        new Date(l.timestamp).getTime()) /
-        60000,
-    );
-    return fmtDuration(dur);
+    return fmtSleepRange(l.timestamp, l.end_timestamp);
   }
   if (l.subtype === "temp") return `${l.temp_celsius}°C`;
   if (l.subtype === "med")
@@ -344,10 +343,14 @@ export default async function HomePage({
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
-              {recent.map((l) => (
+              {recent.map((l, idx) => (
                 <div
                   key={l.id}
-                  className="flex items-center gap-3 px-4 py-3"
+                  className={`flex items-center gap-3 px-4 py-3${
+                    idx === 0 && (logsaved || searchParams.ongoingstarted)
+                      ? " flash-in"
+                      : ""
+                  }`}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
