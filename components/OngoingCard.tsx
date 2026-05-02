@@ -315,16 +315,16 @@ function NightLamp({
         Tutup ✕
       </button>
 
-      <LiveClock className="absolute left-4 top-4 font-mono text-xl font-semibold tabular-nums text-red-700/80" />
+      <LiveClock className="absolute left-4 top-4 font-mono text-4xl font-bold tabular-nums text-red-600 sm:text-5xl" />
 
-      <div className="text-base font-bold uppercase tracking-[0.3em] text-red-700/80">
+      <div className="text-2xl font-bold uppercase tracking-[0.3em] text-red-600 sm:text-3xl">
         {title}
       </div>
       <Stopwatch
         startIso={startIso}
         className="mt-4 font-mono text-7xl font-light tabular-nums text-red-700/90 sm:text-[8rem]"
       />
-      <div className="mt-2 text-sm font-medium tracking-widest text-red-700/70">
+      <div className="mt-3 text-lg font-semibold tracking-widest text-red-600/90 sm:text-xl">
         Sejak {fmtClock(startIso)}
       </div>
 
