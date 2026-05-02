@@ -262,7 +262,8 @@ export default async function HomePage({
       l.started_with_stopwatch === true &&
       (l.subtype === "sleep" ||
         l.subtype === "pumping" ||
-        l.subtype === "feeding"),
+        l.subtype === "feeding" ||
+        l.subtype === "hiccup"),
   );
   const ongoingSubtypes = new Set(
     ongoing.map((l) =>
@@ -330,8 +331,10 @@ export default async function HomePage({
       {ongoing.length > 0 ? (
         <section className="mt-5 space-y-2">
           {ongoing.map((l) => {
-            const cardSubtype: "sleep" | "pumping" | "dbf" =
-              l.subtype === "feeding" ? "dbf" : (l.subtype as "sleep" | "pumping");
+            const cardSubtype: "sleep" | "pumping" | "dbf" | "hiccup" =
+              l.subtype === "feeding"
+                ? "dbf"
+                : (l.subtype as "sleep" | "pumping" | "hiccup");
             return (
               <OngoingCard
                 key={l.id}
@@ -354,7 +357,7 @@ export default async function HomePage({
         <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
           Mulai Sekarang
         </h2>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {!ongoingSubtypes.has("sleep") ? (
             <StartOngoingButton
               subtype="sleep"
@@ -396,6 +399,22 @@ export default async function HomePage({
               </span>
               <span className="text-[11px] font-semibold text-center leading-tight">
                 Pumping berlangsung
+              </span>
+            </div>
+          )}
+          {!ongoingSubtypes.has("hiccup") ? (
+            <StartOngoingButton
+              subtype="hiccup"
+              label="Cegukan"
+              emoji="🤧"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-rose-100 bg-rose-50/40 p-3 text-rose-400">
+              <span className="text-2xl" aria-hidden>
+                🤧
+              </span>
+              <span className="text-[11px] font-semibold text-center leading-tight">
+                Cegukan berlangsung
               </span>
             </div>
           )}
@@ -666,23 +685,23 @@ export default async function HomePage({
                         </form>
                       );
                     })()}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 leading-none">
                       {!ongoing ? (
                         <EditLogModalTrigger
                           log={l}
                           medications={medications}
                           returnTo="/"
-                          className="text-[11px] text-gray-400 hover:text-rose-600"
+                          className="text-[11px] leading-none text-gray-400 hover:text-rose-600"
                         >
                           Edit
                         </EditLogModalTrigger>
                       ) : null}
-                      <form action={deleteLogAction}>
+                      <form action={deleteLogAction} className="contents">
                         <input type="hidden" name="id" value={l.id} />
                         <input type="hidden" name="return_to" value="/" />
                         <SubmitButton
                           pendingText="…"
-                          className="text-[11px] text-gray-400 hover:text-red-600"
+                          className="text-[11px] leading-none text-gray-400 hover:text-red-600"
                         >
                           Hapus
                         </SubmitButton>
