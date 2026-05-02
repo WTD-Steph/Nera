@@ -38,6 +38,16 @@ function nowDatetimeLocal(): string {
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
 }
 
+function addMinutesLocal(localStr: string, minutes: number): string {
+  // localStr is "YYYY-MM-DDTHH:mm" interpreted in local TZ. Adding by ms
+  // and re-deriving local string keeps DST correct.
+  const ms = new Date(localStr).getTime();
+  if (!Number.isFinite(ms)) return localStr;
+  const next = new Date(ms + minutes * 60000);
+  const off = next.getTimezoneOffset();
+  return new Date(next.getTime() - off * 60000).toISOString().slice(0, 16);
+}
+
 export function LogModalTrigger({
   subtype,
   className,
@@ -96,6 +106,41 @@ function LogModal({
   const [feedingMode, setFeedingMode] = useState<"sufor" | "dbf">("sufor");
   // Bottle content (only when feedingMode='sufor'): formula vs expressed ASI
   const [bottleContent, setBottleContent] = useState<"sufor" | "asi">("sufor");
+
+  // Pumping per-side timestamps. Defaults: Kiri now → now+15, Kanan
+  // sequentially after (now+15 → now+30). When user edits Kiri's
+  // selesai, Kanan's mulai cascades to match (only as long as Kanan
+  // hasn't been manually touched).
+  const initialNow = nowDatetimeLocal();
+  const [pumpStartL, setPumpStartL] = useState<string>(initialNow);
+  const [pumpEndL, setPumpEndL] = useState<string>(
+    addMinutesLocal(initialNow, 15),
+  );
+  const [pumpStartR, setPumpStartR] = useState<string>(
+    addMinutesLocal(initialNow, 15),
+  );
+  const [pumpEndR, setPumpEndR] = useState<string>(
+    addMinutesLocal(initialNow, 30),
+  );
+  const [pumpRTouched, setPumpRTouched] = useState(false);
+  const updatePumpEndL = (v: string) => {
+    setPumpEndL(v);
+    if (!pumpRTouched) {
+      setPumpStartR(v);
+      setPumpEndR(addMinutesLocal(v, 15));
+    }
+  };
+  const updatePumpStartL = (v: string) => {
+    setPumpStartL(v);
+    // Bump endL by 15 min relative to new start, keeping cascade
+    const nextEndL = addMinutesLocal(v, 15);
+    setPumpEndL(nextEndL);
+    if (!pumpRTouched) {
+      setPumpStartR(nextEndL);
+      setPumpEndR(addMinutesLocal(nextEndL, 15));
+    }
+  };
+  const markPumpRTouched = () => setPumpRTouched(true);
 
   // Diaper toggles
   const [hasPee, setHasPee] = useState(false);
@@ -277,6 +322,10 @@ function LogModal({
 
           {subtype === "pumping" ? (
             <>
+              <p className="text-[11px] text-gray-500">
+                Isi kedua sisi atau salah satu. Jumlah = 0 → sisi tersebut
+                dianggap tidak pumping.
+              </p>
               <div className="rounded-2xl border border-gray-100 bg-gray-50/40 p-3">
                 <div className="mb-2 text-xs font-semibold text-gray-700">
                   🤱 Kiri
@@ -286,6 +335,8 @@ function LogModal({
                     <input
                       type="datetime-local"
                       name="start_l_at"
+                      value={pumpStartL}
+                      onChange={(e) => updatePumpStartL(e.target.value)}
                       className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                     />
                   </Field>
@@ -293,6 +344,8 @@ function LogModal({
                     <input
                       type="datetime-local"
                       name="end_l_at"
+                      value={pumpEndL}
+                      onChange={(e) => updatePumpEndL(e.target.value)}
                       className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                     />
                   </Field>
@@ -306,6 +359,7 @@ function LogModal({
                     max="500"
                     inputMode="numeric"
                     placeholder="0"
+                    defaultValue={0}
                     className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                   />
                 </Field>
@@ -319,6 +373,12 @@ function LogModal({
                     <input
                       type="datetime-local"
                       name="start_r_at"
+                      value={pumpStartR}
+                      onChange={(e) => {
+                        markPumpRTouched();
+                        setPumpStartR(e.target.value);
+                        setPumpEndR(addMinutesLocal(e.target.value, 15));
+                      }}
                       className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                     />
                   </Field>
@@ -326,6 +386,11 @@ function LogModal({
                     <input
                       type="datetime-local"
                       name="end_r_at"
+                      value={pumpEndR}
+                      onChange={(e) => {
+                        markPumpRTouched();
+                        setPumpEndR(e.target.value);
+                      }}
                       className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                     />
                   </Field>
@@ -339,6 +404,7 @@ function LogModal({
                     max="500"
                     inputMode="numeric"
                     placeholder="0"
+                    defaultValue={0}
                     className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                   />
                 </Field>
