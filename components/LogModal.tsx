@@ -360,7 +360,9 @@ function LogModal({
               </p>
             </Field>
           ) : (
-            <Field label="Waktu">
+            <Field
+              label={subtype === "sleep" ? "Waktu Mulai" : "Waktu"}
+            >
               <input
                 type="datetime-local"
                 name="timestamp"
@@ -631,7 +633,7 @@ function LogModal({
 
           {subtype === "sleep" ? (
             <>
-              <Field label="Bangun (kosongkan jika masih tidur)">
+              <Field label="Waktu Bangun (kosongkan jika masih tidur)">
                 <input
                   type="datetime-local"
                   name="end_timestamp"
@@ -640,6 +642,10 @@ function LogModal({
                   )}
                   className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                 />
+                <p className="mt-1 text-[11px] text-gray-400">
+                  Kosong = bayi masih tidur. Setelah simpan, app akan masuk
+                  mode dark biar bisa monitor stopwatch dari jauh.
+                </p>
               </Field>
               <Field label="Kualitas tidur (opsional)">
                 <select

@@ -44,6 +44,7 @@ type SearchParams = {
   logerror?: string;
   ongoingstarted?: string;
   act?: string;
+  darklamp?: string;
 };
 
 type ActFilter = "bottle" | "dbf" | "pumping" | "sleep" | "diaper";
@@ -124,7 +125,7 @@ const SUBTYPE_LABEL: Record<string, string> = {
   med: "Obat / Suplemen",
 };
 
-function logDetail(l: LogRow): string {
+function logDetail(l: LogRow, dbfRate: number): string {
   // Ongoing pumping / DBF rows have null ml and null durations — show
   // which side is active rather than "L 0 / R 0 ml".
   const isOngoing = l.end_timestamp === null;
@@ -148,7 +149,9 @@ function logDetail(l: LogRow): string {
     }
     const lMin = l.duration_l_min ?? 0;
     const rMin = l.duration_r_min ?? 0;
-    return `🤱 L ${lMin}m / R ${rMin}m`;
+    const lMl = Math.round(lMin * dbfRate);
+    const rMl = Math.round(rMin * dbfRate);
+    return `🤱 L ${lMin}m (≈${lMl} ml) · R ${rMin}m (≈${rMl} ml)`;
   }
   if (l.subtype === "pumping") {
     if (isOngoing) {
@@ -383,11 +386,17 @@ export default async function HomePage({
 
       {ongoing.length > 0 ? (
         <section className="mt-5 space-y-2">
-          {ongoing.map((l) => {
+          {ongoing.map((l, idx) => {
             const cardSubtype: "sleep" | "pumping" | "dbf" | "hiccup" =
               l.subtype === "feeding"
                 ? "dbf"
                 : (l.subtype as "sleep" | "pumping" | "hiccup");
+            // Auto-open dark lamp once after manual sleep submit with
+            // empty Bangun. Match by subtype, only first such row.
+            const shouldAutoOpenLamp =
+              idx === 0 &&
+              searchParams.darklamp === "sleep" &&
+              cardSubtype === "sleep";
             return (
               <OngoingCard
                 key={l.id}
@@ -400,6 +409,7 @@ export default async function HomePage({
                 pumpStartRAt={l.start_r_at}
                 pumpEndRAt={l.end_r_at}
                 dbfMlPerMin={dbfEst.mlPerMin}
+                autoOpenLamp={shouldAutoOpenLamp}
               />
             );
           })}
@@ -606,7 +616,7 @@ export default async function HomePage({
               <StatRow
                 label="🤱 Total Boobs"
                 value={`L ${fmtDuration(totalBoobsLMin)} · R ${fmtDuration(totalBoobsRMin)}`}
-                detail="DBF + Pumping per sisi"
+                detail={`L ≈${Math.round(stats.dbfMinL * dbfEst.mlPerMin) + stats.pumpMlL} ml · R ≈${Math.round(stats.dbfMinR * dbfEst.mlPerMin) + stats.pumpMlR} ml (DBF estimasi + Pumping per sisi)`}
               />
             </div>
           ) : null}
@@ -713,9 +723,9 @@ export default async function HomePage({
                           berlangsung
                         </span>
                       ) : null}
-                      {logDetail(l) ? (
+                      {logDetail(l, dbfEst.mlPerMin) ? (
                         <span className="truncate text-xs text-gray-500">
-                          • {logDetail(l)}
+                          • {logDetail(l, dbfEst.mlPerMin)}
                         </span>
                       ) : null}
                     </div>

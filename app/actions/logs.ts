@@ -145,7 +145,14 @@ export async function createLogAction(formData: FormData) {
       payload.poop_consistency = str(formData, "poop_consistency");
     }
   } else if (subtype === "sleep") {
-    payload.end_timestamp = isoOrNull(formData, "end_timestamp");
+    const endTs = isoOrNull(formData, "end_timestamp");
+    payload.end_timestamp = endTs;
+    // Empty Bangun = baby still sleeping → treat as ongoing so the row
+    // shows in OngoingCard + can be ended via the regular flow. The
+    // home page will also auto-open NightLamp via ?darklamp=sleep.
+    if (endTs === null) {
+      payload.started_with_stopwatch = true;
+    }
     const quality = String(formData.get("sleep_quality") ?? "").trim();
     if (quality === "nyenyak" || quality === "gelisah" || quality === "sering_bangun") {
       payload.sleep_quality = quality;
@@ -225,7 +232,14 @@ export async function createLogAction(formData: FormData) {
 
   revalidatePath("/");
   revalidatePath("/history");
-  redirect(`${returnTo}?logsaved=${subtype}`);
+  // Auto-open NightLamp when manual sleep log was saved with empty
+  // Bangun → baby still sleeping → user wants to monitor stopwatch.
+  const isOngoingSleep =
+    subtype === "sleep" && payload.end_timestamp === null;
+  const queryString = isOngoingSleep
+    ? `?logsaved=${subtype}&darklamp=sleep`
+    : `?logsaved=${subtype}`;
+  redirect(`${returnTo}${queryString}`);
 }
 
 export async function startOngoingLogAction(formData: FormData) {
