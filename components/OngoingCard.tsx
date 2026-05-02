@@ -592,17 +592,10 @@ function DbfControls({
   startRAt: string | null;
   endRAt: string | null;
 }) {
-  // Same per-side state machine as PumpingControls, but Selesai
-  // submits directly (no ml prompt — DBF tracks duration only).
+  // DBF feeds one side at a time biologically. Selesai always ends
+  // the whole session — no Pindah option, no per-side cascade.
   const lActive = !!startLAt && !endLAt;
   const rActive = !!startRAt && !endRAt;
-  const canPindah = (lActive && !startRAt) || (rActive && !startLAt);
-  const fromSide: "kiri" | "kanan" | null = canPindah
-    ? lActive
-      ? "kiri"
-      : "kanan"
-    : null;
-  const otherSide = fromSide === "kiri" ? "Kanan" : "Kiri";
 
   return (
     <div className="mt-3 space-y-2">
@@ -621,9 +614,6 @@ function DbfControls({
           <span>Tidak ada sisi aktif — selesai untuk menyimpan</span>
         ) : null}
       </div>
-      {canPindah && fromSide ? (
-        <PindahForm id={id} fromSide={fromSide} otherSide={otherSide} />
-      ) : null}
       <form action={endOngoingDbfAction}>
         <input type="hidden" name="id" value={id} />
         <input type="hidden" name="return_to" value="/" />
