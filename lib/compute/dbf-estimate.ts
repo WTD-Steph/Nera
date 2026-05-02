@@ -32,9 +32,14 @@ function pumpSessionMinutes(p: LogRow): number {
 }
 
 /**
- * Returns ml/min from the most recent pumping session that has both
- * ml + duration data. Returns null if no such session exists yet.
+ * Returns ml/min from the most recent meaningful pumping session — one
+ * with at least 5 ml total and 10 minutes duration. Tiny sessions
+ * (test pumps, interrupted feeds) skew the rate unrealistically low
+ * (e.g. 10 ml / 21 min = 0.5 ml/min) when they're not representative.
+ * Returns null if no qualifying session exists yet.
  */
+const MIN_PUMP_ML = 5;
+const MIN_PUMP_MIN = 10;
 export function pumpingMlPerMin(logs: LogRow[]): number | null {
   const candidates = [...logs]
     .filter((l) => l.subtype === "pumping" && l.end_timestamp != null)
@@ -45,7 +50,7 @@ export function pumpingMlPerMin(logs: LogRow[]): number | null {
   for (const p of candidates) {
     const totalMl = (p.amount_l_ml ?? 0) + (p.amount_r_ml ?? 0);
     const totalMin = pumpSessionMinutes(p);
-    if (totalMl > 0 && totalMin > 0) {
+    if (totalMl >= MIN_PUMP_ML && totalMin >= MIN_PUMP_MIN) {
       return totalMl / totalMin;
     }
   }
