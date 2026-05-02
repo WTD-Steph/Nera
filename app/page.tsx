@@ -289,8 +289,12 @@ export default async function HomePage({
   const stats = computeTodayStats(logsArray);
   const last = computeLastByType(logsArray);
   const target = getTargetForAge(baby.dob);
-  const currentWeightKg =
-    latestWeightData?.weight_kg ?? baby.birth_weight_kg ?? null;
+  const currentWeightKg = (() => {
+    const raw = latestWeightData?.weight_kg ?? baby.birth_weight_kg ?? null;
+    if (raw == null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
   const milkTarget = computeMilkTarget(target, currentWeightKg);
   const dbfEst = dbfEstimateMl(
     stats.dbfMinTotal,
