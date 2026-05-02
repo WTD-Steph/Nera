@@ -121,6 +121,8 @@ export default async function TrendPage() {
     const agg: DailyAgg = {
       date: key,
       short: shortLabel(d.toISOString()),
+      suforMl: 0,
+      asiMl: 0,
       bottleMl: 0,
       dbfEstimateMl: 0,
       milkTotalMl: 0,
@@ -147,6 +149,14 @@ export default async function TrendPage() {
       if (!agg) continue;
       if (l.amount_ml != null && l.amount_ml > 0) {
         agg.bottleMl += l.amount_ml;
+        // Bucket bottle ml: ASI vs Sufor. Legacy entries with NULL
+        // bottle_content (pre-migration) treated as Sufor since pre-
+        // migration assumption was formula by default.
+        if (l.bottle_content === "asi") {
+          agg.asiMl += l.amount_ml;
+        } else {
+          agg.suforMl += l.amount_ml;
+        }
       }
       const dbfMin = (l.duration_l_min ?? 0) + (l.duration_r_min ?? 0);
       if (dbfMin > 0) {
@@ -155,6 +165,8 @@ export default async function TrendPage() {
           pumpingMultiplier: baby.dbf_pumping_multiplier,
         });
         agg.dbfEstimateMl += est.ml;
+        // DBF = breastmilk → asi total
+        agg.asiMl += est.ml;
       }
     } else if (l.subtype === "pumping") {
       if (!agg) continue;
@@ -189,6 +201,8 @@ export default async function TrendPage() {
   // Round + finalize
   for (const d of days) {
     d.bottleMl = Math.round(d.bottleMl);
+    d.suforMl = Math.round(d.suforMl);
+    d.asiMl = Math.round(d.asiMl);
     d.pumpMlL = Math.round(d.pumpMlL);
     d.pumpMlR = Math.round(d.pumpMlR);
     d.dbfEstimateMl = Math.round(d.dbfEstimateMl);
