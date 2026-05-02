@@ -316,7 +316,7 @@ function NightLamp({
         Tutup ✕
       </button>
 
-      <div className="text-xs uppercase tracking-[0.3em] text-red-900/60">
+      <div className="text-base font-bold uppercase tracking-[0.3em] text-red-700/80">
         {title}
       </div>
       <Stopwatch

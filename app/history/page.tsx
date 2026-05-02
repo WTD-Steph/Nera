@@ -65,9 +65,11 @@ function logDetail(l: LogRow): string {
   if (l.subtype === "pumping") {
     const lDur = pumpDur(l.start_l_at, l.end_l_at);
     const rDur = pumpDur(l.start_r_at, l.end_r_at);
-    const left = `L ${l.amount_l_ml ?? 0}${lDur ? `/${lDur}m` : ""}`;
-    const right = `R ${l.amount_r_ml ?? 0}${rDur ? `/${rDur}m` : ""}`;
-    return `${left} · ${right} ml`;
+    const left =
+      `L ${l.amount_l_ml ?? 0} ml` + (lDur ? ` · ${lDur} mnt` : "");
+    const right =
+      `R ${l.amount_r_ml ?? 0} ml` + (rDur ? ` · ${rDur} mnt` : "");
+    return `${left}  ·  ${right}`;
   }
   if (l.subtype === "diaper") {
     const parts: string[] = [];
