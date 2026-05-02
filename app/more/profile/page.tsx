@@ -36,14 +36,26 @@ export default async function ProfilePage({
       </p>
 
       {saved ? (
-        <p className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-700">
-          Profil tersimpan.
-        </p>
+        <div className="flash-in mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 shadow-sm">
+          <span
+            className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"
+            aria-hidden
+          >
+            ✓
+          </span>
+          <span>Perubahan berhasil tersimpan.</span>
+        </div>
       ) : null}
       {error ? (
-        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-          {error}
-        </p>
+        <div className="flash-in mt-3 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800 shadow-sm">
+          <span
+            className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-red-500 text-white"
+            aria-hidden
+          >
+            !
+          </span>
+          <span>{error}</span>
+        </div>
       ) : null}
 
       <form
