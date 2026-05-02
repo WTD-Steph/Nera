@@ -243,6 +243,10 @@ export default async function HomePage({
               subtype={l.subtype as "sleep" | "pumping"}
               startIso={l.timestamp}
               sleepPlaylistUrl={household.sleep_playlist_url}
+              pumpStartLAt={l.start_l_at}
+              pumpEndLAt={l.end_l_at}
+              pumpStartRAt={l.start_r_at}
+              pumpEndRAt={l.end_r_at}
             />
           ))}
         </section>
@@ -376,12 +380,27 @@ export default async function HomePage({
             value={fmtDuration(stats.dbfMinTotal)}
             sub={stats.dbfCount > 0 ? `${stats.dbfCount}×` : undefined}
           />
-          {stats.pumpML > 0 ? (
-            <StatRow
-              label="💧 Pumping"
-              value={`${stats.pumpML} ml`}
-              sub={`${stats.pumpCount}×`}
-            />
+          {stats.dbfCount > 0 &&
+          (stats.dbfMinL > 0 || stats.dbfMinR > 0) ? (
+            <div className="-mt-1 ml-6 text-[11px] text-gray-500">
+              Kiri {fmtDuration(stats.dbfMinL)} · Kanan{" "}
+              {fmtDuration(stats.dbfMinR)}
+            </div>
+          ) : null}
+          {stats.pumpCount > 0 ? (
+            <>
+              <StatRow
+                label="💧 Pumping"
+                value={`${stats.pumpML} ml`}
+                sub={`${stats.pumpCount} batch · ${fmtDuration(stats.pumpMinL + stats.pumpMinR)}`}
+              />
+              <div className="-mt-1 ml-6 text-[11px] text-gray-500">
+                Kiri {stats.pumpMlL} ml
+                {stats.pumpMinL > 0 ? ` / ${fmtDuration(stats.pumpMinL)}` : ""}{" "}
+                · Kanan {stats.pumpMlR} ml
+                {stats.pumpMinR > 0 ? ` / ${fmtDuration(stats.pumpMinR)}` : ""}
+              </div>
+            </>
           ) : null}
           <StatRow
             label="🌙 Tidur"

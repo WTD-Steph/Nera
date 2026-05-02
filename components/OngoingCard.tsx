@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   endOngoingSleepAction,
   endOngoingPumpingAction,
+  pumpingPindahAction,
 } from "@/app/actions/logs";
 import { Stopwatch } from "@/components/Stopwatch";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -42,11 +43,19 @@ export function OngoingCard({
   subtype,
   startIso,
   sleepPlaylistUrl,
+  pumpStartLAt,
+  pumpEndLAt,
+  pumpStartRAt,
+  pumpEndRAt,
 }: {
   id: string;
   subtype: Subtype;
   startIso: string;
   sleepPlaylistUrl?: string | null;
+  pumpStartLAt?: string | null;
+  pumpEndLAt?: string | null;
+  pumpStartRAt?: string | null;
+  pumpEndRAt?: string | null;
 }) {
   const [showLamp, setShowLamp] = useState(false);
   const [showPumpEnd, setShowPumpEnd] = useState(false);
@@ -123,13 +132,14 @@ export function OngoingCard({
             </form>
           </>
         ) : (
-          <button
-            type="button"
-            onClick={() => setShowPumpEnd(true)}
-            className="mt-3 w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
-          >
-            Stop · Catat ml
-          </button>
+          <PumpingControls
+            id={id}
+            startLAt={pumpStartLAt ?? null}
+            endLAt={pumpEndLAt ?? null}
+            startRAt={pumpStartRAt ?? null}
+            endRAt={pumpEndRAt ?? null}
+            onShowEnd={() => setShowPumpEnd(true)}
+          />
         )}
       </div>
 
@@ -382,6 +392,78 @@ function EndPumpingModal({
           </SubmitButton>
         </form>
       </div>
+    </div>
+  );
+}
+
+function PumpingControls({
+  id,
+  startLAt,
+  endLAt,
+  startRAt,
+  endRAt,
+  onShowEnd,
+}: {
+  id: string;
+  startLAt: string | null;
+  endLAt: string | null;
+  startRAt: string | null;
+  endRAt: string | null;
+  onShowEnd: () => void;
+}) {
+  // Determine which side is currently active. "Active" = started but not
+  // yet ended.
+  const lActive = !!startLAt && !endLAt;
+  const rActive = !!startRAt && !endRAt;
+  // If only one side has been started so far AND it's still active, show
+  // a Pindah button. After Pindah-ing once, both sides have been started
+  // → Pindah no longer makes sense (we'd flip back to a finished side).
+  const canPindah =
+    (lActive && !startRAt) || (rActive && !startLAt);
+  const fromSide: "kiri" | "kanan" | null = canPindah
+    ? lActive
+      ? "kiri"
+      : "kanan"
+    : null;
+  const otherSide = fromSide === "kiri" ? "Kanan" : "Kiri";
+
+  return (
+    <div className="mt-3 space-y-2">
+      <div className="flex items-center justify-center gap-2 text-[11px] text-gray-500">
+        {lActive ? (
+          <span className="rounded-full bg-rose-100 px-2 py-0.5 font-medium text-rose-700">
+            🤱 Kiri aktif
+          </span>
+        ) : null}
+        {rActive ? (
+          <span className="rounded-full bg-rose-100 px-2 py-0.5 font-medium text-rose-700">
+            🤱 Kanan aktif
+          </span>
+        ) : null}
+        {!lActive && !rActive ? (
+          <span>Tidak ada sisi aktif — selesai untuk catat ml</span>
+        ) : null}
+      </div>
+      {canPindah && fromSide ? (
+        <form action={pumpingPindahAction}>
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="from_side" value={fromSide} />
+          <input type="hidden" name="return_to" value="/" />
+          <SubmitButton
+            pendingText="Memindah…"
+            className="w-full rounded-xl border border-rose-200 bg-white py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50"
+          >
+            ⇄ Pindah ke {otherSide}
+          </SubmitButton>
+        </form>
+      ) : null}
+      <button
+        type="button"
+        onClick={onShowEnd}
+        className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
+      >
+        Selesai · Catat ml
+      </button>
     </div>
   );
 }

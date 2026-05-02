@@ -110,19 +110,21 @@ export async function createLogAction(formData: FormData) {
         `${returnTo}?logerror=${encodeURIComponent("Isi jumlah pumping kiri atau kanan.")}`,
       );
     }
-    payload.amount_l_ml = l;
-    payload.amount_r_ml = r;
-    const startL = isoOrNull(formData, "start_l_at");
-    const endL = isoOrNull(formData, "end_l_at");
-    const startR = isoOrNull(formData, "start_r_at");
-    const endR = isoOrNull(formData, "end_r_at");
+    // ml === 0 / null → that side wasn't pumped. Drop ml + timestamps
+    // for that side so we don't store fake defaults from the form.
+    const lActive = l !== null && l > 0;
+    const rActive = r !== null && r > 0;
+    payload.amount_l_ml = lActive ? l : null;
+    payload.amount_r_ml = rActive ? r : null;
+    const startL = lActive ? isoOrNull(formData, "start_l_at") : null;
+    const endL = lActive ? isoOrNull(formData, "end_l_at") : null;
+    const startR = rActive ? isoOrNull(formData, "start_r_at") : null;
+    const endR = rActive ? isoOrNull(formData, "end_r_at") : null;
     payload.start_l_at = startL;
     payload.end_l_at = endL;
     payload.start_r_at = startR;
     payload.end_r_at = endR;
-    // If user filled per-side times, derive overall session timestamps
-    // from min(starts) → max(ends). Falls back to the form's "Waktu" if
-    // neither side has a time set.
+    // Overall session window from per-side min(starts) → max(ends).
     const starts = [startL, startR].filter((v): v is string => !!v).sort();
     const ends = [endL, endR].filter((v): v is string => !!v).sort();
     if (starts[0]) payload.timestamp = starts[0];
@@ -224,13 +226,30 @@ export async function startOngoingLogAction(formData: FormData) {
   if (!baby) redirect("/setup");
 
   const supabase = createClient();
-  const { error } = await supabase.from("logs").insert({
+  const now = new Date().toISOString();
+  const insertPayload: Record<string, unknown> = {
     baby_id: baby.id,
     subtype,
-    timestamp: new Date().toISOString(),
+    timestamp: now,
     end_timestamp: null,
     created_by: user.id,
-  });
+  };
+
+  // Pumping side picker: 'kiri' | 'kanan' | 'both'. Set start_X_at on
+  // the chosen side(s) so we can show the correct mid-session buttons.
+  if (subtype === "pumping") {
+    const side = String(formData.get("pumping_side") ?? "both");
+    if (side === "kiri") {
+      insertPayload.start_l_at = now;
+    } else if (side === "kanan") {
+      insertPayload.start_r_at = now;
+    } else {
+      insertPayload.start_l_at = now;
+      insertPayload.start_r_at = now;
+    }
+  }
+
+  const { error } = await supabase.from("logs").insert(insertPayload as never);
 
   if (error) {
     redirect(
@@ -279,13 +298,40 @@ export async function endOngoingPumpingAction(formData: FormData) {
   }
 
   const supabase = createClient();
+  // Read current per-side state so we can close any side that was
+  // started but not yet ended (user pressed Selesai without Pindah).
+  const { data: existing } = await supabase
+    .from("logs")
+    .select("start_l_at, end_l_at, start_r_at, end_r_at")
+    .eq("id", id)
+    .single();
+  const now = new Date().toISOString();
+  const lActive = l !== null && l > 0;
+  const rActive = r !== null && r > 0;
+  const updates: Record<string, unknown> = {
+    end_timestamp: now,
+    amount_l_ml: lActive ? l : null,
+    amount_r_ml: rActive ? r : null,
+  };
+  if (existing?.start_l_at && !existing.end_l_at && lActive) {
+    updates.end_l_at = now;
+  }
+  if (existing?.start_r_at && !existing.end_r_at && rActive) {
+    updates.end_r_at = now;
+  }
+  // ml=0 → side wasn't actually pumped: scrub its start/end too
+  if (!lActive) {
+    updates.start_l_at = null;
+    updates.end_l_at = null;
+  }
+  if (!rActive) {
+    updates.start_r_at = null;
+    updates.end_r_at = null;
+  }
+
   const { error } = await supabase
     .from("logs")
-    .update({
-      end_timestamp: new Date().toISOString(),
-      amount_l_ml: l,
-      amount_r_ml: r,
-    })
+    .update(updates as never)
     .eq("id", id)
     .eq("subtype", "pumping")
     .is("end_timestamp", null);
@@ -297,6 +343,38 @@ export async function endOngoingPumpingAction(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/history");
   redirect(`${returnTo}?logsaved=pumping`);
+}
+
+export async function pumpingPindahAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const fromSide = String(formData.get("from_side") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/");
+  if (!id || (fromSide !== "kiri" && fromSide !== "kanan")) {
+    redirect(returnTo);
+  }
+
+  const supabase = createClient();
+  const now = new Date().toISOString();
+  const updates: Record<string, unknown> =
+    fromSide === "kiri"
+      ? { end_l_at: now, start_r_at: now }
+      : { end_r_at: now, start_l_at: now };
+
+  const { error } = await supabase
+    .from("logs")
+    .update(updates as never)
+    .eq("id", id)
+    .eq("subtype", "pumping")
+    .is("end_timestamp", null);
+
+  if (error) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent(`Gagal pindah: ${error.message}`)}`,
+    );
+  }
+
+  revalidatePath("/");
+  redirect(returnTo);
 }
 
 export async function deleteLogAction(formData: FormData) {
