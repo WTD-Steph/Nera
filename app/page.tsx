@@ -151,7 +151,7 @@ function logDetail(l: LogRow, dbfRate: number): string {
     const rMin = l.duration_r_min ?? 0;
     const lMl = Math.round(lMin * dbfRate);
     const rMl = Math.round(rMin * dbfRate);
-    return `🤱 L ${lMin}m (≈${lMl} ml) · R ${rMin}m (≈${rMl} ml)`;
+    return `🤱 L ${lMin}m (≈${lMl} ml) | R ${rMin}m (≈${rMl} ml)`;
   }
   if (l.subtype === "pumping") {
     if (isOngoing) {
@@ -168,7 +168,7 @@ function logDetail(l: LogRow, dbfRate: number): string {
       `L ${l.amount_l_ml ?? 0} ml` + (lDur ? ` · ${lDur} mnt` : "");
     const rFmt =
       `R ${l.amount_r_ml ?? 0} ml` + (rDur ? ` · ${rDur} mnt` : "");
-    return `${lFmt}  ·  ${rFmt}`;
+    return `${lFmt} | ${rFmt}`;
   }
   if (l.subtype === "diaper") {
     const parts: string[] = [];
@@ -595,29 +595,73 @@ export default async function HomePage({
             href="/?act=diaper#aktivitas"
             active={activeAct === "diaper"}
           />
-          {stats.pumpCount > 0 ? (
-            <div className="border-t border-gray-100 pt-3">
-              <StatRow
-                label="💧 Pumping"
-                value={`${stats.pumpML} ml`}
-                sub={`${stats.pumpCount} batch`}
-                detail={`Kiri ${stats.pumpMlL} ml${
-                  stats.pumpMinL > 0 ? ` / ${fmtDuration(stats.pumpMinL)}` : ""
-                } · Kanan ${stats.pumpMlR} ml${
-                  stats.pumpMinR > 0 ? ` / ${fmtDuration(stats.pumpMinR)}` : ""
-                }`}
-                href="/?act=pumping#aktivitas"
-                active={activeAct === "pumping"}
-              />
-            </div>
-          ) : null}
+          {stats.pumpCount > 0
+            ? (() => {
+                const pumpTotalMin = stats.pumpMinL + stats.pumpMinR;
+                const pumpRateOverall =
+                  pumpTotalMin > 0 ? stats.pumpML / pumpTotalMin : 0;
+                const lRate =
+                  stats.pumpMinL > 0 ? stats.pumpMlL / stats.pumpMinL : 0;
+                const rRate =
+                  stats.pumpMinR > 0 ? stats.pumpMlR / stats.pumpMinR : 0;
+                const lFmt =
+                  stats.pumpMlL > 0
+                    ? `Kiri ${stats.pumpMlL} ml / ${fmtDuration(stats.pumpMinL)} (${lRate.toFixed(1)} ml/m)`
+                    : "";
+                const rFmt =
+                  stats.pumpMlR > 0
+                    ? `Kanan ${stats.pumpMlR} ml / ${fmtDuration(stats.pumpMinR)} (${rRate.toFixed(1)} ml/m)`
+                    : "";
+                return (
+                  <div className="border-t border-gray-100 pt-3">
+                    <StatRow
+                      label={`💧 Pumping${pumpRateOverall > 0 ? ` (${pumpRateOverall.toFixed(1)} ml/m)` : ""}`}
+                      value={`${stats.pumpML} ml`}
+                      sub={`${stats.pumpCount} batch`}
+                      detail={[lFmt, rFmt].filter(Boolean).join(" | ")}
+                      href="/?act=pumping#aktivitas"
+                      active={activeAct === "pumping"}
+                    />
+                  </div>
+                );
+              })()
+            : null}
           {totalBoobsLMin > 0 || totalBoobsRMin > 0 ? (
             <div className="border-t border-gray-100 pt-3">
               <StatRow
                 label="🤱 Total Boobs"
-                value={`L ${fmtDuration(totalBoobsLMin)} · R ${fmtDuration(totalBoobsRMin)}`}
-                detail={`L ≈${Math.round(stats.dbfMinL * dbfEst.mlPerMin) + stats.pumpMlL} ml · R ≈${Math.round(stats.dbfMinR * dbfEst.mlPerMin) + stats.pumpMlR} ml (DBF estimasi + Pumping per sisi)`}
+                value={`L ${fmtDuration(totalBoobsLMin)} | R ${fmtDuration(totalBoobsRMin)}`}
               />
+              <div className="mt-1.5 space-y-0.5 text-[11px] text-gray-500">
+                <div>
+                  <span className="font-semibold">Kiri:</span>{" "}
+                  {stats.pumpMlL} ml pumping (actual)
+                  {stats.dbfMinL > 0
+                    ? ` + ≈${Math.round(stats.dbfMinL * dbfEst.mlPerMin)} ml DBF (estimasi)`
+                    : ""}
+                  {" = "}
+                  <span className="font-semibold">
+                    ≈
+                    {stats.pumpMlL +
+                      Math.round(stats.dbfMinL * dbfEst.mlPerMin)}{" "}
+                    ml
+                  </span>
+                </div>
+                <div>
+                  <span className="font-semibold">Kanan:</span>{" "}
+                  {stats.pumpMlR} ml pumping (actual)
+                  {stats.dbfMinR > 0
+                    ? ` + ≈${Math.round(stats.dbfMinR * dbfEst.mlPerMin)} ml DBF (estimasi)`
+                    : ""}
+                  {" = "}
+                  <span className="font-semibold">
+                    ≈
+                    {stats.pumpMlR +
+                      Math.round(stats.dbfMinR * dbfEst.mlPerMin)}{" "}
+                    ml
+                  </span>
+                </div>
+              </div>
             </div>
           ) : null}
           <p className="border-t border-gray-100 pt-2 text-[10px] leading-snug text-gray-400">
@@ -729,7 +773,12 @@ export default async function HomePage({
                         </span>
                       ) : null}
                     </div>
-                    <div className="text-[11px] text-gray-400">
+                    {l.notes ? (
+                      <div className="mt-1 italic text-[11px] text-gray-500">
+                        “{l.notes}”
+                      </div>
+                    ) : null}
+                    <div className="mt-0.5 text-[11px] text-gray-400">
                       {fmtTime(l.timestamp)} · {timeSince(l.timestamp)}
                     </div>
                   </div>

@@ -69,7 +69,7 @@ function logDetail(l: LogRow): string {
       `L ${l.amount_l_ml ?? 0} ml` + (lDur ? ` · ${lDur} mnt` : "");
     const right =
       `R ${l.amount_r_ml ?? 0} ml` + (rDur ? ` · ${rDur} mnt` : "");
-    return `${left}  ·  ${right}`;
+    return `${left} | ${right}`;
   }
   if (l.subtype === "diaper") {
     const parts: string[] = [];
