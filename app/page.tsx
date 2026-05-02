@@ -120,22 +120,45 @@ export default async function HomePage({
   const supabase = createClient();
 
   const since = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
-  const [{ data: logs }, { data: medsData }] = await Promise.all([
-    supabase
-      .from("logs")
-      .select(
-        "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, notes",
-      )
-      .eq("baby_id", baby.id)
-      .gte("timestamp", since)
-      .order("timestamp", { ascending: false }),
-    supabase
-      .from("medications")
-      .select("id, name, default_dose, unit")
-      .eq("household_id", household.household_id)
-      .order("name", { ascending: true }),
-  ]);
+  const [{ data: logs }, { data: medsData }, { data: stockData }] =
+    await Promise.all([
+      supabase
+        .from("logs")
+        .select(
+          "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, notes",
+        )
+        .eq("baby_id", baby.id)
+        .gte("timestamp", since)
+        .order("timestamp", { ascending: false }),
+      supabase
+        .from("medications")
+        .select("id, name, default_dose, unit")
+        .eq("household_id", household.household_id)
+        .order("name", { ascending: true }),
+      supabase
+        .from("logs")
+        .select(
+          "id, timestamp, amount_l_ml, amount_r_ml, consumed_ml",
+        )
+        .eq("baby_id", baby.id)
+        .eq("subtype", "pumping")
+        .not("end_timestamp", "is", null)
+        .order("timestamp", { ascending: true }),
+    ]);
   const medications = (medsData ?? []) as Medication[];
+  const stockBatches = (stockData ?? []).map((b) => {
+    const produced = (b.amount_l_ml ?? 0) + (b.amount_r_ml ?? 0);
+    const consumed = b.consumed_ml ?? 0;
+    return {
+      id: b.id,
+      timestamp: b.timestamp,
+      produced,
+      consumed,
+      remaining: Math.max(0, produced - consumed),
+    };
+  });
+  const stockTotalMl = stockBatches.reduce((s, b) => s + b.remaining, 0);
+  const stockBatchCount = stockBatches.filter((b) => b.remaining > 0).length;
 
   const logsArray: LogRow[] = (logs ?? []) as LogRow[];
   const ongoing = logsArray.filter(
@@ -294,6 +317,38 @@ export default async function HomePage({
           ))}
         </div>
       </section>
+
+      {stockBatches.length > 0 ? (
+        <section className="mt-5">
+          <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
+            Stok ASI
+          </h2>
+          <Link
+            href="/stock"
+            className="block rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 shadow-sm hover:bg-emerald-50"
+          >
+            <div className="flex items-baseline justify-between">
+              <div>
+                <div className="text-xs text-emerald-700/80">
+                  Tersisa
+                </div>
+                <div className="text-2xl font-bold text-emerald-700">
+                  {stockTotalMl} <span className="text-sm font-medium text-emerald-700/70">ml</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-emerald-700/80">Batch aktif</div>
+                <div className="text-base font-bold text-emerald-700">
+                  {stockBatchCount}
+                </div>
+              </div>
+            </div>
+            <div className="mt-1 text-[11px] text-emerald-700/60">
+              FIFO · ASI botol auto-deduct dari batch terlama →
+            </div>
+          </Link>
+        </section>
+      ) : null}
 
       <section className="mt-5">
         <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">

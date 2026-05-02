@@ -18,6 +18,7 @@ export type LogRow = {
   med_name: string | null;
   med_dose: string | null;
   bottle_content: "sufor" | "asi" | null;
+  consumed_ml: number | null;
   notes: string | null;
 };
 

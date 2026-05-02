@@ -156,6 +156,41 @@ export async function createLogAction(formData: FormData) {
     );
   }
 
+  // ASI stock allocation: when an ASI bottle feed is logged, deduct the
+  // ml from the oldest pumping batches (FIFO). Multiple batches if the
+  // feed exceeds one batch's remaining stock. If total stock is short,
+  // we still allow the feed (parent might be feeding from a batch we
+  // haven't recorded yet) — just don't go negative anywhere.
+  if (
+    subtype === "feeding" &&
+    payload.bottle_content === "asi" &&
+    typeof payload.amount_ml === "number" &&
+    payload.amount_ml > 0
+  ) {
+    const { data: batches } = await supabase
+      .from("logs")
+      .select("id, amount_l_ml, amount_r_ml, consumed_ml")
+      .eq("baby_id", baby.id)
+      .eq("subtype", "pumping")
+      .not("end_timestamp", "is", null)
+      .order("timestamp", { ascending: true });
+
+    let remaining = payload.amount_ml;
+    for (const b of batches ?? []) {
+      if (remaining <= 0) break;
+      const produced = (b.amount_l_ml ?? 0) + (b.amount_r_ml ?? 0);
+      const consumed = b.consumed_ml ?? 0;
+      const free = produced - consumed;
+      if (free <= 0) continue;
+      const take = Math.min(remaining, free);
+      await supabase
+        .from("logs")
+        .update({ consumed_ml: consumed + take })
+        .eq("id", b.id);
+      remaining -= take;
+    }
+  }
+
   revalidatePath("/");
   revalidatePath("/history");
   redirect(`${returnTo}?logsaved=${subtype}`);
