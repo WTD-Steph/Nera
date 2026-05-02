@@ -12,6 +12,9 @@ export async function updateBabyAction(formData: FormData) {
   const dob = String(formData.get("dob") ?? "");
   const birthWeight = parseFloat(String(formData.get("birth_weight_kg") ?? ""));
   const birthHeight = parseFloat(String(formData.get("birth_height_cm") ?? ""));
+  const dbfRateRaw = String(formData.get("dbf_ml_per_min") ?? "").trim();
+  const dbfRate =
+    dbfRateRaw === "" ? null : parseFloat(dbfRateRaw);
 
   if (!id) redirect("/more/profile");
   if (!name) {
@@ -35,6 +38,14 @@ export async function updateBabyAction(formData: FormData) {
       `/more/profile?error=${encodeURIComponent("Panjang lahir 0–80 cm.")}`,
     );
   }
+  if (
+    dbfRate !== null &&
+    (!Number.isFinite(dbfRate) || dbfRate < 0.5 || dbfRate > 30)
+  ) {
+    redirect(
+      `/more/profile?error=${encodeURIComponent("DBF ml/menit harus 0.5–30 atau kosong.")}`,
+    );
+  }
 
   // Verify ownership via current baby (RLS + scope check)
   const current = await getCurrentBaby();
@@ -53,7 +64,8 @@ export async function updateBabyAction(formData: FormData) {
       dob,
       birth_weight_kg: birthWeight,
       birth_height_cm: birthHeight,
-    })
+      dbf_ml_per_min: dbfRate,
+    } as never)
     .eq("id", id);
 
   if (error) {

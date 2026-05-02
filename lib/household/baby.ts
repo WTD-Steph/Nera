@@ -10,6 +10,8 @@ export type CurrentBaby = {
   birth_weight_kg: number;
   birth_height_cm: number;
   household_id: string;
+  /** Per-baby override for DBF ml/min estimate. NULL = derive auto. */
+  dbf_ml_per_min: number | null;
 };
 
 /**
@@ -24,7 +26,9 @@ export const getCurrentBaby = cache(async (): Promise<CurrentBaby | null> => {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("babies")
-    .select("id, name, gender, dob, birth_weight_kg, birth_height_cm, household_id")
+    .select(
+      "id, name, gender, dob, birth_weight_kg, birth_height_cm, household_id, dbf_ml_per_min",
+    )
     .eq("household_id", household.household_id)
     .order("created_at", { ascending: true })
     .limit(1)

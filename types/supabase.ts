@@ -20,6 +20,7 @@ export type Database = {
           birth_height_cm: number
           birth_weight_kg: number
           created_at: string
+          dbf_ml_per_min: number | null
           dob: string
           gender: string
           household_id: string
@@ -31,6 +32,7 @@ export type Database = {
           birth_height_cm: number
           birth_weight_kg: number
           created_at?: string
+          dbf_ml_per_min?: number | null
           dob: string
           gender: string
           household_id: string
@@ -42,6 +44,7 @@ export type Database = {
           birth_height_cm?: number
           birth_weight_kg?: number
           created_at?: string
+          dbf_ml_per_min?: number | null
           dob?: string
           gender?: string
           household_id?: string
