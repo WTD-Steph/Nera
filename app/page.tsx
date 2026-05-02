@@ -178,9 +178,19 @@ export default async function HomePage({
   const ongoing = logsArray.filter(
     (l) =>
       l.end_timestamp === null &&
-      (l.subtype === "sleep" || l.subtype === "pumping"),
+      (l.subtype === "sleep" ||
+        l.subtype === "pumping" ||
+        // DBF ongoing: feeding row with per-side timestamps set, no ml.
+        // Distinguishes from sufor bottle feeds which always have ml + no
+        // start_l/r_at.
+        (l.subtype === "feeding" &&
+          (l.start_l_at !== null || l.start_r_at !== null))),
   );
-  const ongoingSubtypes = new Set(ongoing.map((l) => l.subtype));
+  const ongoingSubtypes = new Set(
+    ongoing.map((l) =>
+      l.subtype === "feeding" ? "dbf" : l.subtype,
+    ),
+  );
   const stats = computeTodayStats(logsArray);
   const last = computeLastByType(logsArray);
   const recent = logsArray.slice(0, 6);
@@ -243,19 +253,23 @@ export default async function HomePage({
 
       {ongoing.length > 0 ? (
         <section className="mt-5 space-y-2">
-          {ongoing.map((l) => (
-            <OngoingCard
-              key={l.id}
-              id={l.id}
-              subtype={l.subtype as "sleep" | "pumping"}
-              startIso={l.timestamp}
-              sleepPlaylistUrl={household.sleep_playlist_url}
-              pumpStartLAt={l.start_l_at}
-              pumpEndLAt={l.end_l_at}
-              pumpStartRAt={l.start_r_at}
-              pumpEndRAt={l.end_r_at}
-            />
-          ))}
+          {ongoing.map((l) => {
+            const cardSubtype: "sleep" | "pumping" | "dbf" =
+              l.subtype === "feeding" ? "dbf" : (l.subtype as "sleep" | "pumping");
+            return (
+              <OngoingCard
+                key={l.id}
+                id={l.id}
+                subtype={cardSubtype}
+                startIso={l.timestamp}
+                sleepPlaylistUrl={household.sleep_playlist_url}
+                pumpStartLAt={l.start_l_at}
+                pumpEndLAt={l.end_l_at}
+                pumpStartRAt={l.start_r_at}
+                pumpEndRAt={l.end_r_at}
+              />
+            );
+          })}
         </section>
       ) : null}
 
@@ -263,11 +277,11 @@ export default async function HomePage({
         <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
           Mulai Sekarang
         </h2>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {!ongoingSubtypes.has("sleep") ? (
             <StartOngoingButton
               subtype="sleep"
-              label="Mulai Tidur"
+              label="Tidur"
               emoji="🌙"
             />
           ) : (
@@ -275,15 +289,27 @@ export default async function HomePage({
               <span className="text-2xl" aria-hidden>
                 🌙
               </span>
-              <span className="text-[11px] font-semibold">
+              <span className="text-[11px] font-semibold text-center leading-tight">
                 Tidur berlangsung
+              </span>
+            </div>
+          )}
+          {!ongoingSubtypes.has("dbf") ? (
+            <StartOngoingButton subtype="feeding" label="DBF" emoji="🤱" />
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-rose-100 bg-rose-50/40 p-3 text-rose-400">
+              <span className="text-2xl" aria-hidden>
+                🤱
+              </span>
+              <span className="text-[11px] font-semibold text-center leading-tight">
+                DBF berlangsung
               </span>
             </div>
           )}
           {!ongoingSubtypes.has("pumping") ? (
             <StartOngoingButton
               subtype="pumping"
-              label="Mulai Pumping"
+              label="Pumping"
               emoji="💧"
             />
           ) : (
@@ -291,7 +317,7 @@ export default async function HomePage({
               <span className="text-2xl" aria-hidden>
                 💧
               </span>
-              <span className="text-[11px] font-semibold">
+              <span className="text-[11px] font-semibold text-center leading-tight">
                 Pumping berlangsung
               </span>
             </div>

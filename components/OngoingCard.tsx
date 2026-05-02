@@ -4,22 +4,25 @@ import { useEffect, useState } from "react";
 import {
   endOngoingSleepAction,
   endOngoingPumpingAction,
+  endOngoingDbfAction,
   pumpingPindahAction,
 } from "@/app/actions/logs";
 import { Stopwatch } from "@/components/Stopwatch";
 import { SubmitButton } from "@/components/SubmitButton";
 import { FormCloser } from "@/components/FormCloser";
 
-type Subtype = "sleep" | "pumping";
+type Subtype = "sleep" | "pumping" | "dbf";
 
 const TITLES: Record<Subtype, string> = {
   sleep: "Tidur",
   pumping: "Pumping",
+  dbf: "DBF",
 };
 
 const EMOJIS: Record<Subtype, string> = {
   sleep: "🌙",
   pumping: "💧",
+  dbf: "🤱",
 };
 
 // Default playlist if the household has not set their own. Spotify
@@ -84,19 +87,21 @@ export function OngoingCard({
               Sejak {fmtClock(startIso)}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowLamp(true)}
-            className="rounded-full bg-gray-900/5 p-2 text-gray-600 hover:bg-gray-900/10"
-            aria-label="Mode night lamp"
-          >
-            🌑
-          </button>
+          {subtype !== "dbf" ? (
+            <button
+              type="button"
+              onClick={() => setShowLamp(true)}
+              className="rounded-full bg-gray-900/5 p-2 text-gray-600 hover:bg-gray-900/10"
+              aria-label="Mode night lamp"
+            >
+              🌑
+            </button>
+          ) : null}
         </div>
 
         <button
           type="button"
-          onClick={() => setShowLamp(true)}
+          onClick={() => subtype !== "dbf" && setShowLamp(true)}
           className="mt-2 block w-full text-left"
         >
           <Stopwatch
@@ -131,7 +136,7 @@ export function OngoingCard({
               </SubmitButton>
             </form>
           </>
-        ) : (
+        ) : subtype === "pumping" ? (
           <PumpingControls
             id={id}
             startLAt={pumpStartLAt ?? null}
@@ -139,6 +144,14 @@ export function OngoingCard({
             startRAt={pumpStartRAt ?? null}
             endRAt={pumpEndRAt ?? null}
             onShowEnd={() => setShowPumpEnd(true)}
+          />
+        ) : (
+          <DbfControls
+            id={id}
+            startLAt={pumpStartLAt ?? null}
+            endLAt={pumpEndLAt ?? null}
+            startRAt={pumpStartRAt ?? null}
+            endRAt={pumpEndRAt ?? null}
           />
         )}
       </div>
@@ -466,6 +479,75 @@ function PumpingControls({
       >
         Selesai · Catat ml
       </button>
+    </div>
+  );
+}
+
+function DbfControls({
+  id,
+  startLAt,
+  endLAt,
+  startRAt,
+  endRAt,
+}: {
+  id: string;
+  startLAt: string | null;
+  endLAt: string | null;
+  startRAt: string | null;
+  endRAt: string | null;
+}) {
+  // Same per-side state machine as PumpingControls, but Selesai
+  // submits directly (no ml prompt — DBF tracks duration only).
+  const lActive = !!startLAt && !endLAt;
+  const rActive = !!startRAt && !endRAt;
+  const canPindah = (lActive && !startRAt) || (rActive && !startLAt);
+  const fromSide: "kiri" | "kanan" | null = canPindah
+    ? lActive
+      ? "kiri"
+      : "kanan"
+    : null;
+  const otherSide = fromSide === "kiri" ? "Kanan" : "Kiri";
+
+  return (
+    <div className="mt-3 space-y-2">
+      <div className="flex items-center justify-center gap-2 text-[11px] text-gray-500">
+        {lActive ? (
+          <span className="rounded-full bg-rose-100 px-2 py-0.5 font-medium text-rose-700">
+            🤱 Kiri aktif
+          </span>
+        ) : null}
+        {rActive ? (
+          <span className="rounded-full bg-rose-100 px-2 py-0.5 font-medium text-rose-700">
+            🤱 Kanan aktif
+          </span>
+        ) : null}
+        {!lActive && !rActive ? (
+          <span>Tidak ada sisi aktif — selesai untuk menyimpan</span>
+        ) : null}
+      </div>
+      {canPindah && fromSide ? (
+        <form action={pumpingPindahAction}>
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="from_side" value={fromSide} />
+          <input type="hidden" name="return_to" value="/" />
+          <SubmitButton
+            pendingText="Memindah…"
+            className="w-full rounded-xl border border-rose-200 bg-white py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50"
+          >
+            ⇄ Pindah ke {otherSide}
+          </SubmitButton>
+        </form>
+      ) : null}
+      <form action={endOngoingDbfAction}>
+        <input type="hidden" name="id" value={id} />
+        <input type="hidden" name="return_to" value="/" />
+        <SubmitButton
+          pendingText="Menyimpan…"
+          className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
+        >
+          Selesai · Simpan
+        </SubmitButton>
+      </form>
     </div>
   );
 }
