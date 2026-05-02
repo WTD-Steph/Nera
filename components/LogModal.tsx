@@ -38,6 +38,22 @@ function nowDatetimeLocal(): string {
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
 }
 
+function asiBatchLabel(b: { startedAtIso: string; remainingMl: number }): string {
+  const d = new Date(b.startedAtIso);
+  const time = d.toLocaleTimeString("en-GB", {
+    timeZone: "Asia/Jakarta",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const date = d.toLocaleDateString("id-ID", {
+    timeZone: "Asia/Jakarta",
+    day: "numeric",
+    month: "short",
+  });
+  return `${date} · ${time} — ${b.remainingMl} ml tersisa`;
+}
+
 function addMinutesLocal(localStr: string, minutes: number): string {
   // localStr is "YYYY-MM-DDTHH:mm" interpreted in local TZ. Adding by ms
   // and re-deriving local string keeps DST correct.
@@ -48,18 +64,26 @@ function addMinutesLocal(localStr: string, minutes: number): string {
   return new Date(next.getTime() - off * 60000).toISOString().slice(0, 16);
 }
 
+export type AsiBatchOption = {
+  id: string;
+  startedAtIso: string;
+  remainingMl: number;
+};
+
 export function LogModalTrigger({
   subtype,
   className,
   children,
   returnTo = "/",
   medications,
+  asiBatches,
 }: {
   subtype: LogSubtype;
   className?: string;
   children: React.ReactNode;
   returnTo?: string;
   medications?: Medication[];
+  asiBatches?: AsiBatchOption[];
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -77,6 +101,7 @@ export function LogModalTrigger({
           returnTo={returnTo}
           onClose={() => setOpen(false)}
           medications={medications ?? []}
+          asiBatches={asiBatches ?? []}
         />
       ) : null}
     </>
@@ -88,11 +113,13 @@ function LogModal({
   returnTo,
   onClose,
   medications,
+  asiBatches,
 }: {
   subtype: LogSubtype;
   returnTo: string;
   onClose: () => void;
   medications: Medication[];
+  asiBatches: AsiBatchOption[];
 }) {
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
@@ -106,6 +133,8 @@ function LogModal({
   const [feedingMode, setFeedingMode] = useState<"sufor" | "dbf">("sufor");
   // Bottle content (only when feedingMode='sufor'): formula vs expressed ASI
   const [bottleContent, setBottleContent] = useState<"sufor" | "asi">("sufor");
+  // ASI batch override: "" = auto FIFO (oldest first); else specific batch id
+  const [asiBatchId, setAsiBatchId] = useState<string>("");
 
   // Pumping per-side timestamps. Defaults: Kiri now → now+15, Kanan
   // sequentially after (now+15 → now+30). When user edits Kiri's
@@ -274,6 +303,33 @@ function LogModal({
                       </button>
                     </div>
                   </Field>
+                  {bottleContent === "asi" && asiBatches.length > 0 ? (
+                    <Field label="Batch ASI">
+                      <input
+                        type="hidden"
+                        name="asi_batch_id"
+                        value={asiBatchId}
+                      />
+                      <select
+                        value={asiBatchId}
+                        onChange={(e) => setAsiBatchId(e.target.value)}
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                      >
+                        <option value="">
+                          Auto · FIFO (oldest first)
+                        </option>
+                        {asiBatches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {asiBatchLabel(b)}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-[11px] text-gray-400">
+                        Auto akan deduct dari batch terlama dulu. Pilih batch
+                        spesifik kalau mau ambil dari botol tertentu.
+                      </p>
+                    </Field>
+                  ) : null}
                   <Field label="Jumlah (ml)">
                     <input
                       type="number"
@@ -505,9 +561,11 @@ function LogModal({
             />
           </Field>
 
-          <SubmitButton className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700">
-            Simpan
-          </SubmitButton>
+          <div className="sticky bottom-0 -mx-4 -mb-4 mt-2 border-t border-gray-100 bg-white/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+            <SubmitButton className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700">
+              Simpan
+            </SubmitButton>
+          </div>
         </form>
       </div>
     </div>

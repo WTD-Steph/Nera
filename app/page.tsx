@@ -166,6 +166,13 @@ export default async function HomePage({
   });
   const stockTotalMl = stockBatches.reduce((s, b) => s + b.remaining, 0);
   const stockBatchCount = stockBatches.filter((b) => b.remaining > 0).length;
+  const asiBatchOptions = stockBatches
+    .filter((b) => b.remaining > 0)
+    .map((b) => ({
+      id: b.id,
+      startedAtIso: b.timestamp,
+      remainingMl: b.remaining,
+    }));
 
   const logsArray: LogRow[] = (logs ?? []) as LogRow[];
   const ongoing = logsArray.filter(
@@ -301,6 +308,7 @@ export default async function HomePage({
             <LogModalTrigger
               key={q.subtype}
               subtype={q.subtype}
+              asiBatches={q.subtype === "feeding" ? asiBatchOptions : undefined}
               className="flex flex-col items-center gap-1 rounded-2xl border border-white bg-rose-50 p-3 shadow-sm transition-transform active:scale-95"
             >
               <span className="text-2xl" aria-hidden>

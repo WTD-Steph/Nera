@@ -384,12 +384,14 @@ function EndPumpingModal({
             </label>
           </div>
 
-          <SubmitButton
-            pendingText="Menyimpan…"
-            className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
-          >
-            Simpan
-          </SubmitButton>
+          <div className="sticky bottom-0 -mx-5 -mb-5 mt-2 border-t border-gray-100 bg-white/95 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+            <SubmitButton
+              pendingText="Menyimpan…"
+              className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
+            >
+              Simpan
+            </SubmitButton>
+          </div>
         </form>
       </div>
     </div>
