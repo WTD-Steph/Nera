@@ -21,9 +21,9 @@ const EMOJIS: Record<Subtype, string> = {
   pumping: "💧",
 };
 
-// Official Spotify "Baby Sleep" playlist (Spotify editorial, ~777K saves).
-// Universal link: opens Spotify app on mobile, web player on desktop.
-const SLEEP_PLAYLIST_URL =
+// Default playlist if the household has not set their own. Spotify
+// editorial "Baby Sleep" (~777K saves), universal link → app on mobile.
+const DEFAULT_SLEEP_PLAYLIST_URL =
   "https://open.spotify.com/playlist/37i9dQZF1DX0DxcHtn4Hwo";
 
 function fmtClock(iso: string): string {
@@ -41,16 +41,22 @@ export function OngoingCard({
   id,
   subtype,
   startIso,
+  sleepPlaylistUrl,
 }: {
   id: string;
   subtype: Subtype;
   startIso: string;
+  sleepPlaylistUrl?: string | null;
 }) {
   const [showLamp, setShowLamp] = useState(false);
   const [showPumpEnd, setShowPumpEnd] = useState(false);
 
   const title = TITLES[subtype];
   const emoji = EMOJIS[subtype];
+  const playlistUrl =
+    sleepPlaylistUrl && sleepPlaylistUrl.trim() !== ""
+      ? sleepPlaylistUrl
+      : DEFAULT_SLEEP_PLAYLIST_URL;
 
   return (
     <>
@@ -93,7 +99,7 @@ export function OngoingCard({
         {subtype === "sleep" ? (
           <>
             <a
-              href={SLEEP_PLAYLIST_URL}
+              href={playlistUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 active:bg-emerald-100"
@@ -133,6 +139,7 @@ export function OngoingCard({
           subtype={subtype}
           startIso={startIso}
           title={title}
+          playlistUrl={playlistUrl}
           onClose={() => setShowLamp(false)}
           onPumpStop={() => {
             setShowLamp(false);
@@ -153,6 +160,7 @@ function NightLamp({
   subtype,
   startIso,
   title,
+  playlistUrl,
   onClose,
   onPumpStop,
 }: {
@@ -160,6 +168,7 @@ function NightLamp({
   subtype: Subtype;
   startIso: string;
   title: string;
+  playlistUrl: string;
   onClose: () => void;
   onPumpStop: () => void;
 }) {
@@ -216,7 +225,7 @@ function NightLamp({
       <div className="mt-12 w-full max-w-xs space-y-3 px-6">
         {subtype === "sleep" ? (
           <a
-            href={SLEEP_PLAYLIST_URL}
+            href={playlistUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="block w-full rounded-2xl border border-red-900/40 bg-transparent py-3 text-center text-sm font-medium text-red-700/80 hover:bg-red-950/30 active:bg-red-950/50"

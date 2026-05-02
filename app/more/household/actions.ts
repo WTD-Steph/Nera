@@ -88,6 +88,50 @@ export async function removeMemberAction(formData: FormData) {
   redirect("/more/household");
 }
 
+export async function updateSleepPlaylistAction(formData: FormData) {
+  const raw = String(formData.get("sleep_playlist_url") ?? "").trim();
+  const url = raw === "" ? null : raw;
+
+  if (url !== null) {
+    try {
+      const u = new URL(url);
+      if (u.protocol !== "https:" && u.protocol !== "http:") {
+        redirect(
+          `/more/household?prefserror=${encodeURIComponent("URL harus https.")}`,
+        );
+      }
+    } catch {
+      redirect(
+        `/more/household?prefserror=${encodeURIComponent("URL tidak valid.")}`,
+      );
+    }
+  }
+
+  const current = await getCurrentHousehold();
+  if (!current) redirect("/setup");
+  if (current.role !== "owner") {
+    redirect(
+      `/more/household?prefserror=${encodeURIComponent("Hanya owner yang bisa mengubah preferensi.")}`,
+    );
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("households")
+    .update({ sleep_playlist_url: url })
+    .eq("id", current.household_id);
+
+  if (error) {
+    redirect(
+      `/more/household?prefserror=${encodeURIComponent(`Gagal: ${error.message}`)}`,
+    );
+  }
+
+  revalidatePath("/");
+  revalidatePath("/more/household");
+  redirect("/more/household?prefssaved=1");
+}
+
 export async function leaveHouseholdAction(formData: FormData) {
   const householdId = String(formData.get("household_id") ?? "");
   if (!householdId) {

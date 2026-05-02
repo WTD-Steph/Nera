@@ -9,12 +9,15 @@ import {
   revokeInvitationAction,
   removeMemberAction,
   leaveHouseholdAction,
+  updateSleepPlaylistAction,
 } from "./actions";
 
 type SearchParams = {
   error?: string;
   invited?: string;
   url?: string;
+  prefssaved?: string;
+  prefserror?: string;
 };
 
 export default async function HouseholdPage({
@@ -92,6 +95,55 @@ export default async function HouseholdPage({
           {error}
         </p>
       ) : null}
+
+      {/* Preferensi: musik tidur */}
+      <section className="mt-5">
+        <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
+          Preferensi
+        </h2>
+        <form
+          action={updateSleepPlaylistAction}
+          className="space-y-2 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm"
+        >
+          <label className="block">
+            <span className="text-xs font-semibold text-gray-600">
+              URL playlist Spotify untuk Musik tidur
+            </span>
+            <input
+              type="url"
+              name="sleep_playlist_url"
+              defaultValue={current.sleep_playlist_url ?? ""}
+              placeholder="https://open.spotify.com/playlist/..."
+              maxLength={500}
+              disabled={!isOwner}
+              inputMode="url"
+              className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400 disabled:bg-gray-50 disabled:text-gray-500"
+            />
+            <span className="mt-1 block text-[11px] text-gray-400">
+              Kosongkan untuk pakai default (Spotify Baby Sleep). Bisa juga link YouTube / Apple Music — tombol akan buka URL apapun.
+              {!isOwner ? " Hanya owner yang bisa mengubah." : ""}
+            </span>
+          </label>
+          {searchParams.prefssaved ? (
+            <p className="rounded-lg bg-green-50 px-3 py-2 text-xs text-green-700">
+              Preferensi tersimpan.
+            </p>
+          ) : null}
+          {searchParams.prefserror ? (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+              {searchParams.prefserror}
+            </p>
+          ) : null}
+          {isOwner ? (
+            <SubmitButton
+              pendingText="Menyimpan…"
+              className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
+            >
+              Simpan preferensi
+            </SubmitButton>
+          ) : null}
+        </form>
+      </section>
 
       {/* Members */}
       <section className="mt-5">
