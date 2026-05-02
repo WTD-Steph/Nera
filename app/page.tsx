@@ -395,11 +395,11 @@ export default async function HomePage({
                 subtype={cardSubtype}
                 startIso={l.timestamp}
                 pausedAtIso={l.paused_at}
-                sleepPlaylistUrl={household.sleep_playlist_url}
                 pumpStartLAt={l.start_l_at}
                 pumpEndLAt={l.end_l_at}
                 pumpStartRAt={l.start_r_at}
                 pumpEndRAt={l.end_r_at}
+                dbfMlPerMin={dbfEst.mlPerMin}
               />
             );
           })}

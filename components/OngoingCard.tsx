@@ -31,11 +31,6 @@ const EMOJIS: Record<Subtype, string> = {
   hiccup: "🤧",
 };
 
-// Default playlist if the household has not set their own. Spotify
-// editorial "Baby Sleep" (~777K saves), universal link → app on mobile.
-const DEFAULT_SLEEP_PLAYLIST_URL =
-  "https://open.spotify.com/playlist/37i9dQZF1DX0DxcHtn4Hwo";
-
 function fmtClock(iso: string): string {
   // Locked to Asia/Jakarta with en-GB locale (uses colon) so server
   // and client render identically as "HH:MM" — no hydration mismatch.
@@ -52,31 +47,28 @@ export function OngoingCard({
   subtype,
   startIso,
   pausedAtIso,
-  sleepPlaylistUrl,
   pumpStartLAt,
   pumpEndLAt,
   pumpStartRAt,
   pumpEndRAt,
+  dbfMlPerMin,
 }: {
   id: string;
   subtype: Subtype;
   startIso: string;
   pausedAtIso?: string | null;
-  sleepPlaylistUrl?: string | null;
   pumpStartLAt?: string | null;
   pumpEndLAt?: string | null;
   pumpStartRAt?: string | null;
   pumpEndRAt?: string | null;
+  /** Used in NightLamp DBF view to estimate ml = duration × rate. */
+  dbfMlPerMin?: number | null;
 }) {
   const [showLamp, setShowLamp] = useState(false);
   const [showPumpEnd, setShowPumpEnd] = useState(false);
 
   const title = TITLES[subtype];
   const emoji = EMOJIS[subtype];
-  const playlistUrl =
-    sleepPlaylistUrl && sleepPlaylistUrl.trim() !== ""
-      ? sleepPlaylistUrl
-      : DEFAULT_SLEEP_PLAYLIST_URL;
   const isPaused = !!pausedAtIso;
 
   return (
@@ -152,41 +144,7 @@ export function OngoingCard({
         </form>
 
         {subtype === "sleep" ? (
-          <>
-            <a
-              href={playlistUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 active:bg-emerald-100"
-            >
-              <span aria-hidden>🎵</span>
-              <span>Putar musik tidur · Spotify</span>
-            </a>
-            <form
-              action={endOngoingSleepAction}
-              onSubmit={() => setTimeout(() => setShowLamp(false), 0)}
-              className="mt-2"
-            >
-              <input type="hidden" name="id" value={id} />
-              <input type="hidden" name="return_to" value="/" />
-              <select
-                name="sleep_quality"
-                defaultValue=""
-                className="mb-2 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-rose-400"
-              >
-                <option value="">Kualitas tidur (opsional)</option>
-                <option value="nyenyak">😴 Nyenyak</option>
-                <option value="gelisah">😣 Gelisah</option>
-                <option value="sering_bangun">😢 Sering bangun</option>
-              </select>
-              <SubmitButton
-                pendingText="Menyimpan…"
-                className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
-              >
-                Bangun · Stop
-              </SubmitButton>
-            </form>
-          </>
+          <SleepLightControls id={id} />
         ) : subtype === "pumping" ? (
           <PumpingControls
             id={id}
@@ -214,8 +172,13 @@ export function OngoingCard({
           id={id}
           subtype={subtype}
           startIso={startIso}
+          pausedAtIso={pausedAtIso ?? null}
           title={title}
-          playlistUrl={playlistUrl}
+          pumpStartLAt={pumpStartLAt ?? null}
+          pumpEndLAt={pumpEndLAt ?? null}
+          pumpStartRAt={pumpStartRAt ?? null}
+          pumpEndRAt={pumpEndRAt ?? null}
+          dbfMlPerMin={dbfMlPerMin ?? null}
           onClose={() => setShowLamp(false)}
           onPumpStop={() => {
             setShowLamp(false);
@@ -235,19 +198,31 @@ function NightLamp({
   id,
   subtype,
   startIso,
+  pausedAtIso,
   title,
-  playlistUrl,
+  pumpStartLAt,
+  pumpEndLAt,
+  pumpStartRAt,
+  pumpEndRAt,
+  dbfMlPerMin,
   onClose,
   onPumpStop,
 }: {
   id: string;
   subtype: Subtype;
   startIso: string;
+  pausedAtIso: string | null;
   title: string;
-  playlistUrl: string;
+  pumpStartLAt: string | null;
+  pumpEndLAt: string | null;
+  pumpStartRAt: string | null;
+  pumpEndRAt: string | null;
+  dbfMlPerMin: number | null;
   onClose: () => void;
   onPumpStop: () => void;
 }) {
+  const [askingQuality, setAskingQuality] = useState(false);
+  const isPaused = !!pausedAtIso;
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -301,6 +276,9 @@ function NightLamp({
     };
   }, []);
 
+  const darkBtn =
+    "rounded-2xl border border-red-900/40 bg-transparent py-3 text-base font-semibold text-red-700/90 hover:bg-red-950/30 active:bg-red-950/50";
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black"
@@ -319,60 +297,69 @@ function NightLamp({
 
       <div className="text-2xl font-bold uppercase tracking-[0.3em] text-red-600 sm:text-3xl">
         {title}
+        {isPaused ? (
+          <span className="ml-2 text-base font-medium normal-case tracking-normal text-amber-500/80">
+            ⏸ dijeda
+          </span>
+        ) : null}
       </div>
       <Stopwatch
         startIso={startIso}
-        className="mt-4 font-mono text-7xl font-light tabular-nums text-red-700/90 sm:text-[8rem]"
+        pausedAtIso={pausedAtIso}
+        className={`mt-4 font-mono text-7xl font-light tabular-nums sm:text-[8rem] ${
+          isPaused ? "text-amber-500/70" : "text-red-700/90"
+        }`}
       />
       <div className="mt-3 text-lg font-semibold tracking-widest text-red-600/90 sm:text-xl">
         Sejak {fmtClock(startIso)}
       </div>
 
-      <div className="mt-12 w-full max-w-xs space-y-3 px-6">
-        {subtype === "sleep" ? (
-          <a
-            href={playlistUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full rounded-2xl border border-red-900/40 bg-transparent py-3 text-center text-sm font-medium text-red-700/80 hover:bg-red-950/30 active:bg-red-950/50"
+      {subtype === "dbf" ? (
+        <DbfDarkSummary
+          startLAt={pumpStartLAt}
+          endLAt={pumpEndLAt}
+          startRAt={pumpStartRAt}
+          endRAt={pumpEndRAt}
+          dbfMlPerMin={dbfMlPerMin}
+        />
+      ) : null}
+
+      <div className="mt-10 w-full max-w-sm space-y-3 px-6">
+        {/* Pause / Resume — universal, always available */}
+        <form
+          action={isPaused ? resumeFromPauseAction : pauseOngoingLogAction}
+        >
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="return_to" value="/" />
+          <SubmitButton
+            pendingText="…"
+            className={`w-full rounded-2xl border py-3 text-base font-semibold ${
+              isPaused
+                ? "border-emerald-700/40 bg-transparent text-emerald-500/90 hover:bg-emerald-950/30"
+                : "border-amber-700/40 bg-transparent text-amber-500/90 hover:bg-amber-950/30"
+            }`}
           >
-            🎵 Musik tidur · Spotify
-          </a>
-        ) : null}
+            {isPaused ? "▶ Lanjutkan" : "⏸ Pause"}
+          </SubmitButton>
+        </form>
+
         {subtype === "sleep" ? (
-          <form
-            action={endOngoingSleepAction}
-            onSubmit={() => setTimeout(onClose, 0)}
-          >
-            <input type="hidden" name="id" value={id} />
-            <input type="hidden" name="return_to" value="/" />
-            <FormCloser onClose={onClose} />
-            <select
-              name="sleep_quality"
-              defaultValue=""
-              style={{ colorScheme: "dark" }}
-              className="mb-2 w-full appearance-none rounded-xl border border-red-900/40 bg-black/60 px-3 py-2.5 text-sm text-red-700/90 outline-none focus:border-red-700/70"
-            >
-              <option value="" className="bg-black text-red-700/90">
-                — Kualitas (opsional) —
-              </option>
-              <option value="nyenyak" className="bg-black text-red-700/90">
-                😴 Nyenyak
-              </option>
-              <option value="gelisah" className="bg-black text-red-700/90">
-                😣 Gelisah
-              </option>
-              <option value="sering_bangun" className="bg-black text-red-700/90">
-                😢 Sering bangun
-              </option>
-            </select>
-            <SubmitButton
-              pendingText="Menyimpan…"
-              className="w-full rounded-2xl border border-red-900/40 bg-transparent py-3 text-sm font-medium text-red-700/90 hover:bg-red-950/30 active:bg-red-950/50"
+          askingQuality ? (
+            <SleepQualityStep
+              id={id}
+              onClose={onClose}
+              onCancel={() => setAskingQuality(false)}
+              darkBtn={darkBtn}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAskingQuality(true)}
+              className={`w-full ${darkBtn}`}
             >
               Bangun · Stop
-            </SubmitButton>
-          </form>
+            </button>
+          )
         ) : subtype === "dbf" ? (
           <form
             action={endOngoingDbfAction}
@@ -383,25 +370,174 @@ function NightLamp({
             <FormCloser onClose={onClose} />
             <SubmitButton
               pendingText="Menyimpan…"
-              className="w-full rounded-2xl border border-red-900/40 bg-transparent py-3 text-sm font-medium text-red-700/90 hover:bg-red-950/30 active:bg-red-950/50"
+              className={`w-full ${darkBtn}`}
             >
               Selesai · Simpan
             </SubmitButton>
           </form>
-        ) : (
+        ) : subtype === "pumping" ? (
           <button
             type="button"
             onClick={onPumpStop}
-            className="w-full rounded-2xl border border-red-900/40 bg-transparent py-3 text-sm font-medium text-red-700/90 hover:bg-red-950/30 active:bg-red-950/50"
+            className={`w-full ${darkBtn}`}
           >
             Stop · Catat ml
           </button>
-        )}
+        ) : null}
       </div>
 
       <p className="absolute bottom-6 px-6 text-center text-[10px] tracking-widest text-red-950/40">
-        Layar redup untuk malam · tap luar tombol untuk tetap nyala
+        Layar redup · Esc atau Tutup ✕ untuk keluar
       </p>
+    </div>
+  );
+}
+
+function SleepQualityStep({
+  id,
+  onClose,
+  onCancel,
+  darkBtn,
+}: {
+  id: string;
+  onClose: () => void;
+  onCancel: () => void;
+  darkBtn: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="mb-2 text-center text-xs uppercase tracking-widest text-red-700/70">
+        Bagaimana kualitas tidurnya?
+      </p>
+      {(
+        [
+          { value: "nyenyak", label: "😴 Nyenyak" },
+          { value: "gelisah", label: "😣 Gelisah" },
+          { value: "sering_bangun", label: "😢 Sering bangun" },
+          { value: "", label: "Skip" },
+        ] as const
+      ).map((opt) => (
+        <form
+          key={opt.value || "skip"}
+          action={endOngoingSleepAction}
+          onSubmit={() => setTimeout(onClose, 0)}
+        >
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="return_to" value="/" />
+          <input type="hidden" name="sleep_quality" value={opt.value} />
+          <FormCloser onClose={onClose} />
+          <SubmitButton
+            pendingText="Menyimpan…"
+            className={`w-full ${darkBtn}`}
+          >
+            {opt.label}
+          </SubmitButton>
+        </form>
+      ))}
+      <button
+        type="button"
+        onClick={onCancel}
+        className="mt-2 w-full text-center text-xs uppercase tracking-widest text-red-900/60 hover:text-red-700"
+      >
+        ← Batal stop
+      </button>
+    </div>
+  );
+}
+
+function DbfDarkSummary({
+  startLAt,
+  endLAt,
+  startRAt,
+  endRAt,
+  dbfMlPerMin,
+}: {
+  startLAt: string | null;
+  endLAt: string | null;
+  startRAt: string | null;
+  endRAt: string | null;
+  dbfMlPerMin: number | null;
+}) {
+  // Live tick for active sides; static for ended sides.
+  const [now, setNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const sideMins = (start: string | null, end: string | null): number => {
+    if (!start) return 0;
+    const startMs = new Date(start).getTime();
+    const endMs = end ? new Date(end).getTime() : now;
+    return Math.max(0, (endMs - startMs) / 60000);
+  };
+  const lMin = sideMins(startLAt, endLAt);
+  const rMin = sideMins(startRAt, endRAt);
+  const totalMin = lMin + rMin;
+  const rate =
+    typeof dbfMlPerMin === "number" && dbfMlPerMin > 0 ? dbfMlPerMin : null;
+
+  if (totalMin === 0) return null;
+
+  const fmtMin = (m: number): string => {
+    if (m < 1) return "0:00";
+    const total = Math.floor(m * 60);
+    const mm = Math.floor(total / 60);
+    const ss = total % 60;
+    return `${mm}:${ss.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="mt-6 grid w-full max-w-sm grid-cols-2 gap-3 px-6 text-center">
+      <SideTile
+        active={!!startLAt && !endLAt}
+        label="Kiri"
+        timeText={fmtMin(lMin)}
+        mlText={rate ? `≈${Math.round(lMin * rate)} ml` : null}
+      />
+      <SideTile
+        active={!!startRAt && !endRAt}
+        label="Kanan"
+        timeText={fmtMin(rMin)}
+        mlText={rate ? `≈${Math.round(rMin * rate)} ml` : null}
+      />
+      {rate ? (
+        <div className="col-span-2 text-[11px] tracking-widest text-red-900/50">
+          Total ≈{Math.round(totalMin * rate)} ml ({rate.toFixed(1)} ml/menit)
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SideTile({
+  active,
+  label,
+  timeText,
+  mlText,
+}: {
+  active: boolean;
+  label: string;
+  timeText: string;
+  mlText: string | null;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border p-3 ${
+        active
+          ? "border-red-700/60 bg-red-950/20"
+          : "border-red-900/30 bg-transparent"
+      }`}
+    >
+      <div className="text-[11px] uppercase tracking-widest text-red-900/60">
+        {label} {active ? "· aktif" : ""}
+      </div>
+      <div className="mt-1 font-mono text-2xl tabular-nums text-red-700/90">
+        {timeText}
+      </div>
+      {mlText ? (
+        <div className="mt-0.5 text-[11px] text-red-900/60">{mlText}</div>
+      ) : null}
     </div>
   );
 }
@@ -602,6 +738,55 @@ function PindahForm({
         ⇄ Pindah ke {otherSide}
       </SubmitButton>
     </form>
+  );
+}
+
+function SleepLightControls({ id }: { id: string }) {
+  const [asking, setAsking] = useState(false);
+  if (!asking) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAsking(true)}
+        className="mt-3 w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
+      >
+        Bangun · Stop
+      </button>
+    );
+  }
+  return (
+    <div className="mt-3 space-y-2 rounded-xl border border-rose-100 bg-rose-50/40 p-3">
+      <p className="text-center text-[11px] font-semibold text-rose-700">
+        Bagaimana kualitas tidurnya?
+      </p>
+      {(
+        [
+          { value: "nyenyak", label: "😴 Nyenyak" },
+          { value: "gelisah", label: "😣 Gelisah" },
+          { value: "sering_bangun", label: "😢 Sering bangun" },
+          { value: "", label: "Skip" },
+        ] as const
+      ).map((opt) => (
+        <form key={opt.value || "skip"} action={endOngoingSleepAction}>
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="return_to" value="/" />
+          <input type="hidden" name="sleep_quality" value={opt.value} />
+          <SubmitButton
+            pendingText="…"
+            className="w-full rounded-xl border border-rose-200 bg-white py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 active:scale-[0.98]"
+          >
+            {opt.label}
+          </SubmitButton>
+        </form>
+      ))}
+      <button
+        type="button"
+        onClick={() => setAsking(false)}
+        className="w-full text-center text-[11px] text-gray-400 hover:text-gray-600"
+      >
+        ← Batal stop
+      </button>
+    </div>
   );
 }
 
