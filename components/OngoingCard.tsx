@@ -11,6 +11,7 @@ import {
   resumeFromPauseAction,
 } from "@/app/actions/logs";
 import { Stopwatch } from "@/components/Stopwatch";
+import { LiveClock } from "@/components/LiveClock";
 import { SubmitButton } from "@/components/SubmitButton";
 import { FormCloser } from "@/components/FormCloser";
 
@@ -315,6 +316,8 @@ function NightLamp({
       >
         Tutup ✕
       </button>
+
+      <LiveClock className="absolute left-4 top-4 font-mono text-base text-red-900/60 tabular-nums" />
 
       <div className="text-base font-bold uppercase tracking-[0.3em] text-red-700/80">
         {title}
