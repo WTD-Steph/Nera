@@ -361,20 +361,30 @@ function NightLamp({
             </button>
           )
         ) : subtype === "dbf" ? (
-          <form
-            action={endOngoingDbfAction}
-            onSubmit={() => setTimeout(onClose, 0)}
-          >
-            <input type="hidden" name="id" value={id} />
-            <input type="hidden" name="return_to" value="/" />
-            <FormCloser onClose={onClose} />
-            <SubmitButton
-              pendingText="Menyimpan…"
-              className={`w-full ${darkBtn}`}
+          <>
+            <DarkPindahButton
+              id={id}
+              startLAt={pumpStartLAt}
+              endLAt={pumpEndLAt}
+              startRAt={pumpStartRAt}
+              endRAt={pumpEndRAt}
+              darkBtn={darkBtn}
+            />
+            <form
+              action={endOngoingDbfAction}
+              onSubmit={() => setTimeout(onClose, 0)}
             >
-              Selesai · Simpan
-            </SubmitButton>
-          </form>
+              <input type="hidden" name="id" value={id} />
+              <input type="hidden" name="return_to" value="/" />
+              <FormCloser onClose={onClose} />
+              <SubmitButton
+                pendingText="Menyimpan…"
+                className={`w-full ${darkBtn}`}
+              >
+                Selesai · Simpan
+              </SubmitButton>
+            </form>
+          </>
         ) : subtype === "pumping" ? (
           <button
             type="button"
@@ -390,6 +400,43 @@ function NightLamp({
         Layar redup · Esc atau Tutup ✕ untuk keluar
       </p>
     </div>
+  );
+}
+
+function DarkPindahButton({
+  id,
+  startLAt,
+  endLAt,
+  startRAt,
+  endRAt,
+  darkBtn,
+}: {
+  id: string;
+  startLAt: string | null;
+  endLAt: string | null;
+  startRAt: string | null;
+  endRAt: string | null;
+  darkBtn: string;
+}) {
+  const lActive = !!startLAt && !endLAt;
+  const rActive = !!startRAt && !endRAt;
+  const canPindah = (lActive && !startRAt) || (rActive && !startLAt);
+  if (!canPindah) return null;
+  const fromSide: "kiri" | "kanan" = lActive ? "kiri" : "kanan";
+  const otherSide = fromSide === "kiri" ? "Kanan" : "Kiri";
+  return (
+    <form action={pumpingPindahAction}>
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="from_side" value={fromSide} />
+      <input type="hidden" name="pindah_offset_min" value="0" />
+      <input type="hidden" name="return_to" value="/" />
+      <SubmitButton
+        pendingText="Memindah…"
+        className={`w-full ${darkBtn}`}
+      >
+        ⇄ Pindah ke {otherSide}
+      </SubmitButton>
+    </form>
   );
 }
 
