@@ -158,12 +158,13 @@ function logDetail(l: LogRow): string {
       if (rActive) return `Kanan aktif`;
       return `berlangsung`;
     }
-    const parts: string[] = [];
     const lDur = pumpDur(l.start_l_at, l.end_l_at);
     const rDur = pumpDur(l.start_r_at, l.end_r_at);
-    parts.push(`L ${l.amount_l_ml ?? 0}${lDur ? `/${lDur}m` : ""}`);
-    parts.push(`R ${l.amount_r_ml ?? 0}${rDur ? `/${rDur}m` : ""}`);
-    return `${parts.join(" · ")} ml`;
+    const lFmt =
+      `L ${l.amount_l_ml ?? 0} ml` + (lDur ? ` · ${lDur} mnt` : "");
+    const rFmt =
+      `R ${l.amount_r_ml ?? 0} ml` + (rDur ? ` · ${rDur} mnt` : "");
+    return `${lFmt}  ·  ${rFmt}`;
   }
   if (l.subtype === "diaper") {
     const parts: string[] = [];

@@ -570,12 +570,45 @@ export async function resumeFromPauseAction(formData: FormData) {
   if (!id) redirect(returnTo);
 
   const supabase = createClient();
-  const { error } = await supabase
+
+  // Resume needs to exclude the pause window from total duration.
+  // Shift `timestamp` (and any still-active per-side starts) forward by
+  // the pause duration so duration-from-start computations stay correct
+  // both during the live tick and at end_timestamp.
+  const { data: row } = await supabase
     .from("logs")
-    .update({ paused_at: null } as never)
+    .select(
+      "timestamp, paused_at, start_l_at, end_l_at, start_r_at, end_r_at",
+    )
     .eq("id", id)
     .is("end_timestamp", null)
-    .not("paused_at", "is", null);
+    .not("paused_at", "is", null)
+    .single();
+  if (!row) redirect(returnTo);
+
+  const pauseMs =
+    Date.now() - new Date(row.paused_at as string).getTime();
+  const shift = (iso: string | null): string | null =>
+    iso === null
+      ? null
+      : new Date(new Date(iso).getTime() + pauseMs).toISOString();
+
+  const updates: Record<string, unknown> = {
+    paused_at: null,
+    timestamp: shift(row.timestamp as string),
+  };
+  // Only shift per-side starts that are still active (no end yet).
+  if (row.start_l_at && !row.end_l_at) {
+    updates.start_l_at = shift(row.start_l_at as string);
+  }
+  if (row.start_r_at && !row.end_r_at) {
+    updates.start_r_at = shift(row.start_r_at as string);
+  }
+
+  const { error } = await supabase
+    .from("logs")
+    .update(updates as never)
+    .eq("id", id);
 
   if (error) {
     redirect(

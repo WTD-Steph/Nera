@@ -344,18 +344,35 @@ function LogModal({
             </>
           ) : null}
 
-          <Field label="Waktu">
-            <input
-              type="datetime-local"
-              name="timestamp"
-              defaultValue={
-                isoToDatetimeLocal(editLog?.timestamp ?? null) ||
-                nowDatetimeLocal()
-              }
-              required
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
-            />
-          </Field>
+          {subtype === "pumping" ? (
+            <Field label="Waktu Mulai">
+              <input
+                type="datetime-local"
+                name="timestamp"
+                value={pumpStartL}
+                onChange={(e) => updatePumpStartL(e.target.value)}
+                required
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+              />
+              <p className="mt-1 text-[11px] text-gray-400">
+                Mengubah waktu di sini auto-shift Mulai/Selesai per sisi di
+                bawah.
+              </p>
+            </Field>
+          ) : (
+            <Field label="Waktu">
+              <input
+                type="datetime-local"
+                name="timestamp"
+                defaultValue={
+                  isoToDatetimeLocal(editLog?.timestamp ?? null) ||
+                  nowDatetimeLocal()
+                }
+                required
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+              />
+            </Field>
+          )}
 
           {subtype === "feeding" ? (
             <>
@@ -442,18 +459,9 @@ function LogModal({
                     </Field>
                   ) : null}
                   <Field label="Jumlah (ml)">
-                    <input
-                      type="number"
+                    <MlInput
                       name="amount_ml"
-                      step="1"
-                      min="1"
-                      max="500"
-                      required
-                      inputMode="numeric"
-                      placeholder="60"
-                      autoFocus={!isEdit}
-                      defaultValue={editLog?.amount_ml ?? undefined}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                      initial={editLog?.amount_ml ?? 60}
                     />
                   </Field>
                 </>
@@ -496,11 +504,11 @@ function LogModal({
                 Isi kedua sisi atau salah satu. Jumlah = 0 → sisi tersebut
                 dianggap tidak pumping.
               </p>
-              <div className="rounded-2xl border border-gray-100 bg-gray-50/40 p-3">
-                <div className="mb-2 text-xs font-semibold text-gray-700">
+              <div className="space-y-3 rounded-2xl border border-gray-100 bg-gray-50/40 p-4">
+                <div className="text-xs font-semibold text-gray-700">
                   🤱 Kiri
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   <Field label="Mulai">
                     <input
                       type="datetime-local"
@@ -521,24 +529,17 @@ function LogModal({
                   </Field>
                 </div>
                 <Field label="Jumlah (ml)">
-                  <input
-                    type="number"
+                  <MlInput
                     name="amount_l_ml"
-                    step="1"
-                    min="0"
-                    max="500"
-                    inputMode="numeric"
-                    placeholder="0"
-                    defaultValue={editLog?.amount_l_ml ?? 0}
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                    initial={editLog?.amount_l_ml ?? 0}
                   />
                 </Field>
               </div>
-              <div className="rounded-2xl border border-gray-100 bg-gray-50/40 p-3">
-                <div className="mb-2 text-xs font-semibold text-gray-700">
+              <div className="space-y-3 rounded-2xl border border-gray-100 bg-gray-50/40 p-4">
+                <div className="text-xs font-semibold text-gray-700">
                   🤱 Kanan
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   <Field label="Mulai">
                     <input
                       type="datetime-local"
@@ -566,16 +567,9 @@ function LogModal({
                   </Field>
                 </div>
                 <Field label="Jumlah (ml)">
-                  <input
-                    type="number"
+                  <MlInput
                     name="amount_r_ml"
-                    step="1"
-                    min="0"
-                    max="500"
-                    inputMode="numeric"
-                    placeholder="0"
-                    defaultValue={editLog?.amount_r_ml ?? 0}
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                    initial={editLog?.amount_r_ml ?? 0}
                   />
                 </Field>
               </div>
@@ -723,6 +717,74 @@ function Field({
       </span>
       {children}
     </label>
+  );
+}
+
+const ML_PRESETS = [30, 50, 80, 100, 120, 150];
+const ML_STEP = 5;
+
+function MlInput({
+  name,
+  initial,
+}: {
+  name: string;
+  initial: number;
+}) {
+  const [value, setValue] = useState<string>(String(initial));
+  const numeric = Number(value) || 0;
+  return (
+    <div>
+      <div className="flex items-stretch gap-1.5">
+        <button
+          type="button"
+          onClick={() =>
+            setValue(String(Math.max(0, numeric - ML_STEP)))
+          }
+          className="rounded-xl border border-gray-200 bg-white px-3 text-sm font-bold text-gray-600 hover:bg-rose-50 hover:text-rose-700 active:scale-95"
+          aria-label={`-${ML_STEP} ml`}
+        >
+          −
+        </button>
+        <input
+          type="number"
+          name={name}
+          step="1"
+          min="0"
+          max="500"
+          inputMode="numeric"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onFocus={(e) => e.target.select()}
+          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-center text-base font-semibold tabular-nums outline-none focus:border-rose-400"
+        />
+        <button
+          type="button"
+          onClick={() =>
+            setValue(String(Math.min(500, numeric + ML_STEP)))
+          }
+          className="rounded-xl border border-gray-200 bg-white px-3 text-sm font-bold text-gray-600 hover:bg-rose-50 hover:text-rose-700 active:scale-95"
+          aria-label={`+${ML_STEP} ml`}
+        >
+          +
+        </button>
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-1">
+        {ML_PRESETS.map((p) => (
+          <button
+            key={p}
+            type="button"
+            onClick={() => setValue(String(p))}
+            className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              numeric === p
+                ? "bg-rose-500 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-rose-100 hover:text-rose-700"
+            }`}
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
