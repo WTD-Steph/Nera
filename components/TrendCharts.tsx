@@ -17,6 +17,10 @@ import {
 export type DailyAgg = {
   date: string;
   short: string;
+  /** Sufor (formula) bottle ml. */
+  suforMl: number;
+  /** ASI total: bottle ASI + DBF estimate (semua breastmilk). */
+  asiMl: number;
   bottleMl: number;
   dbfEstimateMl: number;
   milkTotalMl: number;
@@ -111,10 +115,10 @@ export function TrendCharts({
               contentStyle={{ fontSize: 12, borderRadius: 8 }}
               formatter={(v, name) => {
                 const label =
-                  name === "bottleMl"
-                    ? "Botol"
-                    : name === "dbfEstimateMl"
-                      ? "DBF estimate"
+                  name === "suforMl"
+                    ? "Sufor"
+                    : name === "asiMl"
+                      ? "ASI (botol + DBF)"
                       : name === "milkTargetMin"
                         ? "Target min"
                         : name === "milkTargetMax"
@@ -123,8 +127,8 @@ export function TrendCharts({
                 return [`${v} ml`, label];
               }}
             />
-            <Bar dataKey="bottleMl" stackId="m" fill={ROSE} />
-            <Bar dataKey="dbfEstimateMl" stackId="m" fill={ROSE_LIGHT} />
+            <Bar dataKey="suforMl" stackId="m" fill={AMBER} />
+            <Bar dataKey="asiMl" stackId="m" fill={ROSE} />
             <Line
               type="stepAfter"
               dataKey="milkTargetMin"
@@ -152,9 +156,9 @@ export function TrendCharts({
         </ResponsiveContainer>
         <Legend
           items={[
-            { color: ROSE, label: "Botol (sufor + ASI)" },
-            { color: ROSE_LIGHT, label: "DBF (estimate)" },
-            { color: EMERALD, label: "Target min/max (per usia)" },
+            { color: ROSE, label: "ASI (botol + DBF)" },
+            { color: AMBER, label: "Sufor" },
+            { color: EMERALD, label: "Target min/max (per usia)", style: "line" },
           ]}
         />
       </ChartCard>
@@ -453,17 +457,27 @@ function ChartCard({
 function Legend({
   items,
 }: {
-  items: { color: string; label: string }[];
+  items: { color: string; label: string; style?: "square" | "line" }[];
 }) {
   return (
     <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-500">
       {items.map((it) => (
         <span key={it.label} className="inline-flex items-center gap-1.5">
-          <span
-            aria-hidden
-            className="inline-block h-2.5 w-2.5 rounded-sm"
-            style={{ background: it.color }}
-          />
+          {it.style === "line" ? (
+            <span
+              aria-hidden
+              className="inline-block h-[2px] w-4"
+              style={{
+                background: `repeating-linear-gradient(to right, ${it.color} 0 4px, transparent 4px 7px)`,
+              }}
+            />
+          ) : (
+            <span
+              aria-hidden
+              className="inline-block h-2.5 w-2.5 rounded-sm"
+              style={{ background: it.color }}
+            />
+          )}
           {it.label}
         </span>
       ))}
