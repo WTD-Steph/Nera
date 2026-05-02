@@ -560,8 +560,10 @@ export async function pauseOngoingLogAction(formData: FormData) {
       `${returnTo}?logerror=${encodeURIComponent(`Gagal pause: ${error.message}`)}`,
     );
   }
+  // No redirect on success → in-place re-render so NightLamp stays open
+  // (otherwise full page reload would unmount the dark mode + flash rose
+  // theme-color back into the iOS status bar).
   revalidatePath("/");
-  redirect(returnTo);
 }
 
 export async function resumeFromPauseAction(formData: FormData) {
@@ -615,8 +617,8 @@ export async function resumeFromPauseAction(formData: FormData) {
       `${returnTo}?logerror=${encodeURIComponent(`Gagal lanjut: ${error.message}`)}`,
     );
   }
+  // Same as pause — no redirect on success so NightLamp stays mounted.
   revalidatePath("/");
-  redirect(returnTo);
 }
 
 /**
