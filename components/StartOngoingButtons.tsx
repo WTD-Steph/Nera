@@ -9,14 +9,20 @@ export function StartOngoingButton({
   label,
   emoji,
 }: {
-  subtype: "sleep" | "pumping";
+  subtype: "sleep" | "pumping" | "feeding";
   label: string;
   emoji: string;
 }) {
-  // Pumping has a side picker — Kiri / Kanan / Dua-duanya. Sleep keeps
-  // its single-button flow.
-  if (subtype === "pumping") {
-    return <StartPumpingButton label={label} emoji={emoji} />;
+  // Pumping AND DBF (subtype='feeding') share a side picker —
+  // Kiri / Kanan / Dua-duanya. Sleep keeps its single-button flow.
+  if (subtype === "pumping" || subtype === "feeding") {
+    return (
+      <StartSidedButton
+        subtype={subtype}
+        label={label}
+        emoji={emoji}
+      />
+    );
   }
   return (
     <form action={startOngoingLogAction}>
@@ -35,10 +41,12 @@ export function StartOngoingButton({
   );
 }
 
-function StartPumpingButton({
+function StartSidedButton({
+  subtype,
   label,
   emoji,
 }: {
+  subtype: "pumping" | "feeding";
   label: string;
   emoji: string;
 }) {
@@ -75,27 +83,30 @@ function StartPumpingButton({
         </button>
       </div>
       <div className="grid grid-cols-3 gap-1.5">
-        <PumpStartChoice side="kiri" emoji="🤱" label="Kiri" />
-        <PumpStartChoice side="kanan" emoji="🤱" label="Kanan" />
-        <PumpStartChoice side="both" emoji="🤱🤱" label="Dua" />
+        <SideChoice subtype={subtype} side="kiri" emoji="🤱" label="Kiri" />
+        <SideChoice subtype={subtype} side="kanan" emoji="🤱" label="Kanan" />
+        <SideChoice subtype={subtype} side="both" emoji="🤱🤱" label="Dua" />
       </div>
     </div>
   );
 }
 
-function PumpStartChoice({
+function SideChoice({
+  subtype,
   side,
   emoji,
   label,
 }: {
+  subtype: "pumping" | "feeding";
   side: "kiri" | "kanan" | "both";
   emoji: string;
   label: string;
 }) {
+  const sideField = subtype === "pumping" ? "pumping_side" : "dbf_side";
   return (
     <form action={startOngoingLogAction}>
-      <input type="hidden" name="subtype" value="pumping" />
-      <input type="hidden" name="pumping_side" value={side} />
+      <input type="hidden" name="subtype" value={subtype} />
+      <input type="hidden" name={sideField} value={side} />
       <input type="hidden" name="return_to" value="/" />
       <SubmitButton
         pendingText="…"

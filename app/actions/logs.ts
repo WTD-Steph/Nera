@@ -227,7 +227,7 @@ export async function startOngoingLogAction(formData: FormData) {
   const subtype = String(formData.get("subtype") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/");
 
-  if (subtype !== "sleep" && subtype !== "pumping") {
+  if (subtype !== "sleep" && subtype !== "pumping" && subtype !== "feeding") {
     redirect(`${returnTo}?logerror=${encodeURIComponent("Subtype tidak mendukung ongoing.")}`);
   }
 
@@ -245,10 +245,13 @@ export async function startOngoingLogAction(formData: FormData) {
     created_by: user.id,
   };
 
-  // Pumping side picker: 'kiri' | 'kanan' | 'both'. Set start_X_at on
-  // the chosen side(s) so we can show the correct mid-session buttons.
-  if (subtype === "pumping") {
-    const side = String(formData.get("pumping_side") ?? "both");
+  // Pumping AND DBF (subtype='feeding') side picker: 'kiri' | 'kanan' |
+  // 'both'. Set start_X_at on the chosen side(s) so we can show the
+  // correct mid-session buttons. DBF is the only ongoing variant of
+  // feeding (sufor/bottle is point-in-time, no Mulai flow).
+  if (subtype === "pumping" || subtype === "feeding") {
+    const sideField = subtype === "pumping" ? "pumping_side" : "dbf_side";
+    const side = String(formData.get(sideField) ?? "both");
     if (side === "kiri") {
       insertPayload.start_l_at = now;
     } else if (side === "kanan") {
@@ -356,6 +359,8 @@ export async function endOngoingPumpingAction(formData: FormData) {
 }
 
 export async function pumpingPindahAction(formData: FormData) {
+  // Subtype-agnostic: works for both pumping and feeding (DBF) ongoing
+  // logs. End the active side, start the other side. Single UPDATE.
   const id = String(formData.get("id") ?? "");
   const fromSide = String(formData.get("from_side") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/");
@@ -374,7 +379,6 @@ export async function pumpingPindahAction(formData: FormData) {
     .from("logs")
     .update(updates as never)
     .eq("id", id)
-    .eq("subtype", "pumping")
     .is("end_timestamp", null);
 
   if (error) {
@@ -387,12 +391,107 @@ export async function pumpingPindahAction(formData: FormData) {
   redirect(returnTo);
 }
 
+export async function endOngoingDbfAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/");
+  if (!id) redirect(returnTo);
+
+  const supabase = createClient();
+  const { data: existing } = await supabase
+    .from("logs")
+    .select("start_l_at, end_l_at, start_r_at, end_r_at")
+    .eq("id", id)
+    .single();
+  if (!existing) redirect(returnTo);
+
+  const now = new Date().toISOString();
+  const endL = existing.end_l_at ?? (existing.start_l_at ? now : null);
+  const endR = existing.end_r_at ?? (existing.start_r_at ? now : null);
+  const updates: Record<string, unknown> = { end_timestamp: now };
+  if (existing.start_l_at && !existing.end_l_at) updates.end_l_at = now;
+  if (existing.start_r_at && !existing.end_r_at) updates.end_r_at = now;
+
+  const minutesBetween = (a: string, b: string) =>
+    Math.max(
+      0,
+      Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000),
+    );
+  if (existing.start_l_at && endL) {
+    updates.duration_l_min = minutesBetween(existing.start_l_at, endL);
+  }
+  if (existing.start_r_at && endR) {
+    updates.duration_r_min = minutesBetween(existing.start_r_at, endR);
+  }
+
+  const { error } = await supabase
+    .from("logs")
+    .update(updates as never)
+    .eq("id", id)
+    .eq("subtype", "feeding")
+    .is("end_timestamp", null);
+
+  if (error) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent(`Gagal stop: ${error.message}`)}`,
+    );
+  }
+
+  revalidatePath("/");
+  revalidatePath("/history");
+  redirect(`${returnTo}?logsaved=feeding`);
+}
+
 export async function deleteLogAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/");
   if (!id) redirect(returnTo);
 
   const supabase = createClient();
+
+  // Read the row first so we can roll back consumed_ml on pumping
+  // batches when deleting an ASI bottle feed. Without this, deleting
+  // a feed leaves the batch's consumed_ml inflated → stock display
+  // shows less than reality.
+  const { data: row } = await supabase
+    .from("logs")
+    .select("baby_id, subtype, bottle_content, amount_ml")
+    .eq("id", id)
+    .single();
+
+  if (
+    row &&
+    row.subtype === "feeding" &&
+    row.bottle_content === "asi" &&
+    typeof row.amount_ml === "number" &&
+    row.amount_ml > 0
+  ) {
+    // Original allocation drew from oldest batches first (FIFO). When
+    // rolling back, refill in reverse — most recently allocated first
+    // (newest non-empty batches). Best-effort heuristic since we don't
+    // store per-feed→batch links; works correctly when only one feed
+    // touched a batch, and degrades gracefully otherwise.
+    const { data: batches } = await supabase
+      .from("logs")
+      .select("id, amount_l_ml, amount_r_ml, consumed_ml, timestamp")
+      .eq("baby_id", row.baby_id)
+      .eq("subtype", "pumping")
+      .gt("consumed_ml", 0)
+      .order("timestamp", { ascending: false });
+
+    let toRefund = row.amount_ml;
+    for (const b of batches ?? []) {
+      if (toRefund <= 0) break;
+      const consumed = b.consumed_ml ?? 0;
+      const give = Math.min(toRefund, consumed);
+      if (give <= 0) continue;
+      await supabase
+        .from("logs")
+        .update({ consumed_ml: consumed - give })
+        .eq("id", b.id);
+      toRefund -= give;
+    }
+  }
+
   const { error } = await supabase.from("logs").delete().eq("id", id);
 
   if (error) {
