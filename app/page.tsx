@@ -14,6 +14,7 @@ import { LogsRealtime } from "@/components/LogsRealtime";
 import { SubmitButton } from "@/components/SubmitButton";
 import { OngoingCard } from "@/components/OngoingCard";
 import { StartOngoingButton } from "@/components/StartOngoingButtons";
+import { IdleClockToggle } from "@/components/IdleClockMode";
 import {
   deleteLogAction,
   resumeOngoingLogAction,
@@ -768,6 +769,18 @@ export default async function HomePage({
           Lihat semua riwayat →
         </Link>
       </section>
+
+      {ongoing.length === 0 ? (
+        <div className="mt-5">
+          <IdleClockToggle
+            babyName={baby.name}
+            babyAgeText={formatAge(baby.dob)}
+            sinceFeeding={last.feeding ? timeSince(last.feeding.timestamp) : null}
+            sinceSleep={last.sleep ? timeSince(last.sleep.timestamp) : null}
+            sinceDiaper={last.diaper ? timeSince(last.diaper.timestamp) : null}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-6 grid grid-cols-2 gap-2">
         <Link
