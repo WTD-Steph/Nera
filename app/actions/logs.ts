@@ -84,6 +84,13 @@ export async function createLogAction(formData: FormData) {
         );
       }
       payload.amount_ml = amount;
+      const content = String(formData.get("bottle_content") ?? "sufor");
+      if (content !== "sufor" && content !== "asi") {
+        redirect(
+          `${returnTo}?logerror=${encodeURIComponent("Pilih ASI atau Sufor.")}`,
+        );
+      }
+      payload.bottle_content = content;
     } else {
       const l = num(formData, "duration_l_min");
       const r = num(formData, "duration_r_min");

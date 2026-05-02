@@ -94,6 +94,8 @@ function LogModal({
 
   // Feeding sub-mode: 'sufor' (botol) atau 'dbf' (langsung)
   const [feedingMode, setFeedingMode] = useState<"sufor" | "dbf">("sufor");
+  // Bottle content (only when feedingMode='sufor'): formula vs expressed ASI
+  const [bottleContent, setBottleContent] = useState<"sufor" | "asi">("sufor");
 
   // Diaper toggles
   const [hasPee, setHasPee] = useState(false);
@@ -136,7 +138,16 @@ function LogModal({
           <input type="hidden" name="subtype" value={subtype} />
           <input type="hidden" name="return_to" value={returnTo} />
           {subtype === "feeding" ? (
-            <input type="hidden" name="feeding_mode" value={feedingMode} />
+            <>
+              <input type="hidden" name="feeding_mode" value={feedingMode} />
+              {feedingMode === "sufor" ? (
+                <input
+                  type="hidden"
+                  name="bottle_content"
+                  value={bottleContent}
+                />
+              ) : null}
+            </>
           ) : null}
           {subtype === "diaper" ? (
             <>
@@ -191,20 +202,48 @@ function LogModal({
               </Field>
 
               {feedingMode === "sufor" ? (
-                <Field label="Jumlah (ml)">
-                  <input
-                    type="number"
-                    name="amount_ml"
-                    step="1"
-                    min="1"
-                    max="500"
-                    required
-                    inputMode="numeric"
-                    placeholder="60"
-                    autoFocus
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
-                  />
-                </Field>
+                <>
+                  <Field label="Isi botol">
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setBottleContent("asi")}
+                        className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
+                          bottleContent === "asi"
+                            ? "border-rose-400 bg-rose-50 text-rose-700"
+                            : "border-gray-200 bg-white text-gray-700"
+                        }`}
+                      >
+                        🤱 ASI perah
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBottleContent("sufor")}
+                        className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
+                          bottleContent === "sufor"
+                            ? "border-rose-400 bg-rose-50 text-rose-700"
+                            : "border-gray-200 bg-white text-gray-700"
+                        }`}
+                      >
+                        🥛 Sufor
+                      </button>
+                    </div>
+                  </Field>
+                  <Field label="Jumlah (ml)">
+                    <input
+                      type="number"
+                      name="amount_ml"
+                      step="1"
+                      min="1"
+                      max="500"
+                      required
+                      inputMode="numeric"
+                      placeholder="60"
+                      autoFocus
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                    />
+                  </Field>
+                </>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Kiri (menit)">
