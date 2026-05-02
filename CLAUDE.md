@@ -39,6 +39,7 @@ Dokumen lengkap insiden + fix: [docs/troubleshooting.md](docs/troubleshooting.md
 - **Commit message:** prefix sesuai branch type, message singkat. End dengan `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` saat commit dari Claude Code
 - **PR:** `gh pr create` (GitHub MCP write 401, fallback gh CLI). Setiap PR: type-check + lint + build verify. E2E via Playwright + Supabase MCP saat applicable
 - **Deliverable report tiap PR:** state migration applied/committed/pushed, branch + remote, verification output, screenshot kalau UI changes
+- **WAJIB verify UI changes via Playwright sebelum claim "fixed"**. Type-check + build hijau ≠ feature works. Submit-button labels, modal close, form pending states, redirect targets — semua harus diuji end-to-end di Playwright (login → klik → observe DOM/screenshot) sebelum bilang task selesai. Bila prod butuh deploy dulu, tunggu Vercel deploy lalu test di nera-jeanne.vercel.app. Bila local, `npm run dev` dulu
 
 ## RLS pattern (per pelajaran PR #2b)
 
