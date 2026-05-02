@@ -29,20 +29,40 @@ export default async function ImunisasiPage({
 
   const { data: progress } = await supabase
     .from("immunization_progress")
-    .select("vaccine_key, given_at, facility, notes")
+    .select("vaccine_key, given_at, facility, doctor_name, notes")
     .eq("baby_id", baby.id);
 
   const givenMap = new Map<
     string,
-    { given_at: string; facility: string | null; notes: string | null }
+    {
+      given_at: string;
+      facility: string | null;
+      doctor_name: string | null;
+      notes: string | null;
+    }
   >();
   for (const p of progress ?? []) {
     givenMap.set(p.vaccine_key, {
       given_at: p.given_at,
       facility: p.facility,
+      doctor_name: p.doctor_name,
       notes: p.notes,
     });
   }
+  const pastFacilities = [
+    ...new Set(
+      (progress ?? [])
+        .map((p) => p.facility)
+        .filter((v): v is string => !!v && v.trim() !== ""),
+    ),
+  ].sort();
+  const pastDoctors = [
+    ...new Set(
+      (progress ?? [])
+        .map((p) => p.doctor_name)
+        .filter((v): v is string => !!v && v.trim() !== ""),
+    ),
+  ].sort();
 
   const currentMonth = ageInMonths(baby.dob);
   const totalGiven = givenMap.size;
@@ -138,11 +158,14 @@ export default async function ImunisasiPage({
                   return (
                     <ImunisasiRow
                       key={item.id}
+                      pastFacilities={pastFacilities}
+                      pastDoctors={pastDoctors}
                       data={{
                         vaccineKey: item.id,
                         vaccineName: item.name,
                         givenAt: detail?.given_at ?? null,
                         facility: detail?.facility ?? null,
+                        doctorName: detail?.doctor_name ?? null,
                         notes: detail?.notes ?? null,
                       }}
                     />
