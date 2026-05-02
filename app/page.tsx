@@ -5,6 +5,7 @@ import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentHousehold } from "@/lib/household/current";
 import { getCurrentBaby } from "@/lib/household/baby";
 import { LogModalTrigger, type LogSubtype } from "@/components/LogModal";
+import type { Medication } from "@/app/actions/medications";
 import { LogsRealtime } from "@/components/LogsRealtime";
 import { SubmitButton } from "@/components/SubmitButton";
 import { OngoingCard } from "@/components/OngoingCard";
@@ -64,7 +65,7 @@ const SUBTYPE_LABEL: Record<string, string> = {
   sleep: "Tidur",
   bath: "Mandi",
   temp: "Suhu",
-  med: "Obat",
+  med: "Obat / Suplemen",
 };
 
 function logDetail(l: LogRow): string {
@@ -111,14 +112,22 @@ export default async function HomePage({
   const supabase = createClient();
 
   const since = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
-  const { data: logs } = await supabase
-    .from("logs")
-    .select(
-      "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, notes",
-    )
-    .eq("baby_id", baby.id)
-    .gte("timestamp", since)
-    .order("timestamp", { ascending: false });
+  const [{ data: logs }, { data: medsData }] = await Promise.all([
+    supabase
+      .from("logs")
+      .select(
+        "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, notes",
+      )
+      .eq("baby_id", baby.id)
+      .gte("timestamp", since)
+      .order("timestamp", { ascending: false }),
+    supabase
+      .from("medications")
+      .select("id, name, default_dose, unit")
+      .eq("household_id", household.household_id)
+      .order("name", { ascending: true }),
+  ]);
+  const medications = (medsData ?? []) as Medication[];
 
   const logsArray: LogRow[] = (logs ?? []) as LogRow[];
   const ongoing = logsArray.filter(
@@ -265,6 +274,7 @@ export default async function HomePage({
             <LogModalTrigger
               key={q.subtype}
               subtype={q.subtype}
+              medications={q.subtype === "med" ? medications : undefined}
               className="flex items-center justify-center gap-1.5 rounded-2xl border border-gray-100 bg-white px-2 py-2 shadow-sm transition-transform active:scale-95"
             >
               <span aria-hidden>{q.emoji}</span>

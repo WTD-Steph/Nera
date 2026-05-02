@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { createLogAction } from "@/app/actions/logs";
+import {
+  addMedicationAction,
+  type Medication,
+  type MedUnit,
+} from "@/app/actions/medications";
 import { SubmitButton } from "@/components/SubmitButton";
 import { FormCloser } from "@/components/FormCloser";
 
@@ -21,7 +26,7 @@ const SUBTYPE_LABEL: Record<LogSubtype, string> = {
   sleep: "Tidur",
   bath: "Mandi",
   temp: "Suhu",
-  med: "Obat",
+  med: "Obat / Suplemen",
 };
 
 const POOP_COLORS = ["kuning", "hijau", "coklat", "hitam", "merah"];
@@ -38,11 +43,13 @@ export function LogModalTrigger({
   className,
   children,
   returnTo = "/",
+  medications,
 }: {
   subtype: LogSubtype;
   className?: string;
   children: React.ReactNode;
   returnTo?: string;
+  medications?: Medication[];
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -59,6 +66,7 @@ export function LogModalTrigger({
           subtype={subtype}
           returnTo={returnTo}
           onClose={() => setOpen(false)}
+          medications={medications ?? []}
         />
       ) : null}
     </>
@@ -69,10 +77,12 @@ function LogModal({
   subtype,
   returnTo,
   onClose,
+  medications,
 }: {
   subtype: LogSubtype;
   returnTo: string;
   onClose: () => void;
+  medications: Medication[];
 }) {
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
@@ -334,28 +344,7 @@ function LogModal({
           ) : null}
 
           {subtype === "med" ? (
-            <>
-              <Field label="Nama obat">
-                <input
-                  type="text"
-                  name="med_name"
-                  required
-                  maxLength={100}
-                  autoFocus
-                  placeholder="Paracetamol drop"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
-                />
-              </Field>
-              <Field label="Dosis (opsional)">
-                <input
-                  type="text"
-                  name="med_dose"
-                  maxLength={50}
-                  placeholder="0.6 ml"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
-                />
-              </Field>
-            </>
+            <MedFields initialMeds={medications} />
           ) : null}
 
           <Field label="Catatan (opsional)">
@@ -419,5 +408,201 @@ function Chips({
         </button>
       ))}
     </div>
+  );
+}
+
+const ADD_NEW = "__add_new__";
+const UNITS: { value: MedUnit; label: string }[] = [
+  { value: "ml", label: "ml" },
+  { value: "drop", label: "drop" },
+  { value: "gr", label: "gr" },
+  { value: "tab", label: "tablet" },
+  { value: "sachet", label: "sachet" },
+];
+
+function MedFields({ initialMeds }: { initialMeds: Medication[] }) {
+  const [meds, setMeds] = useState<Medication[]>(initialMeds);
+  const [selectedId, setSelectedId] = useState<string>(
+    initialMeds[0]?.id ?? "",
+  );
+  const [doseValue, setDoseValue] = useState<string>(
+    initialMeds[0]?.default_dose ?? "",
+  );
+  const [unit, setUnit] = useState<MedUnit>(initialMeds[0]?.unit ?? "ml");
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDose, setNewDose] = useState("");
+  const [newUnit, setNewUnit] = useState<MedUnit>("ml");
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const selected = meds.find((m) => m.id === selectedId);
+  const medName = selected?.name ?? "";
+  const doseString =
+    doseValue.trim() === "" ? "" : `${doseValue.trim()} ${unit}`;
+
+  function handlePickMed(id: string) {
+    if (id === ADD_NEW) {
+      setAdding(true);
+      return;
+    }
+    setSelectedId(id);
+    const m = meds.find((x) => x.id === id);
+    if (m) {
+      setDoseValue(m.default_dose ?? "");
+      setUnit(m.unit);
+    }
+  }
+
+  function handleAddNew() {
+    setError(null);
+    startTransition(async () => {
+      const res = await addMedicationAction(
+        newName,
+        newDose === "" ? null : newDose,
+        newUnit,
+      );
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      const next = [...meds, res.medication];
+      setMeds(next);
+      setSelectedId(res.medication.id);
+      setDoseValue(res.medication.default_dose ?? "");
+      setUnit(res.medication.unit);
+      setAdding(false);
+      setNewName("");
+      setNewDose("");
+      setNewUnit("ml");
+    });
+  }
+
+  return (
+    <>
+      {/* Hidden inputs that the form action reads */}
+      <input type="hidden" name="med_name" value={medName} />
+      <input type="hidden" name="med_dose" value={doseString} />
+
+      <Field label="Nama obat / suplemen">
+        <select
+          value={selectedId}
+          onChange={(e) => handlePickMed(e.target.value)}
+          required
+          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+        >
+          {meds.length === 0 ? (
+            <option value="" disabled>
+              Belum ada — tambah dulu di bawah
+            </option>
+          ) : (
+            meds.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+                {m.default_dose ? ` · ${m.default_dose} ${m.unit}` : ""}
+              </option>
+            ))
+          )}
+          <option value={ADD_NEW}>+ Tambah opsi baru…</option>
+        </select>
+      </Field>
+
+      {!adding && meds.length > 0 ? (
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Dosis">
+            <input
+              type="text"
+              value={doseValue}
+              onChange={(e) => setDoseValue(e.target.value)}
+              maxLength={20}
+              inputMode="decimal"
+              placeholder="1"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+            />
+          </Field>
+          <Field label="Satuan">
+            <select
+              value={unit}
+              onChange={(e) => setUnit(e.target.value as MedUnit)}
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+            >
+              {UNITS.map((u) => (
+                <option key={u.value} value={u.value}>
+                  {u.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      ) : null}
+
+      {adding ? (
+        <div className="space-y-3 rounded-2xl border border-rose-100 bg-rose-50/40 p-3">
+          <div className="text-xs font-semibold text-rose-700">
+            Tambah opsi obat / suplemen
+          </div>
+          <Field label="Nama">
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              maxLength={100}
+              placeholder="Paracetamol"
+              autoFocus
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Dosis default">
+              <input
+                type="text"
+                value={newDose}
+                onChange={(e) => setNewDose(e.target.value)}
+                maxLength={20}
+                inputMode="decimal"
+                placeholder="0.6"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+              />
+            </Field>
+            <Field label="Satuan">
+              <select
+                value={newUnit}
+                onChange={(e) => setNewUnit(e.target.value as MedUnit)}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+              >
+                {UNITS.map((u) => (
+                  <option key={u.value} value={u.value}>
+                    {u.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          {error ? (
+            <div className="text-xs text-red-600">{error}</div>
+          ) : null}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleAddNew}
+              disabled={pending || newName.trim() === ""}
+              className="flex-1 rounded-xl bg-rose-500 py-2 text-xs font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700 disabled:opacity-50"
+            >
+              {pending ? "Menyimpan…" : "Simpan opsi"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAdding(false);
+                setError(null);
+              }}
+              className="flex-1 rounded-xl border border-gray-200 bg-white py-2 text-xs font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Batal
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
