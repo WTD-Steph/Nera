@@ -13,6 +13,7 @@ export type ImunisasiRowData = {
   vaccineName: string;
   givenAt: string | null; // YYYY-MM-DD
   facility: string | null;
+  doctorName: string | null;
   notes: string | null;
 };
 
@@ -20,7 +21,15 @@ function todayDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function ImunisasiRow({ data }: { data: ImunisasiRowData }) {
+export function ImunisasiRow({
+  data,
+  pastFacilities,
+  pastDoctors,
+}: {
+  data: ImunisasiRowData;
+  pastFacilities: string[];
+  pastDoctors: string[];
+}) {
   const [open, setOpen] = useState(false);
   const given = !!data.givenAt;
 
@@ -70,7 +79,12 @@ export function ImunisasiRow({ data }: { data: ImunisasiRowData }) {
         </div>
       </button>
       {open ? (
-        <ImunisasiModal data={data} onClose={() => setOpen(false)} />
+        <ImunisasiModal
+          data={data}
+          pastFacilities={pastFacilities}
+          pastDoctors={pastDoctors}
+          onClose={() => setOpen(false)}
+        />
       ) : null}
     </>
   );
@@ -78,11 +92,17 @@ export function ImunisasiRow({ data }: { data: ImunisasiRowData }) {
 
 function ImunisasiModal({
   data,
+  pastFacilities,
+  pastDoctors,
   onClose,
 }: {
   data: ImunisasiRowData;
+  pastFacilities: string[];
+  pastDoctors: string[];
   onClose: () => void;
 }) {
+  const facilityListId = `facility-options-${data.vaccineKey}`;
+  const doctorListId = `doctor-options-${data.vaccineKey}`;
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -147,23 +167,51 @@ function ImunisasiModal({
             <input
               type="text"
               name="facility"
+              list={facilityListId}
               maxLength={120}
               defaultValue={data.facility ?? ""}
               placeholder="RS Pondok Indah / Posyandu Mawar"
+              autoComplete="off"
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
             />
+            <datalist id={facilityListId}>
+              {pastFacilities.map((f) => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
           </label>
 
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-gray-600">
-              Catatan dokter (opsional)
+              Nama dokter (opsional)
+            </span>
+            <input
+              type="text"
+              name="doctor_name"
+              list={doctorListId}
+              maxLength={120}
+              defaultValue={data.doctorName ?? ""}
+              placeholder="dr. Sarah"
+              autoComplete="off"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+            />
+            <datalist id={doctorListId}>
+              {pastDoctors.map((d) => (
+                <option key={d} value={d} />
+              ))}
+            </datalist>
+          </label>
+
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold text-gray-600">
+              Catatan (opsional)
             </span>
             <textarea
               name="notes"
               maxLength={500}
               rows={2}
               defaultValue={data.notes ?? ""}
-              placeholder="Misal: dr. Sarah, ada reaksi demam ringan 1 hari"
+              placeholder="Misal: ada reaksi demam ringan 1 hari"
               className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-rose-400"
             />
           </label>

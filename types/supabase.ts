@@ -210,6 +210,7 @@ export type Database = {
         Row: {
           baby_id: string
           created_by: string | null
+          doctor_name: string | null
           facility: string | null
           given_at: string
           notes: string | null
@@ -218,6 +219,7 @@ export type Database = {
         Insert: {
           baby_id: string
           created_by?: string | null
+          doctor_name?: string | null
           facility?: string | null
           given_at: string
           notes?: string | null
@@ -226,6 +228,7 @@ export type Database = {
         Update: {
           baby_id?: string
           created_by?: string | null
+          doctor_name?: string | null
           facility?: string | null
           given_at?: string
           notes?: string | null

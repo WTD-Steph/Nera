@@ -10,6 +10,7 @@ export async function markImmunizationAction(formData: FormData) {
   const vaccineKey = String(formData.get("vaccine_key") ?? "");
   const givenAt = String(formData.get("given_at") ?? "").trim();
   const facility = String(formData.get("facility") ?? "").trim() || null;
+  const doctorName = String(formData.get("doctor_name") ?? "").trim() || null;
   const notes = String(formData.get("notes") ?? "").trim() || null;
   const returnTo = String(formData.get("return_to") ?? "/imunisasi");
 
@@ -31,6 +32,7 @@ export async function markImmunizationAction(formData: FormData) {
       vaccine_key: vaccineKey,
       given_at: givenAt,
       facility,
+      doctor_name: doctorName,
       notes,
       created_by: user.id,
     },
