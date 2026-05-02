@@ -93,5 +93,5 @@ export async function deleteGrowthAction(formData: FormData) {
   }
 
   revalidatePath("/growth");
-  redirect(`${returnTo}?growthdeleted=1`);
+  redirect(returnTo);
 }

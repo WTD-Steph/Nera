@@ -72,5 +72,5 @@ export async function unmarkImmunizationAction(formData: FormData) {
   }
 
   revalidatePath("/imunisasi");
-  redirect(`${returnTo}?imudeleted=1`);
+  redirect(returnTo);
 }
