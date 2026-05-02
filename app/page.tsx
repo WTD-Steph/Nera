@@ -316,6 +316,21 @@ export default async function HomePage({
   }
   const milkBreakdown =
     milkBreakdownParts.length > 0 ? milkBreakdownParts.join(" · ") : undefined;
+  const totalBoobsLMin = stats.dbfMinL + stats.pumpMinL;
+  const totalBoobsRMin = stats.dbfMinR + stats.pumpMinR;
+  const feedingReminder = (() => {
+    if (!last.feeding) return null;
+    const minsSince =
+      (Date.now() - new Date(last.feeding.timestamp).getTime()) / 60000;
+    if (minsSince < 240) return null;
+    const hours = Math.floor(minsSince / 60);
+    const mins = Math.round(minsSince % 60);
+    const text = `Sudah ${hours}j ${mins}m belum minum`;
+    return {
+      text,
+      tone: minsSince >= 480 ? ("urgent" as const) : ("warning" as const),
+    };
+  })();
   const activeAct = parseAct(searchParams.act);
   const filteredLogs = activeAct
     ? logsArray.filter((l) => matchesAct(l, activeAct))
@@ -586,6 +601,15 @@ export default async function HomePage({
               />
             </div>
           ) : null}
+          {totalBoobsLMin > 0 || totalBoobsRMin > 0 ? (
+            <div className="border-t border-gray-100 pt-3">
+              <StatRow
+                label="🤱 Total Boobs"
+                value={`L ${fmtDuration(totalBoobsLMin)} · R ${fmtDuration(totalBoobsRMin)}`}
+                detail="DBF + Pumping per sisi"
+              />
+            </div>
+          ) : null}
           <p className="border-t border-gray-100 pt-2 text-[10px] leading-snug text-gray-400">
             Target referensi WHO/IDAI/AAP usia{" "}
             {Math.floor(
@@ -773,16 +797,38 @@ export default async function HomePage({
       {ongoing.length === 0 ? (
         <div className="mt-5">
           <IdleClockToggle
-            babyName={baby.name}
-            babyAgeText={formatAge(baby.dob)}
-            sinceFeeding={last.feeding ? timeSince(last.feeding.timestamp) : null}
+            sinceFeeding={
+              last.feeding ? timeSince(last.feeding.timestamp) : null
+            }
             sinceSleep={last.sleep ? timeSince(last.sleep.timestamp) : null}
-            sinceDiaper={last.diaper ? timeSince(last.diaper.timestamp) : null}
+            sinceDiaper={
+              last.diaper ? timeSince(last.diaper.timestamp) : null
+            }
+            reminder={feedingReminder}
+            stats={{
+              milkTotalMl,
+              milkTargetMin: milkTarget.min,
+              milkTargetMax: milkTarget.max,
+              sleepMin: stats.sleepMin,
+              sleepTargetHoursMin: target.sleepHoursMin,
+              sleepTargetHoursMax: target.sleepHoursMax,
+              peeCount: stats.diaperPeeCount,
+              peeTargetMin: target.peeMin,
+              poopCount: stats.diaperPoopCount,
+              poopTargetMin: target.poopMin,
+            }}
+            ongoingSubtypes={Array.from(ongoingSubtypes)}
           />
         </div>
       ) : null}
 
       <div className="mt-6 grid grid-cols-2 gap-2">
+        <Link
+          href="/trend"
+          className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+        >
+          📊 Trend
+        </Link>
         <Link
           href="/growth"
           className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
