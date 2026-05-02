@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createGrowthAction } from "@/app/actions/growth";
 import { SubmitButton } from "@/components/SubmitButton";
+import { FormCloser } from "@/components/FormCloser";
 
 function nowDatetimeLocal(): string {
   const d = new Date();
@@ -76,6 +77,7 @@ function Modal({
         </div>
 
         <form action={createGrowthAction} className="space-y-4 p-4">
+          <FormCloser onClose={onClose} />
           <input type="hidden" name="return_to" value={returnTo} />
 
           <label className="block">

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
 
 export async function toggleMilestoneAction(formData: FormData) {
@@ -12,14 +13,11 @@ export async function toggleMilestoneAction(formData: FormData) {
 
   if (!milestoneKey) redirect(returnTo);
 
-  const baby = await getCurrentBaby();
+  const [user, baby] = await Promise.all([getCachedUser(), getCurrentBaby()]);
+  if (!user) redirect("/login");
   if (!baby) redirect("/setup");
 
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   if (currentlyAchieved) {
     await supabase

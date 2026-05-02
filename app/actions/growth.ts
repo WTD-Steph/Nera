@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
 
 function num(formData: FormData, key: string): number | null {
@@ -45,14 +46,11 @@ export async function createGrowthAction(formData: FormData) {
     );
   }
 
-  const baby = await getCurrentBaby();
+  const [user, baby] = await Promise.all([getCachedUser(), getCurrentBaby()]);
+  if (!user) redirect("/login");
   if (!baby) redirect("/setup");
 
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   const { error } = await supabase.from("growth_measurements").insert({
     baby_id: baby.id,

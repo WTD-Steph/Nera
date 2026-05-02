@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
 
 export async function markImmunizationAction(formData: FormData) {
@@ -19,52 +20,27 @@ export async function markImmunizationAction(formData: FormData) {
     );
   }
 
-  const baby = await getCurrentBaby();
+  const [user, baby] = await Promise.all([getCachedUser(), getCurrentBaby()]);
+  if (!user) redirect("/login");
   if (!baby) redirect("/setup");
 
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  // Upsert: kalau sudah ada (re-mark), update; kalau belum, insert.
-  const { data: existing } = await supabase
-    .from("immunization_progress")
-    .select("baby_id")
-    .eq("baby_id", baby.id)
-    .eq("vaccine_key", vaccineKey)
-    .maybeSingle();
-
-  if (existing) {
-    const { error } = await supabase
-      .from("immunization_progress")
-      .update({
-        given_at: givenAt,
-        facility,
-        notes,
-      })
-      .eq("baby_id", baby.id)
-      .eq("vaccine_key", vaccineKey);
-    if (error) {
-      redirect(
-        `${returnTo}?imuerror=${encodeURIComponent(`Gagal update: ${error.message}`)}`,
-      );
-    }
-  } else {
-    const { error } = await supabase.from("immunization_progress").insert({
+  const { error } = await supabase.from("immunization_progress").upsert(
+    {
       baby_id: baby.id,
       vaccine_key: vaccineKey,
       given_at: givenAt,
       facility,
       notes,
       created_by: user.id,
-    });
-    if (error) {
-      redirect(
-        `${returnTo}?imuerror=${encodeURIComponent(`Gagal simpan: ${error.message}`)}`,
-      );
-    }
+    },
+    { onConflict: "baby_id,vaccine_key" },
+  );
+
+  if (error) {
+    redirect(
+      `${returnTo}?imuerror=${encodeURIComponent(`Gagal simpan: ${error.message}`)}`,
+    );
   }
 
   revalidatePath("/imunisasi");
