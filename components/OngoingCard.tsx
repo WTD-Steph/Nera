@@ -52,6 +52,7 @@ export function OngoingCard({
   pumpStartRAt,
   pumpEndRAt,
   dbfMlPerMin,
+  autoOpenLamp,
 }: {
   id: string;
   subtype: Subtype;
@@ -63,8 +64,11 @@ export function OngoingCard({
   pumpEndRAt?: string | null;
   /** Used in NightLamp DBF view to estimate ml = duration × rate. */
   dbfMlPerMin?: number | null;
+  /** Initial state — auto-open NightLamp on mount (e.g. just submitted
+   *  manual sleep with empty Bangun). */
+  autoOpenLamp?: boolean;
 }) {
-  const [showLamp, setShowLamp] = useState(false);
+  const [showLamp, setShowLamp] = useState(!!autoOpenLamp);
   const [showPumpEnd, setShowPumpEnd] = useState(false);
 
   const title = TITLES[subtype];
