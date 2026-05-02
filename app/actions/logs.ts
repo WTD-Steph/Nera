@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
 
 const SUBTYPES = [
@@ -51,18 +52,11 @@ export async function createLogAction(formData: FormData) {
     redirect(`${returnTo}?logerror=${encodeURIComponent("Subtype tidak valid.")}`);
   }
 
-  const baby = await getCurrentBaby();
-  if (!baby) {
-    redirect("/setup");
-  }
+  const [user, baby] = await Promise.all([getCachedUser(), getCurrentBaby()]);
+  if (!user) redirect("/login");
+  if (!baby) redirect("/setup");
 
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    redirect("/login");
-  }
 
   const timestamp =
     isoOrNull(formData, "timestamp") ?? new Date().toISOString();

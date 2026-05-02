@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createLogAction } from "@/app/actions/logs";
 import { SubmitButton } from "@/components/SubmitButton";
+import { FormCloser } from "@/components/FormCloser";
 
 export type LogSubtype =
   | "feeding"
@@ -117,6 +118,7 @@ function LogModal({
         </div>
 
         <form action={createLogAction} className="space-y-4 p-4">
+          <FormCloser onClose={onClose} />
           <input type="hidden" name="subtype" value={subtype} />
           <input type="hidden" name="return_to" value={returnTo} />
           {subtype === "feeding" ? (

@@ -6,6 +6,7 @@ import {
   unmarkImmunizationAction,
 } from "@/app/actions/imunisasi";
 import { SubmitButton } from "@/components/SubmitButton";
+import { FormCloser } from "@/components/FormCloser";
 
 export type ImunisasiRowData = {
   vaccineKey: string;
@@ -117,6 +118,7 @@ function ImunisasiModal({
         </div>
 
         <form action={markImmunizationAction} className="space-y-4 p-4">
+          <FormCloser onClose={onClose} />
           <input type="hidden" name="vaccine_key" value={data.vaccineKey} />
           <input type="hidden" name="return_to" value="/imunisasi" />
 
@@ -175,6 +177,7 @@ function ImunisasiModal({
             action={unmarkImmunizationAction}
             className="border-t border-gray-100 px-4 pb-4 pt-3"
           >
+            <FormCloser onClose={onClose} />
             <input type="hidden" name="vaccine_key" value={data.vaccineKey} />
             <input type="hidden" name="return_to" value="/imunisasi" />
             <SubmitButton
