@@ -236,13 +236,23 @@ export async function startOngoingLogAction(formData: FormData) {
   if (!baby) redirect("/setup");
 
   const supabase = createClient();
-  const now = new Date().toISOString();
+  // Backdate option: form may include start_offset_min (0/5/10/15/30)
+  // for "Mulai dari X menit lalu". Default 0 → now.
+  const offsetMin = (() => {
+    const raw = String(formData.get("start_offset_min") ?? "0");
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0 || n > 60) return 0;
+    return Math.round(n);
+  })();
+  const startMs = Date.now() - offsetMin * 60 * 1000;
+  const now = new Date(startMs).toISOString();
   const insertPayload: Record<string, unknown> = {
     baby_id: baby.id,
     subtype,
     timestamp: now,
     end_timestamp: null,
     created_by: user.id,
+    started_with_stopwatch: true,
   };
 
   // Pumping AND DBF (subtype='feeding') side picker: 'kiri' | 'kanan' |

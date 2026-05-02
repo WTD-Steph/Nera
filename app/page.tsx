@@ -159,7 +159,7 @@ export default async function HomePage({
       supabase
         .from("logs")
         .select(
-          "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, paused_at, notes",
+          "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, paused_at, started_with_stopwatch, notes",
         )
         .eq("baby_id", baby.id)
         .gte("timestamp", since)
@@ -205,13 +205,10 @@ export default async function HomePage({
   const ongoing = logsArray.filter(
     (l) =>
       l.end_timestamp === null &&
+      l.started_with_stopwatch === true &&
       (l.subtype === "sleep" ||
         l.subtype === "pumping" ||
-        // DBF ongoing: feeding row with per-side timestamps set, no ml.
-        // Distinguishes from sufor bottle feeds which always have ml + no
-        // start_l/r_at.
-        (l.subtype === "feeding" &&
-          (l.start_l_at !== null || l.start_r_at !== null))),
+        l.subtype === "feeding"),
   );
   const ongoingSubtypes = new Set(
     ongoing.map((l) =>
@@ -506,7 +503,11 @@ export default async function HomePage({
           ) : (
             <div className="divide-y divide-gray-50">
               {recent.map((l, idx) => {
-                const ongoing = l.end_timestamp === null;
+                // "Berlangsung" only applies to Mulai-flow sessions —
+                // manual Catat entries with NULL end_timestamp are
+                // incomplete data, not active sessions.
+                const ongoing =
+                  l.end_timestamp === null && l.started_with_stopwatch;
                 const paused = ongoing && l.paused_at !== null;
                 const rowBg = paused
                   ? "bg-amber-50/60 border-l-4 border-l-amber-300"

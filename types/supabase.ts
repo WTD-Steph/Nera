@@ -270,6 +270,7 @@ export type Database = {
           poop_consistency: string | null
           start_l_at: string | null
           start_r_at: string | null
+          started_with_stopwatch: boolean
           subtype: string
           temp_celsius: number | null
           timestamp: string
@@ -300,6 +301,7 @@ export type Database = {
           poop_consistency?: string | null
           start_l_at?: string | null
           start_r_at?: string | null
+          started_with_stopwatch?: boolean
           subtype: string
           temp_celsius?: number | null
           timestamp: string
@@ -330,6 +332,7 @@ export type Database = {
           poop_consistency?: string | null
           start_l_at?: string | null
           start_r_at?: string | null
+          started_with_stopwatch?: boolean
           subtype?: string
           temp_celsius?: number | null
           timestamp?: string

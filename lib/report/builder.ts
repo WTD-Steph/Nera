@@ -36,6 +36,7 @@ export type LogRow = {
   start_r_at: string | null;
   end_r_at: string | null;
   paused_at: string | null;
+  started_with_stopwatch: boolean;
   notes: string | null;
 };
 
