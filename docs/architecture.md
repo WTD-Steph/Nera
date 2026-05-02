@@ -57,6 +57,13 @@ High-level walkthrough Nera. Mendukung [PROJECT_BRIEF.md](../PROJECT_BRIEF.md) �
        │     ├────────► logs
        │     │             (baby_id FK, subtype enum, timestamp,
        │     │              fields per subtype dengan partial CHECK)
+       │     │             — feeding: amount_ml + bottle_content
+       │     │               ('sufor'|'asi') ATAU duration_l/r_min
+       │     │             — pumping: amount_l/r_ml + per-side
+       │     │               start_l_at, end_l_at, start_r_at, end_r_at
+       │     │             — pumping batches: consumed_ml tracks how
+       │     │               much fed back via ASI bottle feeds
+       │     │             — sleep: end_timestamp nullable (ongoing)
        │     │
        │     ├────────► growth_measurements
        │     │             (baby_id FK, measured_at,
@@ -67,6 +74,16 @@ High-level walkthrough Nera. Mendukung [PROJECT_BRIEF.md](../PROJECT_BRIEF.md) �
        │     │
        │     └────────► immunization_progress
        │                   PRIMARY KEY (baby_id, vaccine_key)
+       │                   + doctor_name (datalist autocomplete)
+       │
+       │  household-scoped:
+       │     households.sleep_playlist_url (per-household night-lamp
+       │       Spotify URL override, NULL = app default)
+       │
+       │     ├────────► medications
+       │                   (household_id FK, name, default_dose, unit
+       │                    IN ('ml','drop','gr','tab','sachet'))
+       │                   UNIQUE(household_id, name)
 ```
 
 Semua tabel kecuali `auth.*` ada di schema `public`. Semua punya RLS enabled.
@@ -160,6 +177,49 @@ import { fooAction } from "@/app/actions/foo";
 ```
 
 Untuk form yang butuh client state (modal, conditional fields), wrap di client component yang mounts hidden input + form action.
+
+## Ongoing log flows (sleep + pumping)
+
+Sleep dan pumping bisa di-log dua cara:
+
+1. **Catat manual** (Catat Cepat → Tidur / Pumping) → buka LogModal dengan field lengkap (start, end, ml, durasi). Cocok untuk retroactive entry.
+2. **Mulai sekarang + stopwatch** → insert row dengan `end_timestamp = NULL`, render OngoingCard dengan live stopwatch + Stop button. Cocok untuk track real-time.
+
+### Sleep ongoing
+- `Mulai Tidur` → INSERT `subtype=sleep, timestamp=now(), end_timestamp=null`
+- OngoingCard: stopwatch ticks, 🌑 Mode Night Lamp button, "Bangun · Stop" button
+- Night-lamp overlay: black bg + dim red, fullscreen (Fullscreen API + theme-color black + html/body bg black for safe-area), Spotify "Putar musik tidur" link (`households.sleep_playlist_url` atau default Baby Sleep playlist)
+- "Bangun · Stop" → `endOngoingSleepAction` UPDATE end_timestamp = now()
+
+### Pumping ongoing — per-side flow
+- `Mulai Pumping` tile expands inline ke 3 buttons: 🤱 Kiri / 🤱 Kanan / 🤱🤱 Dua-duanya
+- INSERT log dengan `start_l_at`/`start_r_at`/both di-set ke now (sesuai pilihan)
+- OngoingCard PumpingControls computed state dari per-side flags:
+  - `Kiri aktif` / `Kanan aktif` badge ditampilkan sesuai side dengan start set + end null
+  - `Pindah ke X` button hanya muncul kalau salah satu side belum pernah dipakai (single-side mode). After Pindah → both sides pernah aktif → button hilang
+  - `Selesai · Catat ml` selalu ada → buka EndPumpingModal
+- `pumpingPindahAction`: single UPDATE end_X_at=now + start_other_at=now (atomic side-switch)
+- `endOngoingPumpingAction`: read existing per-side state, set end_l/r_at=now untuk side yang masih aktif (untuk parent yang langsung Selesai tanpa Pindah), scrub start/end side dengan ml=0
+
+## ASI stock batching
+
+Pumping log = batch. Produced ml = `amount_l_ml + amount_r_ml`. Consumed via `consumed_ml` column. Remaining = produced - consumed_ml.
+
+- `/stock` page: header summary (tersisa, batch aktif, total produksi/dipakai) + list batches dengan progress bar (penuh / sebagian / habis)
+- `Stok ASI` card di home page: total tersisa + batch aktif count → link ke /stock
+- **Auto FIFO allocation**: saat `createLogAction` insert feeding row dengan `bottle_content='asi'` dan `amount_ml > 0`, query pumping batches order by timestamp ASC, increment consumed_ml across batches sampai feed amount habis. Multiple batches bisa di-touch dalam satu feed kalau perlu.
+- **Manual batch picker**: LogModal feeding dengan ASI selected menampilkan dropdown "Batch ASI" dengan options "Auto · FIFO" + tiap batch dengan remaining ml. User pilih → batch_id ke server → batch tersebut di-prioritize di queue, sisa spill FIFO ke batch lain
+- DBF feeding tidak count terhadap stock (langsung dari source). Sufor bottle feed juga tidak (bukan ASI).
+
+## Timezone (Asia/Jakarta)
+
+Vercel runtime UTC; browser any TZ; semua wall-clock display + parse explicitly Asia/Jakarta.
+
+- `lib/compute/format.ts` `fmtTime` pakai `toLocaleTimeString("en-GB", { timeZone: "Asia/Jakarta", hour:"2-digit", minute:"2-digit", hour12: false })` → "HH:MM" colon (id-ID locale render dengan period "HH.MM" yang user found confusing)
+- `fmtDate` pakai id-ID locale + timeZone Jakarta → "2 Mei 2026"
+- `fmtSleepRange` + `pumpDur` derive durasi dari ISO timestamps tanpa raw `getHours()`
+- Server actions `isoOrNull` parse `<input type="datetime-local">` value (no TZ) dengan append `+07:00` suffix sebelum `new Date()` → Jakarta-local input properly converted to UTC instant
+- Hydration safety: locale + TZ stable di server (UTC runtime) dan client (Jakarta browser) menghasilkan output identik → no #418/#423/#425 mismatch
 
 ## CSV + AI report
 

@@ -27,10 +27,20 @@ Dokumen lengkap insiden + fix: [docs/troubleshooting.md](docs/troubleshooting.md
 ## Schema commitments — JANGAN ubah
 
 - Subtypes log: `feeding`, `pumping`, `diaper`, `sleep`, `bath`, `temp`, `med` (consolidated dari original 9 di brief). `feeding` punya amount_ml ATAU duration_l/r_min. `diaper` punya has_pee/has_poop boolean
+- `logs.bottle_content` enum: `'sufor' | 'asi' | NULL`. Diisi saat feeding+sufor (bottle); NULL untuk DBF dan log lama. Pakai untuk bedakan ASI perah vs formula di tampilan + ASI stock allocation
+- `logs.consumed_ml` numeric DEFAULT 0 — track berapa ml dari pumping batch sudah dikonsumsi via ASI bottle feeds. CHECK >= 0. Stock remaining = (amount_l_ml + amount_r_ml) - consumed_ml
+- `logs.start_l_at, end_l_at, start_r_at, end_r_at` timestamptz nullable — per-side pumping window. Overall `timestamp` / `end_timestamp` derived dari min(starts) / max(ends). CHECK end_X >= start_X per sisi kalau both set
 - ID stable di constants — `MILESTONES_LIST` (32 items KPSP/IDAI), `IMUNISASI_LIST` (21 vaccines IDAI). `id` field pair dengan `*_progress.{milestone,vaccine}_key`. Jangan rename setelah ada data
 - `babies.gender` enum: `'female' | 'male'` (CHECK constraint). Tidak ada non-binary di v1
 - `household_members.role`: `'owner' | 'member'` (CHECK constraint)
 - `household_invitations.role`: same enum, default `'member'`
+- `households.sleep_playlist_url` nullable — per-household override untuk night-lamp Spotify link. NULL = default Baby Sleep playlist (`37i9dQZF1DX0DxcHtn4Hwo`)
+- `medications` table per household — `(household_id, name, default_dose, unit)` dengan `unit IN ('ml','drop','gr','tab','sachet')`. Dropdown options di LogModal med subtype. UNIQUE(household_id, name)
+- `immunization_progress.doctor_name` nullable — datalist autocomplete dari past entries
+
+## Wall-clock TZ commitment
+
+Semua wall-clock display + parse locked ke `Asia/Jakarta` (GMT+7), terlepas server (Vercel UTC) atau client (any). Pakai `lib/compute/format.ts` `fmtTime` (en-GB locale, HH:MM colon), `fmtDate` (id-ID locale "2 Mei 2026"), `fmtSleepRange`, `pumpDur` helpers — JANGAN raw `getHours()` yang TZ-dependent. Server actions parse `<input type="datetime-local">` dengan append `+07:00` suffix sebelum `new Date()` — see `app/actions/logs.ts` `isoOrNull`. Hydration-safe: same locale + TZ on both sides.
 
 ## Workflow conventions
 
@@ -102,34 +112,48 @@ app/                        # Next.js App Router
   setup/                    # onboarding (household → baby)
   invite/[token]/           # accept invite
   more/                     # secondary nav
-    household/              # member management
+    household/              # member management + Preferensi (sleep playlist URL)
     profile/                # baby profile edit
   growth/                   # /growth chart + history
   milestone/                # KPSP/IDAI checklist
-  imunisasi/                # vaccine schedule
+  imunisasi/                # vaccine schedule + facility/doctor datalist
   history/                  # log riwayat dengan filter
   report/                   # CSV export + AI prompt copier
+  stock/                    # ASI batch ledger (pumping batches with FIFO consumption)
   api/
     invite/, export/        # POST invite, GET CSV
   actions/                  # server actions per domain
-    logs.ts, growth.ts, milestone.ts, imunisasi.ts
+    logs.ts                 # createLogAction, startOngoingLogAction,
+                            # endOngoingSleepAction, endOngoingPumpingAction,
+                            # pumpingPindahAction, deleteLogAction
+    growth.ts, milestone.ts, imunisasi.ts, medications.ts
   page.tsx                  # main dashboard
-  layout.tsx                # root layout + PWA meta
+  layout.tsx                # root layout + PWA meta (statusBarStyle: black-translucent)
   manifest.ts               # PWA manifest (Next 14 file convention)
   icon.tsx, apple-icon.tsx  # PWA icons via ImageResponse
+  globals.css               # Tailwind + flash-in keyframes
 
 components/                 # client components
-  LogModal.tsx              # log entry modal (subtype-aware)
+  LogModal.tsx              # log entry modal: subtype-aware, MedFields dropdown,
+                            # bottle ASI/Sufor + batch picker, per-side pumping
+  OngoingCard.tsx           # ongoing sleep/pumping card + NightLamp overlay +
+                            # PumpingControls (Pindah/Selesai), EndPumpingModal
+  StartOngoingButtons.tsx   # Mulai Tidur + Mulai Pumping side picker
+  Stopwatch.tsx             # client tick component (defer Date.now to mount)
+  FormCloser.tsx            # auto-close modal on form submission complete
+  SubmitButton.tsx          # useFormStatus pending state + spinner
   LogsRealtime.tsx          # logs realtime subscription → router.refresh()
   GrowthChart.tsx           # recharts WHO percentile
   GrowthMeasureModal.tsx    # ukur form
   GrowthRealtime.tsx, ProgressRealtime.tsx
   PromptCopier.tsx          # AI prompt clipboard
+  ImunisasiRow.tsx          # imunisasi modal with facility + doctor datalist
 
 lib/
   supabase/                 # browser/server/middleware client
-  household/                # current household + baby helpers
-  compute/                  # pure helpers (format, stats)
+  auth/                     # getCachedUser (React cache() wrapped auth.getUser)
+  household/                # getCurrentHousehold + getCurrentBaby (cached)
+  compute/                  # pure helpers (format, stats) — Asia/Jakarta TZ-locked
   constants/                # WHO percentile, milestone, imunisasi
   report/                   # CSV + AI prompt builders
 
@@ -150,12 +174,26 @@ CLAUDE.md                   # this file
 - [docs/troubleshooting.md](docs/troubleshooting.md) — known issues + recovery procedures (SEGV, PGRST stuck, MCP scope, env vars)
 - [docs/operations.md](docs/operations.md) — env vars, Supabase + Vercel config, deploy procedure
 
-## Active follow-ups (lihat brief §15 + per-PR scope cuts)
+## Major features added post-launch (PRs #14–#34)
+
+- **Auto-close + sticky Simpan modal pattern**: useFormStatus + onSubmit setTimeout for instant close, sticky footer so Simpan never falls off-screen on tablet landscape
+- **Asia/Jakarta TZ-locked formatters** + datetime-local parsing with `+07:00` suffix
+- **Ongoing sleep/pumping** with live Stopwatch, NightLamp overlay (Spotify link + per-household URL pref), Pumping side picker (Kiri/Kanan/Dua) + Pindah action
+- **ASI stock batching**: pumping rows = batches; consumed_ml tracks ASI bottle feeds. Auto FIFO allocation in createLogAction; manual per-batch picker via dropdown. `/stock` page lists batches with progress bar
+- **Bottle content (sufor / asi)** + per-side pumping timestamps (start_l_at, end_l_at, start_r_at, end_r_at)
+- **Medications dropdown** (per-household, with units ml/drop/gr/tab/sachet); Vitamin D seeded
+- **Imunisasi facility + doctor** as datalist autocomplete from past entries
+- **Total Hari Ini** with DBF L/R + Pumping per-side + batch count detail
+- **Flash-in animation** on first Aktivitas Terbaru row after submit
+
+## Active follow-ups
 
 - Edit log on tap recent activity (currently delete + add new)
-- Service worker untuk offline read (PWA manifest sufficient untuk install + add-to-home-screen)
+- Service worker untuk offline read + PWA auto-update (currently: user force-quit + reopen for new deploy on iOS standalone)
 - Push notifications reminder imunisasi (defer ke browser PWA push API)
 - Resend SMTP integration (kalau email reliability worth-it untuk reset password / invite email)
 - Reset password flow (currently: manual via Supabase dashboard)
 - Multi-baby support saat anak ke-2 (flow di /more/babies/new — schema ready, UI defer)
+- Stock allocation re-balance saat ASI feed dihapus (currently consumed_ml tetap terpakai walaupun row dihapus)
+- DBF stopwatch ongoing flow (currently DBF hanya manual log, no Mulai DBF + Stopwatch)
 - Optimistic insert dengan client-generated UUID (current realtime: full re-render via router.refresh, OK untuk volume low)
