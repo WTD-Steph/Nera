@@ -7,7 +7,9 @@ const TZ = "Asia/Jakarta";
 
 export function fmtTime(ts: string | Date | null | undefined): string {
   if (!ts) return "-";
-  return new Date(ts).toLocaleTimeString("id-ID", {
+  // en-GB renders 24-hour HH:MM with colon; id-ID uses "HH.MM" with period
+  // which the user found confusing. Date format stays id-ID for "2 Mei 2026".
+  return new Date(ts).toLocaleTimeString("en-GB", {
     timeZone: TZ,
     hour: "2-digit",
     minute: "2-digit",
