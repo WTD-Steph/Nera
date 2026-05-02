@@ -9,6 +9,7 @@ import {
   pumpingPindahAction,
   pauseOngoingLogAction,
   resumeFromPauseAction,
+  startOngoingLogAction as startOngoingLogActionImported,
 } from "@/app/actions/logs";
 import { Stopwatch } from "@/components/Stopwatch";
 import { LiveClock } from "@/components/LiveClock";
@@ -53,6 +54,7 @@ export function OngoingCard({
   pumpEndRAt,
   dbfMlPerMin,
   autoOpenLamp,
+  otherPumpingOngoing,
 }: {
   id: string;
   subtype: Subtype;
@@ -67,6 +69,9 @@ export function OngoingCard({
   /** Initial state — auto-open NightLamp on mount (e.g. just submitted
    *  manual sleep with empty Bangun). */
   autoOpenLamp?: boolean;
+  /** True if a separate pumping session is already ongoing — used by
+   *  DBF card to hide "Sambil pumping" combo shortcut. */
+  otherPumpingOngoing?: boolean;
 }) {
   const [showLamp, setShowLamp] = useState(!!autoOpenLamp);
   const [showPumpEnd, setShowPumpEnd] = useState(false);
@@ -165,6 +170,7 @@ export function OngoingCard({
             endLAt={pumpEndLAt ?? null}
             startRAt={pumpStartRAt ?? null}
             endRAt={pumpEndRAt ?? null}
+            otherPumpingOngoing={!!otherPumpingOngoing}
           />
         ) : (
           <HiccupControls id={id} />
@@ -862,17 +868,15 @@ function DbfControls({
   endLAt,
   startRAt,
   endRAt,
+  otherPumpingOngoing,
 }: {
   id: string;
   startLAt: string | null;
   endLAt: string | null;
   startRAt: string | null;
   endRAt: string | null;
+  otherPumpingOngoing: boolean;
 }) {
-  // Per-side state: bayi nyusu satu sisi pada satu waktu, tapi bisa
-  // pindah ke sisi lain dalam satu sesi. Pindah kalau sisi lain belum
-  // mulai. Selesai kapan pun → end whole session, durasi per-sisi
-  // dihitung dari start_X_at → end_X_at.
   const lActive = !!startLAt && !endLAt;
   const rActive = !!startRAt && !endRAt;
   const canPindah = (lActive && !startRAt) || (rActive && !startLAt);
@@ -882,6 +886,15 @@ function DbfControls({
       : "kanan"
     : null;
   const otherSide = fromSide === "kiri" ? "Kanan" : "Kiri";
+  // Combo shortcut: kalau DBF aktif di satu sisi dan tidak ada pumping
+  // ongoing → tawarkan quick-start pumping di sisi sebaliknya. Common
+  // pattern: nursing kiri sambil pump kanan untuk capture letdown.
+  const comboPumpSide: "kiri" | "kanan" | null =
+    !otherPumpingOngoing && (lActive || rActive)
+      ? lActive
+        ? "kanan"
+        : "kiri"
+      : null;
 
   return (
     <div className="mt-3 space-y-2">
@@ -903,6 +916,9 @@ function DbfControls({
       {canPindah && fromSide ? (
         <PindahForm id={id} fromSide={fromSide} otherSide={otherSide} />
       ) : null}
+      {comboPumpSide ? (
+        <ComboPumpButton side={comboPumpSide} />
+      ) : null}
       <form action={endOngoingDbfAction}>
         <input type="hidden" name="id" value={id} />
         <input type="hidden" name="return_to" value="/" />
@@ -914,5 +930,22 @@ function DbfControls({
         </SubmitButton>
       </form>
     </div>
+  );
+}
+
+function ComboPumpButton({ side }: { side: "kiri" | "kanan" }) {
+  return (
+    <form action={startOngoingLogActionImported}>
+      <input type="hidden" name="subtype" value="pumping" />
+      <input type="hidden" name="pumping_side" value={side} />
+      <input type="hidden" name="start_offset_min" value="0" />
+      <input type="hidden" name="return_to" value="/" />
+      <SubmitButton
+        pendingText="…"
+        className="w-full rounded-xl border border-amber-300 bg-amber-50 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 active:scale-[0.99]"
+      >
+        💧 Sambil pump {side === "kiri" ? "Kiri" : "Kanan"}
+      </SubmitButton>
+    </form>
   );
 }

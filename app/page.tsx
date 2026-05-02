@@ -403,15 +403,17 @@ export default async function HomePage({
     };
   })();
   const activeAct = parseAct(searchParams.act);
-  // Filter logs to selected day (when not today, narrow Aktivitas Terbaru
-  // too so user sees what happened that day). When today, show 36-hour
-  // window already fetched.
-  const dayFiltered = isToday
-    ? logsArray
-    : logsArray.filter((l) => {
-        const t = new Date(l.timestamp).getTime();
-        return t >= selectedDayMs && t < selectedDayMs + 86400000;
-      });
+  // Filter logs by selected day:
+  // - Today + no filter: 36-hour rolling window (default home view)
+  // - Today + act filter: only today's category-filtered logs
+  // - Past day: that day's logs (filtered or not)
+  const dayFiltered =
+    isToday && !activeAct
+      ? logsArray
+      : logsArray.filter((l) => {
+          const t = new Date(l.timestamp).getTime();
+          return t >= selectedDayMs && t < selectedDayMs + 86400000;
+        });
   const filteredLogs = activeAct
     ? dayFiltered.filter((l) => matchesAct(l, activeAct))
     : dayFiltered;
@@ -487,6 +489,7 @@ export default async function HomePage({
                 pumpEndRAt={l.end_r_at}
                 dbfMlPerMin={dbfEst.mlPerMin}
                 autoOpenLamp={shouldAutoOpenLamp}
+                otherPumpingOngoing={ongoingSubtypes.has("pumping")}
               />
             );
           })}
@@ -1073,6 +1076,21 @@ function SinceCard({
       log.subtype === "pumping" ||
       (log.subtype === "feeding" &&
         (log.start_l_at !== null || log.start_r_at !== null)));
+
+  // For sleep specifically, "sejak terakhir" semantically = sejak baby
+  // bangun (end_timestamp), bukan sejak mulai tidur. Other subtypes use
+  // timestamp (event time = relevant anchor).
+  const useEndAnchor =
+    !!log && log.subtype === "sleep" && log.end_timestamp != null;
+  const anchorIso = useEndAnchor ? log!.end_timestamp! : log?.timestamp ?? null;
+  const subText = !log
+    ? null
+    : useEndAnchor
+      ? `Bangun ${fmtTime(log.end_timestamp!)}`
+      : isOngoing
+        ? `Mulai ${fmtTime(log.timestamp)}`
+        : fmtTime(log.timestamp);
+
   return (
     <div
       className={`rounded-2xl border p-3 shadow-sm ${
@@ -1087,12 +1105,14 @@ function SinceCard({
           isOngoing ? "text-rose-600" : "text-gray-800"
         }`}
       >
-        {!log ? "—" : isOngoing ? "sedang berjalan" : timeSince(log.timestamp)}
+        {!log
+          ? "—"
+          : isOngoing
+            ? "sedang berjalan"
+            : timeSince(anchorIso!)}
       </div>
-      {log ? (
-        <div className="text-[11px] text-gray-400">
-          {isOngoing ? `Mulai ${fmtTime(log.timestamp)}` : fmtTime(log.timestamp)}
-        </div>
+      {subText ? (
+        <div className="text-[11px] text-gray-400">{subText}</div>
       ) : null}
     </div>
   );
