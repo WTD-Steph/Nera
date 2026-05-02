@@ -14,3 +14,29 @@ body {
   background: linear-gradient(180deg, #fff7f5 0%, #fff 60%);
   -webkit-font-smoothing: antialiased;
 }
+
+@keyframes flash-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px);
+    background-color: rgb(254 226 226 / 0.8);
+  }
+  60% {
+    background-color: rgb(254 226 226 / 0.4);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    background-color: transparent;
+  }
+}
+
+.flash-in {
+  animation: flash-in 0.7s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flash-in {
+    animation: none;
+  }
+}

@@ -35,6 +35,19 @@ export function fmtDuration(mins: number): string {
   return rem ? `${h}j ${rem}m` : `${h}j`;
 }
 
+export function fmtSleepRange(
+  startIso: string,
+  endIso: string | null,
+): string {
+  const startStr = fmtTime(startIso);
+  if (!endIso) return `${startStr} → sekarang`;
+  const endStr = fmtTime(endIso);
+  const mins = Math.round(
+    (new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000,
+  );
+  return `${startStr} → ${endStr} · ${fmtDuration(mins)}`;
+}
+
 export function timeSince(ts: string | Date): string {
   const diff = Date.now() - new Date(ts).getTime();
   const mins = Math.floor(diff / 60000);
