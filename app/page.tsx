@@ -74,6 +74,9 @@ const SUBTYPE_LABEL: Record<string, string> = {
 };
 
 function logDetail(l: LogRow): string {
+  // Ongoing pumping / DBF rows have null ml and null durations — show
+  // which side is active rather than "L 0 / R 0 ml".
+  const isOngoing = l.end_timestamp === null;
   if (l.subtype === "feeding") {
     if (l.amount_ml != null) {
       const src =
@@ -84,11 +87,27 @@ function logDetail(l: LogRow): string {
             : null;
       return src ? `🍼 ${src} ${l.amount_ml} ml` : `🍼 ${l.amount_ml} ml`;
     }
+    if (isOngoing && (l.start_l_at || l.start_r_at)) {
+      const lActive = !!l.start_l_at && !l.end_l_at;
+      const rActive = !!l.start_r_at && !l.end_r_at;
+      if (lActive && rActive) return `🤱 Dua sisi aktif`;
+      if (lActive) return `🤱 Kiri aktif`;
+      if (rActive) return `🤱 Kanan aktif`;
+      return `🤱 berlangsung`;
+    }
     const lMin = l.duration_l_min ?? 0;
     const rMin = l.duration_r_min ?? 0;
     return `🤱 L ${lMin}m / R ${rMin}m`;
   }
   if (l.subtype === "pumping") {
+    if (isOngoing) {
+      const lActive = !!l.start_l_at && !l.end_l_at;
+      const rActive = !!l.start_r_at && !l.end_r_at;
+      if (lActive && rActive) return `Dua sisi aktif`;
+      if (lActive) return `Kiri aktif`;
+      if (rActive) return `Kanan aktif`;
+      return `berlangsung`;
+    }
     const parts: string[] = [];
     const lDur = pumpDur(l.start_l_at, l.end_l_at);
     const rDur = pumpDur(l.start_r_at, l.end_r_at);
@@ -486,20 +505,41 @@ export default async function HomePage({
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
-              {recent.map((l, idx) => (
+              {recent.map((l, idx) => {
+                const ongoing = l.end_timestamp === null;
+                const paused = ongoing && l.paused_at !== null;
+                const rowBg = paused
+                  ? "bg-amber-50/60 border-l-4 border-l-amber-300"
+                  : ongoing
+                    ? "bg-rose-50/50 border-l-4 border-l-rose-300"
+                    : "";
+                const flash =
+                  idx === 0 && (logsaved || searchParams.ongoingstarted)
+                    ? " flash-in"
+                    : "";
+                return (
                 <div
                   key={l.id}
-                  className={`flex items-center gap-3 px-4 py-3${
-                    idx === 0 && (logsaved || searchParams.ongoingstarted)
-                      ? " flash-in"
-                      : ""
-                  }`}
+                  className={`flex items-center gap-3 px-4 py-3 ${rowBg}${flash}`}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-semibold text-gray-800">
                         {SUBTYPE_LABEL[l.subtype] ?? l.subtype}
                       </span>
+                      {paused ? (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">
+                          ⏸ dijeda
+                        </span>
+                      ) : ongoing ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-px text-[10px] font-semibold text-rose-700">
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-rose-500" />
+                          </span>
+                          berlangsung
+                        </span>
+                      ) : null}
                       {logDetail(l) ? (
                         <span className="truncate text-xs text-gray-500">
                           • {logDetail(l)}
@@ -556,7 +596,8 @@ export default async function HomePage({
                     </form>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
