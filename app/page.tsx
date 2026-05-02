@@ -296,11 +296,10 @@ export default async function HomePage({
     return Number.isFinite(n) && n > 0 ? n : null;
   })();
   const milkTarget = computeMilkTarget(target, currentWeightKg);
-  const dbfEst = dbfEstimateMl(
-    stats.dbfMinTotal,
-    logsArray,
-    baby.dbf_ml_per_min,
-  );
+  const dbfEst = dbfEstimateMl(stats.dbfMinTotal, logsArray, {
+    fixedMlPerMin: baby.dbf_ml_per_min,
+    pumpingMultiplier: baby.dbf_pumping_multiplier,
+  });
   const milkTotalMl = stats.feedingMlTotal + dbfEst.ml;
   const milkBreakdownParts: string[] = [];
   if (stats.feedingMlCount > 0) {
@@ -595,11 +594,13 @@ export default async function HomePage({
               ? `, susu ${target.milkMlPerKgMin}–${target.milkMlPerKgMax} ml/kg/hari × ${currentWeightKg} kg`
               : ""}
             . DBF estimasi{" "}
-            {dbfEst.source === "manual"
-              ? `${dbfEst.mlPerMin} ml/menit (override manual)`
-              : dbfEst.source === "pumping"
-                ? `${dbfEst.mlPerMin.toFixed(1)} ml/menit dari pumping terakhir`
-                : `default ${dbfEst.mlPerMin} ml/menit`}{" "}
+            {dbfEst.source === "multiplier" && dbfEst.pumpingRate != null
+              ? `${dbfEst.mlPerMin.toFixed(1)} ml/menit (${baby.dbf_pumping_multiplier}× pumping ${dbfEst.pumpingRate.toFixed(1)} ml/menit)`
+              : dbfEst.source === "fixed"
+                ? `${dbfEst.mlPerMin} ml/menit (override fixed)`
+                : dbfEst.source === "pumping"
+                  ? `${dbfEst.mlPerMin.toFixed(1)} ml/menit dari pumping terakhir`
+                  : `default ${dbfEst.mlPerMin} ml/menit`}{" "}
             — bukan ukuran pasti. Selalu konsultasi DSA untuk evaluasi medis.
           </p>
         </div>

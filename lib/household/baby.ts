@@ -10,8 +10,10 @@ export type CurrentBaby = {
   birth_weight_kg: number;
   birth_height_cm: number;
   household_id: string;
-  /** Per-baby override for DBF ml/min estimate. NULL = derive auto. */
+  /** Per-baby fixed override for DBF ml/min. NULL = not used. */
   dbf_ml_per_min: number | null;
+  /** Multiplier applied to auto pumping rate. NULL = not used. */
+  dbf_pumping_multiplier: number | null;
 };
 
 /**
@@ -27,7 +29,7 @@ export const getCurrentBaby = cache(async (): Promise<CurrentBaby | null> => {
   const { data, error } = await supabase
     .from("babies")
     .select(
-      "id, name, gender, dob, birth_weight_kg, birth_height_cm, household_id, dbf_ml_per_min",
+      "id, name, gender, dob, birth_weight_kg, birth_height_cm, household_id, dbf_ml_per_min, dbf_pumping_multiplier",
     )
     .eq("household_id", household.household_id)
     .order("created_at", { ascending: true })
