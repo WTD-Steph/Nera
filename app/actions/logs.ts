@@ -145,6 +145,10 @@ export async function createLogAction(formData: FormData) {
     }
   } else if (subtype === "sleep") {
     payload.end_timestamp = isoOrNull(formData, "end_timestamp");
+    const quality = String(formData.get("sleep_quality") ?? "").trim();
+    if (quality === "nyenyak" || quality === "gelisah" || quality === "sering_bangun") {
+      payload.sleep_quality = quality;
+    }
   } else if (subtype === "temp") {
     const t = num(formData, "temp_celsius");
     if (t === null || t < 30 || t > 45) {
@@ -288,6 +292,13 @@ export async function startOngoingLogAction(formData: FormData) {
 export async function endOngoingSleepAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/");
+  const qualityRaw = String(formData.get("sleep_quality") ?? "").trim();
+  const sleepQuality =
+    qualityRaw === "nyenyak" ||
+    qualityRaw === "gelisah" ||
+    qualityRaw === "sering_bangun"
+      ? qualityRaw
+      : null;
   if (!id) redirect(returnTo);
 
   const supabase = createClient();
@@ -300,9 +311,15 @@ export async function endOngoingSleepAction(formData: FormData) {
     .single();
   const endIso = row?.paused_at ?? new Date().toISOString();
 
+  const updates: Record<string, unknown> = {
+    end_timestamp: endIso,
+    paused_at: null,
+  };
+  if (sleepQuality) updates.sleep_quality = sleepQuality;
+
   const { error } = await supabase
     .from("logs")
-    .update({ end_timestamp: endIso, paused_at: null })
+    .update(updates as never)
     .eq("id", id)
     .eq("subtype", "sleep")
     .is("end_timestamp", null);
@@ -381,20 +398,41 @@ export async function endOngoingPumpingAction(formData: FormData) {
 
 export async function pumpingPindahAction(formData: FormData) {
   // Subtype-agnostic: works for both pumping and feeding (DBF) ongoing
-  // logs. End the active side, start the other side. Single UPDATE.
+  // logs. End the active side, start the other side. Default Pindah
+  // time = now; user can backdate via pindah_offset_min form field
+  // ('lupa klik pindah X menit lalu').
   const id = String(formData.get("id") ?? "");
   const fromSide = String(formData.get("from_side") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/");
   if (!id || (fromSide !== "kiri" && fromSide !== "kanan")) {
     redirect(returnTo);
   }
+  const offsetMin = (() => {
+    const raw = String(formData.get("pindah_offset_min") ?? "0");
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0 || n > 60) return 0;
+    return Math.round(n);
+  })();
 
   const supabase = createClient();
-  const now = new Date().toISOString();
+  let pivotIso = new Date(Date.now() - offsetMin * 60_000).toISOString();
+  // Validate: pivot must be >= active side's start. If user backdated
+  // before the active start, clamp to start (no zero-duration sliver).
+  const { data: existing } = await supabase
+    .from("logs")
+    .select("start_l_at, start_r_at, end_l_at, end_r_at")
+    .eq("id", id)
+    .single();
+  const activeStart =
+    fromSide === "kiri" ? existing?.start_l_at : existing?.start_r_at;
+  if (activeStart && new Date(pivotIso).getTime() < new Date(activeStart).getTime()) {
+    pivotIso = activeStart;
+  }
+
   const updates: Record<string, unknown> =
     fromSide === "kiri"
-      ? { end_l_at: now, start_r_at: now }
-      : { end_r_at: now, start_l_at: now };
+      ? { end_l_at: pivotIso, start_r_at: pivotIso }
+      : { end_r_at: pivotIso, start_l_at: pivotIso };
 
   const { error } = await supabase
     .from("logs")

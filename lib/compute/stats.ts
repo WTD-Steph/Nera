@@ -25,6 +25,7 @@ export type LogRow = {
   end_r_at: string | null;
   paused_at: string | null;
   started_with_stopwatch: boolean;
+  sleep_quality: "nyenyak" | "gelisah" | "sering_bangun" | null;
   notes: string | null;
 };
 

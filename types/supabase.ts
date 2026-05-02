@@ -268,6 +268,7 @@ export type Database = {
           paused_at: string | null
           poop_color: string | null
           poop_consistency: string | null
+          sleep_quality: string | null
           start_l_at: string | null
           start_r_at: string | null
           started_with_stopwatch: boolean
@@ -299,6 +300,7 @@ export type Database = {
           paused_at?: string | null
           poop_color?: string | null
           poop_consistency?: string | null
+          sleep_quality?: string | null
           start_l_at?: string | null
           start_r_at?: string | null
           started_with_stopwatch?: boolean
@@ -330,6 +332,7 @@ export type Database = {
           paused_at?: string | null
           poop_color?: string | null
           poop_consistency?: string | null
+          sleep_quality?: string | null
           start_l_at?: string | null
           start_r_at?: string | null
           started_with_stopwatch?: boolean
