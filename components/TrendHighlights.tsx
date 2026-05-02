@@ -122,8 +122,9 @@ function buildBullets(d: HighlightsData): { tone: Tone; text: string }[] {
     });
   }
 
-  // DBF rate sanity check (only if DBF is being used)
-  if (d.dbfMin > 0 && d.dbfRate < 2) {
+  // DBF rate sanity check: literature 3-5 ml/min for newborn-6mo. Flag
+  // anything below 3 as potentially under-counting milk intake.
+  if (d.dbfMin > 0 && d.dbfRate < 3) {
     const sourceLabel =
       d.dbfRateSource === "fixed"
         ? "fixed override"
