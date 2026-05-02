@@ -23,6 +23,7 @@ import {
 import {
   computeTodayStats,
   computeLastByType,
+  jakartaDayStartMs,
   type LogRow,
 } from "@/lib/compute/stats";
 import {
@@ -45,7 +46,55 @@ type SearchParams = {
   ongoingstarted?: string;
   act?: string;
   darklamp?: string;
+  /** YYYY-MM-DD (Asia/Jakarta). Default = today. */
+  date?: string;
 };
+
+function parseJakartaDate(s: string | undefined): number | null {
+  if (!s) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) {
+    return null;
+  }
+  // Build Jakarta midnight for that date
+  const offsetMs = 7 * 60 * 60 * 1000;
+  const utcMs = Date.UTC(y, mo - 1, d, 0, 0, 0);
+  return utcMs - offsetMs;
+}
+
+function jakartaDayKey(ms: number): string {
+  const offsetMs = 7 * 60 * 60 * 1000;
+  const local = new Date(ms + offsetMs);
+  return `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, "0")}-${String(local.getUTCDate()).padStart(2, "0")}`;
+}
+
+function jakartaDayLabel(ms: number, todayMs: number): string {
+  const k = jakartaDayKey(ms);
+  if (k === jakartaDayKey(todayMs)) return "Hari ini";
+  if (k === jakartaDayKey(todayMs - 86400000)) return "Kemarin";
+  const offsetMs = 7 * 60 * 60 * 1000;
+  const local = new Date(ms + offsetMs);
+  const HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+  const BULAN = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "Mei",
+    "Jun",
+    "Jul",
+    "Agu",
+    "Sep",
+    "Okt",
+    "Nov",
+    "Des",
+  ];
+  return `${HARI[local.getUTCDay()]}, ${local.getUTCDate()} ${BULAN[local.getUTCMonth()]}`;
+}
 
 type ActFilter = "bottle" | "dbf" | "pumping" | "sleep" | "diaper";
 const ACT_LABEL: Record<ActFilter, string> = {
@@ -217,7 +266,18 @@ export default async function HomePage({
 
   const supabase = createClient();
 
-  const since = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
+  // Date filter: if ?date= is set, expand fetch window to cover that
+  // day. Otherwise default 36-hour rolling window for today's view.
+  const todayMsForFetch = jakartaDayStartMs();
+  const selectedDayMsForFetch =
+    parseJakartaDate(searchParams.date) ?? todayMsForFetch;
+  // Always fetch from min(selectedDay - 12h, now - 36h) to ensure we have
+  // both the requested day and recent activity for "Sejak Terakhir".
+  const earliestMs = Math.min(
+    selectedDayMsForFetch - 12 * 60 * 60 * 1000,
+    Date.now() - 36 * 60 * 60 * 1000,
+  );
+  const since = new Date(earliestMs).toISOString();
   const [
     { data: logs },
     { data: medsData },
@@ -291,8 +351,16 @@ export default async function HomePage({
       l.subtype === "feeding" ? "dbf" : l.subtype,
     ),
   );
-  const stats = computeTodayStats(logsArray);
+  // Selected date: from ?date=YYYY-MM-DD (Jakarta) or today.
+  const todayMs = jakartaDayStartMs();
+  const selectedDayMs = parseJakartaDate(searchParams.date) ?? todayMs;
+  const selectedDayKey = jakartaDayKey(selectedDayMs);
+  const selectedDayLabel = jakartaDayLabel(selectedDayMs, todayMs);
+  const isToday = selectedDayKey === jakartaDayKey(todayMs);
+  const stats = computeTodayStats(logsArray, selectedDayMs);
   const last = computeLastByType(logsArray);
+  const dayPrev = jakartaDayKey(selectedDayMs - 86400000);
+  const dayNext = jakartaDayKey(selectedDayMs + 86400000);
   const target = getTargetForAge(baby.dob);
   const currentWeightKg = (() => {
     const raw = latestWeightData?.weight_kg ?? baby.birth_weight_kg ?? null;
@@ -335,10 +403,19 @@ export default async function HomePage({
     };
   })();
   const activeAct = parseAct(searchParams.act);
+  // Filter logs to selected day (when not today, narrow Aktivitas Terbaru
+  // too so user sees what happened that day). When today, show 36-hour
+  // window already fetched.
+  const dayFiltered = isToday
+    ? logsArray
+    : logsArray.filter((l) => {
+        const t = new Date(l.timestamp).getTime();
+        return t >= selectedDayMs && t < selectedDayMs + 86400000;
+      });
   const filteredLogs = activeAct
-    ? logsArray.filter((l) => matchesAct(l, activeAct))
-    : logsArray;
-  const recent = filteredLogs.slice(0, activeAct ? 20 : 6);
+    ? dayFiltered.filter((l) => matchesAct(l, activeAct))
+    : dayFiltered;
+  const recent = filteredLogs.slice(0, activeAct || !isToday ? 30 : 6);
 
   const welcome = searchParams.welcome;
   const welcomeMsg =
@@ -555,9 +632,39 @@ export default async function HomePage({
       ) : null}
 
       <section className="mt-5">
-        <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
-          Total Hari Ini
-        </h2>
+        <div className="mb-2 flex items-center justify-between gap-2 px-1">
+          <h2 className="text-sm font-semibold text-gray-700">
+            {isToday ? "Total Hari Ini" : `Total ${selectedDayLabel}`}
+          </h2>
+          <div className="flex items-center gap-1">
+            <Link
+              href={`/?date=${dayPrev}`}
+              className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50"
+              aria-label="Hari sebelumnya"
+            >
+              ‹
+            </Link>
+            <span className="min-w-[80px] text-center text-[11px] text-gray-500">
+              {selectedDayLabel}
+            </span>
+            <Link
+              href={`/?date=${dayNext}`}
+              className={`rounded-md border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50 ${isToday ? "pointer-events-none opacity-30" : ""}`}
+              aria-label="Hari berikutnya"
+              aria-disabled={isToday}
+            >
+              ›
+            </Link>
+            {!isToday ? (
+              <Link
+                href="/"
+                className="ml-1 text-[11px] font-semibold text-rose-600 hover:underline"
+              >
+                Hari ini
+              </Link>
+            ) : null}
+          </div>
+        </div>
         <div className="space-y-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <StatRow
             label="🍼 Susu"
@@ -567,6 +674,7 @@ export default async function HomePage({
             detail={milkBreakdown}
             href="/?act=bottle#aktivitas"
             active={activeAct === "bottle"}
+            trendAnchor="susu"
           />
           <StatRow
             label="🌙 Tidur"
@@ -578,6 +686,7 @@ export default async function HomePage({
             }
             href="/?act=sleep#aktivitas"
             active={activeAct === "sleep"}
+            trendAnchor="tidur"
           />
           <StatRow
             label="💛 Pipis"
@@ -586,6 +695,7 @@ export default async function HomePage({
             progress={stats.diaperPeeCount / target.peeMin}
             href="/?act=diaper#aktivitas"
             active={activeAct === "diaper"}
+            trendAnchor="diaper"
           />
           <StatRow
             label="💩 BAB"
@@ -594,6 +704,7 @@ export default async function HomePage({
             progress={stats.diaperPoopCount / target.poopMin}
             href="/?act=diaper#aktivitas"
             active={activeAct === "diaper"}
+            trendAnchor="diaper"
           />
           {stats.pumpCount > 0
             ? (() => {
@@ -621,6 +732,7 @@ export default async function HomePage({
                       detail={[lFmt, rFmt].filter(Boolean).join(" | ")}
                       href="/?act=pumping#aktivitas"
                       active={activeAct === "pumping"}
+                      trendAnchor="pumping"
                     />
                   </div>
                 );
@@ -700,7 +812,9 @@ export default async function HomePage({
       <section id="aktivitas" className="mt-5 scroll-mt-4">
         <div className="mb-2 flex items-center justify-between px-1">
           <h2 className="text-sm font-semibold text-gray-700">
-            Aktivitas Terbaru
+            {isToday
+              ? "Aktivitas Terbaru"
+              : `Aktivitas ${selectedDayLabel}`}
           </h2>
           {activeAct ? (
             <Link
@@ -949,14 +1063,36 @@ function SinceCard({
   label: string;
   log: LogRow | null;
 }) {
+  // Ongoing duration-based logs (sleep / pumping / feeding-with-start)
+  // currently in progress → indicate "sedang berjalan" instead of
+  // "X lalu" which implies the event already passed.
+  const isOngoing =
+    !!log &&
+    log.end_timestamp === null &&
+    (log.subtype === "sleep" ||
+      log.subtype === "pumping" ||
+      (log.subtype === "feeding" &&
+        (log.start_l_at !== null || log.start_r_at !== null)));
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+    <div
+      className={`rounded-2xl border p-3 shadow-sm ${
+        isOngoing
+          ? "border-rose-200 bg-rose-50/60"
+          : "border-gray-100 bg-white"
+      }`}
+    >
       <div className="text-xs text-gray-500">{label}</div>
-      <div className="mt-0.5 text-sm font-bold text-gray-800">
-        {log ? timeSince(log.timestamp) : "—"}
+      <div
+        className={`mt-0.5 text-sm font-bold ${
+          isOngoing ? "text-rose-600" : "text-gray-800"
+        }`}
+      >
+        {!log ? "—" : isOngoing ? "sedang berjalan" : timeSince(log.timestamp)}
       </div>
       {log ? (
-        <div className="text-[11px] text-gray-400">{fmtTime(log.timestamp)}</div>
+        <div className="text-[11px] text-gray-400">
+          {isOngoing ? `Mulai ${fmtTime(log.timestamp)}` : fmtTime(log.timestamp)}
+        </div>
       ) : null}
     </div>
   );
@@ -970,6 +1106,7 @@ function StatRow({
   detail,
   href,
   active,
+  trendAnchor,
 }: {
   label: string;
   value: string;
@@ -981,6 +1118,8 @@ function StatRow({
   detail?: string;
   href?: string;
   active?: boolean;
+  /** When set, renders a small icon button → /trend#<anchor>. */
+  trendAnchor?: string;
 }) {
   const pct = progress != null ? Math.min(1, Math.max(0, progress)) : null;
   const barColor =
@@ -1015,17 +1154,35 @@ function StatRow({
       ) : null}
     </div>
   );
+  const trendIcon = trendAnchor ? (
+    <Link
+      href={`/trend#${trendAnchor}`}
+      className="ml-1 flex-shrink-0 rounded-full border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+      aria-label={`Lihat trend 14 hari`}
+      title="Trend 14 hari"
+    >
+      📊
+    </Link>
+  ) : null;
   if (!href) {
-    return <div>{inner}</div>;
+    return (
+      <div className="flex items-center gap-1">
+        <div className="flex-1">{inner}</div>
+        {trendIcon}
+      </div>
+    );
   }
   return (
-    <Link
-      href={href}
-      className={`-mx-2 block rounded-lg px-2 py-1 transition-colors ${
-        active ? "bg-rose-50 ring-1 ring-rose-200" : "hover:bg-gray-50"
-      }`}
-    >
-      {inner}
-    </Link>
+    <div className="flex items-center gap-1">
+      <Link
+        href={href}
+        className={`-mx-2 block flex-1 rounded-lg px-2 py-1 transition-colors ${
+          active ? "bg-rose-50 ring-1 ring-rose-200" : "hover:bg-gray-50"
+        }`}
+      >
+        {inner}
+      </Link>
+      {trendIcon}
+    </div>
   );
 }

@@ -58,15 +58,30 @@ export type TodayStats = {
   sleepCount: number;
 };
 
-function todayStartMs(): number {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
+/**
+ * Asia/Jakarta start-of-day boundary in UTC ms. Server-side `new Date()`
+ * returns UTC, so naive setHours(0) gives UTC midnight — which lands at
+ * 07:00 Jakarta. Need explicit TZ math: shift +07:00, snap to UTC
+ * midnight, shift back to UTC.
+ */
+function jakartaDayStartMs(now: Date = new Date()): number {
+  const offsetMs = 7 * 60 * 60 * 1000;
+  const local = new Date(now.getTime() + offsetMs);
+  local.setUTCHours(0, 0, 0, 0);
+  return local.getTime() - offsetMs;
 }
 
-export function computeTodayStats(logs: LogRow[]): TodayStats {
-  const start = todayStartMs();
-  const today = logs.filter((l) => new Date(l.timestamp).getTime() >= start);
+export function computeTodayStats(
+  logs: LogRow[],
+  /** Optional explicit day-start (Jakarta UTC ms). Default = current Jakarta day. */
+  dayStartMs?: number,
+): TodayStats {
+  const start = dayStartMs ?? jakartaDayStartMs();
+  const end = start + 86400000;
+  const today = logs.filter((l) => {
+    const t = new Date(l.timestamp).getTime();
+    return t >= start && t < end;
+  });
   const s: TodayStats = {
     feedingMlTotal: 0,
     feedingMlCount: 0,
@@ -145,6 +160,8 @@ export function computeTodayStats(logs: LogRow[]): TodayStats {
   s.sleepMin = Math.round(s.sleepMin);
   return s;
 }
+
+export { jakartaDayStartMs };
 
 export type LastByType = {
   feeding: LogRow | null;
