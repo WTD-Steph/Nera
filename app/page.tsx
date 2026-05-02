@@ -204,6 +204,7 @@ export default async function HomePage({
               id={l.id}
               subtype={l.subtype as "sleep" | "pumping"}
               startIso={l.timestamp}
+              sleepPlaylistUrl={household.sleep_playlist_url}
             />
           ))}
         </section>

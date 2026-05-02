@@ -6,6 +6,7 @@ export type CurrentHousehold = {
   household_id: string;
   role: "owner" | "member";
   household_name: string;
+  sleep_playlist_url: string | null;
 };
 
 /**
@@ -32,7 +33,7 @@ export const getCurrentHousehold = cache(
 
     const { data: household, error: householdError } = await supabase
       .from("households")
-      .select("name")
+      .select("name, sleep_playlist_url")
       .eq("id", member.household_id)
       .maybeSingle();
 
@@ -42,6 +43,7 @@ export const getCurrentHousehold = cache(
       household_id: member.household_id,
       role: member.role as "owner" | "member",
       household_name: household.name,
+      sleep_playlist_url: household.sleep_playlist_url ?? null,
     };
   },
 );

@@ -185,6 +185,7 @@ export type Database = {
           created_by: string | null
           id: string
           name: string
+          sleep_playlist_url: string | null
           updated_at: string
         }
         Insert: {
@@ -192,6 +193,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           name: string
+          sleep_playlist_url?: string | null
           updated_at?: string
         }
         Update: {
@@ -199,6 +201,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           name?: string
+          sleep_playlist_url?: string | null
           updated_at?: string
         }
         Relationships: []
