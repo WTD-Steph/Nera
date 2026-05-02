@@ -281,9 +281,18 @@ export async function endOngoingSleepAction(formData: FormData) {
   if (!id) redirect(returnTo);
 
   const supabase = createClient();
+  // If currently paused, end at paused_at so the pause window doesn't
+  // count toward duration. Otherwise end at now().
+  const { data: row } = await supabase
+    .from("logs")
+    .select("paused_at")
+    .eq("id", id)
+    .single();
+  const endIso = row?.paused_at ?? new Date().toISOString();
+
   const { error } = await supabase
     .from("logs")
-    .update({ end_timestamp: new Date().toISOString() })
+    .update({ end_timestamp: endIso, paused_at: null })
     .eq("id", id)
     .eq("subtype", "sleep")
     .is("end_timestamp", null);
@@ -313,18 +322,20 @@ export async function endOngoingPumpingAction(formData: FormData) {
   const supabase = createClient();
   // Read current per-side state so we can close any side that was
   // started but not yet ended (user pressed Selesai without Pindah).
+  // If paused, freeze end at paused_at so duration excludes pause time.
   const { data: existing } = await supabase
     .from("logs")
-    .select("start_l_at, end_l_at, start_r_at, end_r_at")
+    .select("start_l_at, end_l_at, start_r_at, end_r_at, paused_at")
     .eq("id", id)
     .single();
-  const now = new Date().toISOString();
+  const now = existing?.paused_at ?? new Date().toISOString();
   const lActive = l !== null && l > 0;
   const rActive = r !== null && r > 0;
   const updates: Record<string, unknown> = {
     end_timestamp: now,
     amount_l_ml: lActive ? l : null,
     amount_r_ml: rActive ? r : null,
+    paused_at: null,
   };
   if (existing?.start_l_at && !existing.end_l_at && lActive) {
     updates.end_l_at = now;
@@ -399,15 +410,19 @@ export async function endOngoingDbfAction(formData: FormData) {
   const supabase = createClient();
   const { data: existing } = await supabase
     .from("logs")
-    .select("start_l_at, end_l_at, start_r_at, end_r_at")
+    .select("start_l_at, end_l_at, start_r_at, end_r_at, paused_at")
     .eq("id", id)
     .single();
   if (!existing) redirect(returnTo);
 
-  const now = new Date().toISOString();
+  // If paused, freeze end at paused_at so durations exclude pause time.
+  const now = existing.paused_at ?? new Date().toISOString();
   const endL = existing.end_l_at ?? (existing.start_l_at ? now : null);
   const endR = existing.end_r_at ?? (existing.start_r_at ? now : null);
-  const updates: Record<string, unknown> = { end_timestamp: now };
+  const updates: Record<string, unknown> = {
+    end_timestamp: now,
+    paused_at: null,
+  };
   if (existing.start_l_at && !existing.end_l_at) updates.end_l_at = now;
   if (existing.start_r_at && !existing.end_r_at) updates.end_r_at = now;
 
@@ -439,6 +454,170 @@ export async function endOngoingDbfAction(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/history");
   redirect(`${returnTo}?logsaved=feeding`);
+}
+
+export async function pauseOngoingLogAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/");
+  if (!id) redirect(returnTo);
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("logs")
+    .update({ paused_at: new Date().toISOString() } as never)
+    .eq("id", id)
+    .is("end_timestamp", null)
+    .is("paused_at", null);
+
+  if (error) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent(`Gagal pause: ${error.message}`)}`,
+    );
+  }
+  revalidatePath("/");
+  redirect(returnTo);
+}
+
+export async function resumeFromPauseAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/");
+  if (!id) redirect(returnTo);
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("logs")
+    .update({ paused_at: null } as never)
+    .eq("id", id)
+    .is("end_timestamp", null)
+    .not("paused_at", "is", null);
+
+  if (error) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent(`Gagal lanjut: ${error.message}`)}`,
+    );
+  }
+  revalidatePath("/");
+  redirect(returnTo);
+}
+
+/**
+ * Sweep ongoing sessions yang paused lebih dari 10 menit → auto-end
+ * dengan end_timestamp = paused_at (tidak ikut hitung pause time).
+ * Dipanggil dari home page sebelum query data → user yang baru buka
+ * app pertama kali setelah lama pause akan lihat sesinya udah selesai.
+ *
+ * Bukan true cron — hanya fire saat ada page render. Untuk auto-end
+ * yang benar-benar background (user tidak buka app), butuh Vercel Cron
+ * atau pg_cron — defer.
+ */
+export async function expireStalePausedLogs(babyId: string) {
+  const supabase = createClient();
+  const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const { data: stale } = await supabase
+    .from("logs")
+    .select("id, paused_at, start_l_at, end_l_at, start_r_at, end_r_at")
+    .eq("baby_id", babyId)
+    .is("end_timestamp", null)
+    .not("paused_at", "is", null)
+    .lt("paused_at", cutoff);
+  if (!stale || stale.length === 0) return;
+  for (const r of stale) {
+    if (!r.paused_at) continue;
+    const updates: Record<string, unknown> = {
+      end_timestamp: r.paused_at,
+    };
+    if (r.start_l_at && !r.end_l_at) updates.end_l_at = r.paused_at;
+    if (r.start_r_at && !r.end_r_at) updates.end_r_at = r.paused_at;
+    await supabase
+      .from("logs")
+      .update(updates as never)
+      .eq("id", r.id);
+  }
+}
+
+export async function resumeOngoingLogAction(formData: FormData) {
+  // "Lanjutkan" — re-open a finished sleep / pumping / DBF log as
+  // ongoing. Use case: baby woke briefly then went back to sleep and
+  // user doesn't want a second log entry; or user accidentally tapped
+  // Selesai before the session was actually done.
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/");
+  if (!id) redirect(returnTo);
+
+  const supabase = createClient();
+  const { data: row } = await supabase
+    .from("logs")
+    .select("baby_id, subtype, end_timestamp, end_l_at, end_r_at")
+    .eq("id", id)
+    .single();
+  if (!row || !row.end_timestamp) redirect(returnTo);
+  if (
+    row.subtype !== "sleep" &&
+    row.subtype !== "pumping" &&
+    row.subtype !== "feeding"
+  ) {
+    redirect(returnTo);
+  }
+
+  // Block if another ongoing of same logical type already exists. For
+  // 'feeding' (DBF) we narrow further: only block if it's a per-side
+  // ongoing (matches the DBF detection used on home).
+  const { data: existingOngoing } = await supabase
+    .from("logs")
+    .select("id, start_l_at, start_r_at")
+    .eq("baby_id", row.baby_id)
+    .eq("subtype", row.subtype)
+    .is("end_timestamp", null);
+  const blocked = (existingOngoing ?? []).some((r) => {
+    if (row.subtype === "feeding") {
+      return r.start_l_at !== null || r.start_r_at !== null;
+    }
+    return true;
+  });
+  if (blocked) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent(`Sudah ada sesi ${row.subtype} berlangsung — selesaikan dulu.`)}`,
+    );
+  }
+
+  // Compute which end_X_at to clear. For sleep: only end_timestamp.
+  // For pumping/DBF: re-open the side that ended last (most recent
+  // end_X_at). If both ended at the same moment (e.g. Selesai with
+  // both sides active), clear both → both sides resume.
+  const updates: Record<string, unknown> = { end_timestamp: null };
+  if (row.subtype === "pumping" || row.subtype === "feeding") {
+    const lEnd = row.end_l_at;
+    const rEnd = row.end_r_at;
+    if (lEnd && rEnd) {
+      if (lEnd === rEnd) {
+        updates.end_l_at = null;
+        updates.end_r_at = null;
+      } else if (new Date(lEnd).getTime() > new Date(rEnd).getTime()) {
+        updates.end_l_at = null;
+      } else {
+        updates.end_r_at = null;
+      }
+    } else if (lEnd) {
+      updates.end_l_at = null;
+    } else if (rEnd) {
+      updates.end_r_at = null;
+    }
+  }
+
+  const { error } = await supabase
+    .from("logs")
+    .update(updates as never)
+    .eq("id", id);
+
+  if (error) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent(`Gagal lanjut: ${error.message}`)}`,
+    );
+  }
+
+  revalidatePath("/");
+  revalidatePath("/history");
+  redirect(`${returnTo}?logsaved=${row.subtype}`);
 }
 
 export async function deleteLogAction(formData: FormData) {

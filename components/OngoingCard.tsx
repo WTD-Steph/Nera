@@ -6,6 +6,8 @@ import {
   endOngoingPumpingAction,
   endOngoingDbfAction,
   pumpingPindahAction,
+  pauseOngoingLogAction,
+  resumeFromPauseAction,
 } from "@/app/actions/logs";
 import { Stopwatch } from "@/components/Stopwatch";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -45,6 +47,7 @@ export function OngoingCard({
   id,
   subtype,
   startIso,
+  pausedAtIso,
   sleepPlaylistUrl,
   pumpStartLAt,
   pumpEndLAt,
@@ -54,6 +57,7 @@ export function OngoingCard({
   id: string;
   subtype: Subtype;
   startIso: string;
+  pausedAtIso?: string | null;
   sleepPlaylistUrl?: string | null;
   pumpStartLAt?: string | null;
   pumpEndLAt?: string | null;
@@ -69,6 +73,7 @@ export function OngoingCard({
     sleepPlaylistUrl && sleepPlaylistUrl.trim() !== ""
       ? sleepPlaylistUrl
       : DEFAULT_SLEEP_PLAYLIST_URL;
+  const isPaused = !!pausedAtIso;
 
   return (
     <>
@@ -77,14 +82,22 @@ export function OngoingCard({
           <div>
             <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-rose-600">
               <span aria-hidden>{emoji}</span>
-              <span>{title} berlangsung</span>
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500" />
+              <span>
+                {title}{" "}
+                {isPaused ? "dijeda" : "berlangsung"}
               </span>
+              {isPaused ? (
+                <span aria-hidden>⏸</span>
+              ) : (
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500" />
+                </span>
+              )}
             </div>
             <div className="text-[11px] text-gray-500">
               Sejak {fmtClock(startIso)}
+              {isPaused ? " · auto-end 10 menit kalau tetap dijeda" : ""}
             </div>
           </div>
           {subtype !== "dbf" ? (
@@ -106,9 +119,31 @@ export function OngoingCard({
         >
           <Stopwatch
             startIso={startIso}
-            className="font-mono text-4xl font-bold tabular-nums tracking-tight text-rose-600"
+            pausedAtIso={pausedAtIso ?? null}
+            className={`font-mono text-4xl font-bold tabular-nums tracking-tight ${
+              isPaused ? "text-gray-500" : "text-rose-600"
+            }`}
           />
         </button>
+
+        {/* Pause / Resume controls — universal for all ongoing subtypes */}
+        <form
+          action={isPaused ? resumeFromPauseAction : pauseOngoingLogAction}
+          className="mt-2"
+        >
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="return_to" value="/" />
+          <SubmitButton
+            pendingText="…"
+            className={`w-full rounded-xl border py-2 text-xs font-semibold ${
+              isPaused
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+            }`}
+          >
+            {isPaused ? "▶ Lanjutkan" : "⏸ Pause"}
+          </SubmitButton>
+        </form>
 
         {subtype === "sleep" ? (
           <>
