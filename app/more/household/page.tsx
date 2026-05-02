@@ -110,7 +110,9 @@ export default async function HouseholdPage({
                 </div>
                 <div className="text-[11px] text-gray-400">
                   {m.role === "owner" ? "Owner" : "Member"} · bergabung{" "}
-                  {new Date(m.joined_at).toLocaleDateString("id-ID")}
+                  {new Date(m.joined_at).toLocaleDateString("id-ID", {
+                    timeZone: "Asia/Jakarta",
+                  })}
                 </div>
               </div>
               {isOwner && m.user_id !== user.id ? (
@@ -228,7 +230,7 @@ export default async function HouseholdPage({
                       {inv.role === "owner" ? "Co-parent" : "Caregiver"} ·{" "}
                       {isExpired
                         ? "kedaluwarsa"
-                        : `kedaluwarsa ${new Date(inv.expires_at).toLocaleDateString("id-ID")}`}
+                        : `kedaluwarsa ${new Date(inv.expires_at).toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" })}`}
                     </div>
                   </div>
                   <form action={revokeInvitationAction}>

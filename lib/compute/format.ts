@@ -1,14 +1,24 @@
-// Pure formatting helpers — easy to unit test.
+// Pure formatting helpers. All wall-clock display is locked to
+// Asia/Jakarta (GMT+7) so the same string renders on Vercel UTC server
+// and on a client browser regardless of its local timezone — eliminates
+// SSR/CSR hydration mismatch and shows times the user actually expects.
+
+const TZ = "Asia/Jakarta";
 
 export function fmtTime(ts: string | Date | null | undefined): string {
   if (!ts) return "-";
-  const d = new Date(ts);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return new Date(ts).toLocaleTimeString("id-ID", {
+    timeZone: TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 export function fmtDate(ts: string | Date | null | undefined): string {
   if (!ts) return "-";
   return new Date(ts).toLocaleDateString("id-ID", {
+    timeZone: TZ,
     day: "numeric",
     month: "short",
     year: "numeric",

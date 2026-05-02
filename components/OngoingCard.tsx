@@ -22,22 +22,14 @@ const EMOJIS: Record<Subtype, string> = {
 };
 
 function fmtClock(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getHours().toString().padStart(2, "0")}:${d
-    .getMinutes()
-    .toString()
-    .padStart(2, "0")}`;
-}
-
-function ClockTime({ iso }: { iso: string }) {
-  // Defer to mount: server (UTC) vs client (local TZ) would produce
-  // different getHours() values → hydration mismatch. Render placeholder
-  // until client takes over.
-  const [s, setS] = useState<string>("--:--");
-  useEffect(() => {
-    setS(fmtClock(iso));
-  }, [iso]);
-  return <>{s}</>;
+  // Locked to Asia/Jakarta so server (UTC) and client (any TZ) render
+  // identically — no hydration mismatch.
+  return new Date(iso).toLocaleTimeString("id-ID", {
+    timeZone: "Asia/Jakarta",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 export function OngoingCard({
@@ -69,7 +61,7 @@ export function OngoingCard({
               </span>
             </div>
             <div className="text-[11px] text-gray-500">
-              Sejak <ClockTime iso={startIso} />
+              Sejak {fmtClock(startIso)}
             </div>
           </div>
           <button
@@ -185,7 +177,7 @@ function NightLamp({
         className="mt-4 font-mono text-7xl font-light tabular-nums text-red-700/90 sm:text-[8rem]"
       />
       <div className="mt-2 text-[11px] tracking-widest text-red-900/50">
-        Sejak <ClockTime iso={startIso} />
+        Sejak {fmtClock(startIso)}
       </div>
 
       <div className="mt-12 w-full max-w-xs px-6">

@@ -40,7 +40,12 @@ function bool(formData: FormData, key: string): boolean {
 function isoOrNull(formData: FormData, key: string): string | null {
   const raw = String(formData.get(key) ?? "").trim();
   if (raw === "") return null;
-  const d = new Date(raw);
+  // <input type="datetime-local"> submits "YYYY-MM-DDTHH:mm" with no
+  // timezone. Vercel server runs in UTC; without the offset, new Date()
+  // would treat 09:00 as 09:00 UTC instead of 09:00 Jakarta. Force the
+  // input to be parsed as Asia/Jakarta (+07:00).
+  const withTz = /[+-]\d{2}:\d{2}$|Z$/i.test(raw) ? raw : `${raw}:00+07:00`;
+  const d = new Date(withTz);
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
