@@ -522,13 +522,27 @@ function LogModal({
           ) : null}
 
           {subtype === "sleep" ? (
-            <Field label="Bangun (kosongkan jika masih tidur)">
-              <input
-                type="datetime-local"
-                name="end_timestamp"
-                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
-              />
-            </Field>
+            <>
+              <Field label="Bangun (kosongkan jika masih tidur)">
+                <input
+                  type="datetime-local"
+                  name="end_timestamp"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                />
+              </Field>
+              <Field label="Kualitas tidur (opsional)">
+                <select
+                  name="sleep_quality"
+                  defaultValue=""
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                >
+                  <option value="">—</option>
+                  <option value="nyenyak">😴 Nyenyak</option>
+                  <option value="gelisah">😣 Gelisah</option>
+                  <option value="sering_bangun">😢 Sering bangun</option>
+                </select>
+              </Field>
+            </>
           ) : null}
 
           {subtype === "temp" ? (

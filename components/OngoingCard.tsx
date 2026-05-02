@@ -163,6 +163,16 @@ export function OngoingCard({
             >
               <input type="hidden" name="id" value={id} />
               <input type="hidden" name="return_to" value="/" />
+              <select
+                name="sleep_quality"
+                defaultValue=""
+                className="mb-2 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-rose-400"
+              >
+                <option value="">Kualitas tidur (opsional)</option>
+                <option value="nyenyak">😴 Nyenyak</option>
+                <option value="gelisah">😣 Gelisah</option>
+                <option value="sering_bangun">😢 Sering bangun</option>
+              </select>
               <SubmitButton
                 pendingText="Menyimpan…"
                 className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
@@ -327,6 +337,24 @@ function NightLamp({
             <input type="hidden" name="id" value={id} />
             <input type="hidden" name="return_to" value="/" />
             <FormCloser onClose={onClose} />
+            <select
+              name="sleep_quality"
+              defaultValue=""
+              className="mb-2 w-full rounded-xl border border-red-900/40 bg-transparent px-2 py-1.5 text-xs text-red-700/80 outline-none"
+            >
+              <option value="" className="bg-black text-red-700">
+                Kualitas (opsional)
+              </option>
+              <option value="nyenyak" className="bg-black text-red-700">
+                Nyenyak
+              </option>
+              <option value="gelisah" className="bg-black text-red-700">
+                Gelisah
+              </option>
+              <option value="sering_bangun" className="bg-black text-red-700">
+                Sering bangun
+              </option>
+            </select>
             <SubmitButton
               pendingText="Menyimpan…"
               className="w-full rounded-2xl border border-red-900/40 bg-transparent py-3 text-sm font-medium text-red-700/90 hover:bg-red-950/30 active:bg-red-950/50"
@@ -495,17 +523,7 @@ function PumpingControls({
         ) : null}
       </div>
       {canPindah && fromSide ? (
-        <form action={pumpingPindahAction}>
-          <input type="hidden" name="id" value={id} />
-          <input type="hidden" name="from_side" value={fromSide} />
-          <input type="hidden" name="return_to" value="/" />
-          <SubmitButton
-            pendingText="Memindah…"
-            className="w-full rounded-xl border border-rose-200 bg-white py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50"
-          >
-            ⇄ Pindah ke {otherSide}
-          </SubmitButton>
-        </form>
+        <PindahForm id={id} fromSide={fromSide} otherSide={otherSide} />
       ) : null}
       <button
         type="button"
@@ -515,6 +533,49 @@ function PumpingControls({
         Selesai · Catat ml
       </button>
     </div>
+  );
+}
+
+const PINDAH_OFFSETS: { value: number; label: string }[] = [
+  { value: 0, label: "Sekarang" },
+  { value: 1, label: "1 mnt lalu" },
+  { value: 3, label: "3 mnt lalu" },
+  { value: 5, label: "5 mnt lalu" },
+  { value: 10, label: "10 mnt lalu" },
+];
+
+function PindahForm({
+  id,
+  fromSide,
+  otherSide,
+}: {
+  id: string;
+  fromSide: "kiri" | "kanan";
+  otherSide: string;
+}) {
+  return (
+    <form action={pumpingPindahAction} className="space-y-1.5">
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="from_side" value={fromSide} />
+      <input type="hidden" name="return_to" value="/" />
+      <select
+        name="pindah_offset_min"
+        defaultValue={0}
+        className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[11px] outline-none focus:border-rose-400"
+      >
+        {PINDAH_OFFSETS.map((o) => (
+          <option key={o.value} value={o.value}>
+            Pindah · {o.label}
+          </option>
+        ))}
+      </select>
+      <SubmitButton
+        pendingText="Memindah…"
+        className="w-full rounded-xl border border-rose-200 bg-white py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50"
+      >
+        ⇄ Pindah ke {otherSide}
+      </SubmitButton>
+    </form>
   );
 }
 
@@ -561,17 +622,7 @@ function DbfControls({
         ) : null}
       </div>
       {canPindah && fromSide ? (
-        <form action={pumpingPindahAction}>
-          <input type="hidden" name="id" value={id} />
-          <input type="hidden" name="from_side" value={fromSide} />
-          <input type="hidden" name="return_to" value="/" />
-          <SubmitButton
-            pendingText="Memindah…"
-            className="w-full rounded-xl border border-rose-200 bg-white py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50"
-          >
-            ⇄ Pindah ke {otherSide}
-          </SubmitButton>
-        </form>
+        <PindahForm id={id} fromSide={fromSide} otherSide={otherSide} />
       ) : null}
       <form action={endOngoingDbfAction}>
         <input type="hidden" name="id" value={id} />
