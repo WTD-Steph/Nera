@@ -256,6 +256,8 @@ export type Database = {
           created_by: string | null
           duration_l_min: number | null
           duration_r_min: number | null
+          end_l_at: string | null
+          end_r_at: string | null
           end_timestamp: string | null
           has_pee: boolean | null
           has_poop: boolean | null
@@ -265,6 +267,8 @@ export type Database = {
           notes: string | null
           poop_color: string | null
           poop_consistency: string | null
+          start_l_at: string | null
+          start_r_at: string | null
           subtype: string
           temp_celsius: number | null
           timestamp: string
@@ -281,6 +285,8 @@ export type Database = {
           created_by?: string | null
           duration_l_min?: number | null
           duration_r_min?: number | null
+          end_l_at?: string | null
+          end_r_at?: string | null
           end_timestamp?: string | null
           has_pee?: boolean | null
           has_poop?: boolean | null
@@ -290,6 +296,8 @@ export type Database = {
           notes?: string | null
           poop_color?: string | null
           poop_consistency?: string | null
+          start_l_at?: string | null
+          start_r_at?: string | null
           subtype: string
           temp_celsius?: number | null
           timestamp: string
@@ -306,6 +314,8 @@ export type Database = {
           created_by?: string | null
           duration_l_min?: number | null
           duration_r_min?: number | null
+          end_l_at?: string | null
+          end_r_at?: string | null
           end_timestamp?: string | null
           has_pee?: boolean | null
           has_poop?: boolean | null
@@ -315,6 +325,8 @@ export type Database = {
           notes?: string | null
           poop_color?: string | null
           poop_consistency?: string | null
+          start_l_at?: string | null
+          start_r_at?: string | null
           subtype?: string
           temp_celsius?: number | null
           timestamp?: string

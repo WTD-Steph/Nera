@@ -20,6 +20,7 @@ import {
   fmtDuration,
   fmtSleepRange,
   fmtTime,
+  pumpDur,
   timeSince,
 } from "@/lib/compute/format";
 
@@ -83,8 +84,14 @@ function logDetail(l: LogRow): string {
     const rMin = l.duration_r_min ?? 0;
     return `🤱 L ${lMin}m / R ${rMin}m`;
   }
-  if (l.subtype === "pumping")
-    return `L ${l.amount_l_ml ?? 0} / R ${l.amount_r_ml ?? 0} ml`;
+  if (l.subtype === "pumping") {
+    const parts: string[] = [];
+    const lDur = pumpDur(l.start_l_at, l.end_l_at);
+    const rDur = pumpDur(l.start_r_at, l.end_r_at);
+    parts.push(`L ${l.amount_l_ml ?? 0}${lDur ? `/${lDur}m` : ""}`);
+    parts.push(`R ${l.amount_r_ml ?? 0}${rDur ? `/${rDur}m` : ""}`);
+    return `${parts.join(" · ")} ml`;
+  }
   if (l.subtype === "diaper") {
     const parts: string[] = [];
     if (l.has_pee) parts.push("💛");
@@ -125,7 +132,7 @@ export default async function HomePage({
       supabase
         .from("logs")
         .select(
-          "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, notes",
+          "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, notes",
         )
         .eq("baby_id", baby.id)
         .gte("timestamp", since)

@@ -201,14 +201,27 @@ function NightLamp({
   // night-lamp is open — otherwise PWA / Safari uses the manifest
   // theme_color (rose) which shows as a bright red strip at the top of
   // the screen, defeating the dim purpose. Restore the original on close.
+  // Also paint <html> + <body> + safe-area-top black so the iOS PWA
+  // status bar (black-translucent) shows pure black underneath instead
+  // of a thin rose strip from the page background gradient.
   useEffect(() => {
     const meta = document.querySelector(
       'meta[name="theme-color"]',
     ) as HTMLMetaElement | null;
-    const prev = meta?.getAttribute("content") ?? null;
+    const prevTheme = meta?.getAttribute("content") ?? null;
     if (meta) meta.setAttribute("content", "#000000");
+
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlBg = html.style.background;
+    const prevBodyBg = body.style.background;
+    html.style.background = "#000";
+    body.style.background = "#000";
+
     return () => {
-      if (meta && prev !== null) meta.setAttribute("content", prev);
+      if (meta && prevTheme !== null) meta.setAttribute("content", prevTheme);
+      html.style.background = prevHtmlBg;
+      body.style.background = prevBodyBg;
     };
   }, []);
 

@@ -14,7 +14,11 @@ export const metadata: Metadata = {
   applicationName: "Nera",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    // black-translucent makes the iOS PWA status bar transparent so the
+    // page background extends underneath. Important for night-lamp mode
+    // (otherwise iOS draws a non-black bar at the top, leaving a visible
+    // strip even with theme-color = #000000).
+    statusBarStyle: "black-translucent",
     title: "Nera",
   },
   formatDetection: {

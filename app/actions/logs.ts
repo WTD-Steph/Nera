@@ -112,6 +112,21 @@ export async function createLogAction(formData: FormData) {
     }
     payload.amount_l_ml = l;
     payload.amount_r_ml = r;
+    const startL = isoOrNull(formData, "start_l_at");
+    const endL = isoOrNull(formData, "end_l_at");
+    const startR = isoOrNull(formData, "start_r_at");
+    const endR = isoOrNull(formData, "end_r_at");
+    payload.start_l_at = startL;
+    payload.end_l_at = endL;
+    payload.start_r_at = startR;
+    payload.end_r_at = endR;
+    // If user filled per-side times, derive overall session timestamps
+    // from min(starts) → max(ends). Falls back to the form's "Waktu" if
+    // neither side has a time set.
+    const starts = [startL, startR].filter((v): v is string => !!v).sort();
+    const ends = [endL, endR].filter((v): v is string => !!v).sort();
+    if (starts[0]) payload.timestamp = starts[0];
+    if (ends[ends.length - 1]) payload.end_timestamp = ends[ends.length - 1];
   } else if (subtype === "diaper") {
     const hasPee = bool(formData, "has_pee");
     const hasPoop = bool(formData, "has_poop");
