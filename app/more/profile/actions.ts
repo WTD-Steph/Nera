@@ -12,9 +12,20 @@ export async function updateBabyAction(formData: FormData) {
   const dob = String(formData.get("dob") ?? "");
   const birthWeight = parseFloat(String(formData.get("birth_weight_kg") ?? ""));
   const birthHeight = parseFloat(String(formData.get("birth_height_cm") ?? ""));
-  const dbfRateRaw = String(formData.get("dbf_ml_per_min") ?? "").trim();
-  const dbfRate =
-    dbfRateRaw === "" ? null : parseFloat(dbfRateRaw);
+  // DBF estimate mode picker: 'auto' | 'multiplier' | 'fixed'. Only the
+  // value matching the chosen mode is persisted; others are nulled so
+  // priority chain in dbfEstimateMl resolves cleanly.
+  const dbfMode = String(formData.get("dbf_estimate_mode") ?? "auto");
+  const dbfFixedRaw = String(formData.get("dbf_ml_per_min") ?? "").trim();
+  const dbfMultRaw = String(
+    formData.get("dbf_pumping_multiplier") ?? "",
+  ).trim();
+  const dbfFixed =
+    dbfMode === "fixed" && dbfFixedRaw !== "" ? parseFloat(dbfFixedRaw) : null;
+  const dbfMult =
+    dbfMode === "multiplier" && dbfMultRaw !== ""
+      ? parseFloat(dbfMultRaw)
+      : null;
 
   if (!id) redirect("/more/profile");
   if (!name) {
@@ -39,11 +50,19 @@ export async function updateBabyAction(formData: FormData) {
     );
   }
   if (
-    dbfRate !== null &&
-    (!Number.isFinite(dbfRate) || dbfRate < 0.5 || dbfRate > 30)
+    dbfFixed !== null &&
+    (!Number.isFinite(dbfFixed) || dbfFixed < 0.5 || dbfFixed > 30)
   ) {
     redirect(
       `/more/profile?error=${encodeURIComponent("DBF ml/menit harus 0.5–30 atau kosong.")}`,
+    );
+  }
+  if (
+    dbfMult !== null &&
+    (!Number.isFinite(dbfMult) || dbfMult < 0.1 || dbfMult > 5)
+  ) {
+    redirect(
+      `/more/profile?error=${encodeURIComponent("Multiplier harus 0.1–5 atau kosong.")}`,
     );
   }
 
@@ -64,7 +83,8 @@ export async function updateBabyAction(formData: FormData) {
       dob,
       birth_weight_kg: birthWeight,
       birth_height_cm: birthHeight,
-      dbf_ml_per_min: dbfRate,
+      dbf_ml_per_min: dbfFixed,
+      dbf_pumping_multiplier: dbfMult,
     } as never)
     .eq("id", id);
 

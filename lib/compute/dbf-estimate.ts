@@ -57,32 +57,62 @@ export function pumpingMlPerMin(logs: LogRow[]): number | null {
   return null;
 }
 
+export type DbfEstimateOverrides = {
+  /** Fixed ml/min override (highest priority after multiplier). */
+  fixedMlPerMin?: number | null;
+  /** Multiplier applied to pumping rate. Highest priority when both
+   *  multiplier and a usable pumping rate exist. */
+  pumpingMultiplier?: number | null;
+};
+
 /**
- * @param override Per-baby manual override (from babies.dbf_ml_per_min).
- *   When set, takes precedence over pumping-derived rate. Null/undefined
- *   = use auto chain (pumping → literature default).
+ * Resolve DBF rate using priority chain:
+ *   1. multiplier × pumping rate (when both set)
+ *   2. fixed ml/min override
+ *   3. auto pumping rate
+ *   4. literature default 4 ml/min
  */
 export function dbfEstimateMl(
   dbfMinutes: number,
   logs: LogRow[],
-  override?: number | null,
+  overrides: DbfEstimateOverrides = {},
 ): {
   ml: number;
   mlPerMin: number;
-  source: "manual" | "pumping" | "default";
+  source: "multiplier" | "fixed" | "pumping" | "default";
+  pumpingRate: number | null;
 } {
-  if (typeof override === "number" && override > 0) {
+  const fromPump = pumpingMlPerMin(logs);
+  const { fixedMlPerMin, pumpingMultiplier } = overrides;
+
+  if (
+    typeof pumpingMultiplier === "number" &&
+    pumpingMultiplier > 0 &&
+    fromPump != null
+  ) {
+    const rate = fromPump * pumpingMultiplier;
     return {
-      ml: Math.round(dbfMinutes * override),
-      mlPerMin: override,
-      source: "manual",
+      ml: Math.round(dbfMinutes * rate),
+      mlPerMin: rate,
+      source: "multiplier",
+      pumpingRate: fromPump,
     };
   }
-  const fromPump = pumpingMlPerMin(logs);
+
+  if (typeof fixedMlPerMin === "number" && fixedMlPerMin > 0) {
+    return {
+      ml: Math.round(dbfMinutes * fixedMlPerMin),
+      mlPerMin: fixedMlPerMin,
+      source: "fixed",
+      pumpingRate: fromPump,
+    };
+  }
+
   const rate = fromPump ?? DEFAULT_DBF_ML_PER_MIN;
   return {
     ml: Math.round(dbfMinutes * rate),
     mlPerMin: rate,
     source: fromPump != null ? "pumping" : "default",
+    pumpingRate: fromPump,
   };
 }

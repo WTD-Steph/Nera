@@ -4,6 +4,7 @@ import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
 import { SubmitButton } from "@/components/SubmitButton";
 import { updateBabyAction } from "./actions";
+import { DbfEstimateFieldset } from "./DbfEstimateFieldset";
 
 type SearchParams = { error?: string; saved?: string };
 
@@ -138,33 +139,10 @@ export default async function ProfilePage({
           </label>
         </div>
 
-        <fieldset className="rounded-xl border border-gray-100 bg-gray-50/40 p-3">
-          <legend className="px-1 text-xs font-semibold text-gray-600">
-            Estimasi DBF (opsional)
-          </legend>
-          <label className="mt-1 block">
-            <span className="text-xs text-gray-600">
-              ml per menit
-            </span>
-            <input
-              type="number"
-              name="dbf_ml_per_min"
-              step="0.1"
-              min="0.5"
-              max="30"
-              inputMode="decimal"
-              placeholder="Auto (dari pumping terbaru, default 4)"
-              defaultValue={baby.dbf_ml_per_min ?? ""}
-              className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-400"
-            />
-          </label>
-          <p className="mt-1 text-[11px] leading-snug text-gray-400">
-            Kosongkan untuk auto: app pakai ml/menit dari pumping terbaru
-            yang ≥5 ml & ≥10 menit. Kalau ingin override (misal dokter
-            kasih estimasi spesifik atau pumping tidak representatif),
-            isi angka di sini. Range 0.5–30 ml/menit.
-          </p>
-        </fieldset>
+        <DbfEstimateFieldset
+          fixedDefault={baby.dbf_ml_per_min}
+          multiplierDefault={baby.dbf_pumping_multiplier}
+        />
 
         <SubmitButton
           pendingText="Menyimpan…"
