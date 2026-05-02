@@ -197,6 +197,21 @@ function NightLamp({
     };
   }, []);
 
+  // Swap the iOS / Android system status-bar tint to black while the
+  // night-lamp is open — otherwise PWA / Safari uses the manifest
+  // theme_color (rose) which shows as a bright red strip at the top of
+  // the screen, defeating the dim purpose. Restore the original on close.
+  useEffect(() => {
+    const meta = document.querySelector(
+      'meta[name="theme-color"]',
+    ) as HTMLMetaElement | null;
+    const prev = meta?.getAttribute("content") ?? null;
+    if (meta) meta.setAttribute("content", "#000000");
+    return () => {
+      if (meta && prev !== null) meta.setAttribute("content", prev);
+    };
+  }, []);
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black"
