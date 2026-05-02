@@ -265,6 +265,7 @@ export type Database = {
           med_dose: string | null
           med_name: string | null
           notes: string | null
+          paused_at: string | null
           poop_color: string | null
           poop_consistency: string | null
           start_l_at: string | null
@@ -294,6 +295,7 @@ export type Database = {
           med_dose?: string | null
           med_name?: string | null
           notes?: string | null
+          paused_at?: string | null
           poop_color?: string | null
           poop_consistency?: string | null
           start_l_at?: string | null
@@ -323,6 +325,7 @@ export type Database = {
           med_dose?: string | null
           med_name?: string | null
           notes?: string | null
+          paused_at?: string | null
           poop_color?: string | null
           poop_consistency?: string | null
           start_l_at?: string | null

@@ -23,6 +23,7 @@ export type LogRow = {
   end_l_at: string | null;
   start_r_at: string | null;
   end_r_at: string | null;
+  paused_at: string | null;
   notes: string | null;
 };
 

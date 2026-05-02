@@ -10,7 +10,11 @@ import { LogsRealtime } from "@/components/LogsRealtime";
 import { SubmitButton } from "@/components/SubmitButton";
 import { OngoingCard } from "@/components/OngoingCard";
 import { StartOngoingButton } from "@/components/StartOngoingButtons";
-import { deleteLogAction } from "@/app/actions/logs";
+import {
+  deleteLogAction,
+  resumeOngoingLogAction,
+  expireStalePausedLogs,
+} from "@/app/actions/logs";
 import {
   computeTodayStats,
   computeLastByType,
@@ -124,6 +128,10 @@ export default async function HomePage({
   const baby = await getCurrentBaby();
   if (!baby) redirect("/setup/baby");
 
+  // Sweep ongoing sessions paused > 10 min before fetching the page
+  // data — gives the user a stale state cleaned up on first visit.
+  await expireStalePausedLogs(baby.id);
+
   const supabase = createClient();
 
   const since = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
@@ -132,7 +140,7 @@ export default async function HomePage({
       supabase
         .from("logs")
         .select(
-          "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, notes",
+          "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, paused_at, notes",
         )
         .eq("baby_id", baby.id)
         .gte("timestamp", since)
@@ -262,6 +270,7 @@ export default async function HomePage({
                 id={l.id}
                 subtype={cardSubtype}
                 startIso={l.timestamp}
+                pausedAtIso={l.paused_at}
                 sleepPlaylistUrl={household.sleep_playlist_url}
                 pumpStartLAt={l.start_l_at}
                 pumpEndLAt={l.end_l_at}
@@ -501,16 +510,51 @@ export default async function HomePage({
                       {fmtTime(l.timestamp)} · {timeSince(l.timestamp)}
                     </div>
                   </div>
-                  <form action={deleteLogAction}>
-                    <input type="hidden" name="id" value={l.id} />
-                    <input type="hidden" name="return_to" value="/" />
-                    <SubmitButton
-                      pendingText="…"
-                      className="text-[11px] text-gray-400 hover:text-red-600"
-                    >
-                      Hapus
-                    </SubmitButton>
-                  </form>
+                  <div className="flex flex-col items-end gap-1">
+                    {(() => {
+                      // Lanjutkan only on completed (end_timestamp set)
+                      // sleep / pumping / DBF rows, when no ongoing of
+                      // same logical type already exists.
+                      if (!l.end_timestamp) return null;
+                      const sameTypeOngoing =
+                        l.subtype === "sleep"
+                          ? ongoingSubtypes.has("sleep")
+                          : l.subtype === "pumping"
+                            ? ongoingSubtypes.has("pumping")
+                            : l.subtype === "feeding" &&
+                                (l.start_l_at !== null || l.start_r_at !== null)
+                              ? ongoingSubtypes.has("dbf")
+                              : true;
+                      const supportsResume =
+                        l.subtype === "sleep" ||
+                        l.subtype === "pumping" ||
+                        (l.subtype === "feeding" &&
+                          (l.start_l_at !== null || l.start_r_at !== null));
+                      if (!supportsResume || sameTypeOngoing) return null;
+                      return (
+                        <form action={resumeOngoingLogAction}>
+                          <input type="hidden" name="id" value={l.id} />
+                          <input type="hidden" name="return_to" value="/" />
+                          <SubmitButton
+                            pendingText="…"
+                            className="text-[11px] font-semibold text-rose-600 hover:underline"
+                          >
+                            ▶ Lanjutkan
+                          </SubmitButton>
+                        </form>
+                      );
+                    })()}
+                    <form action={deleteLogAction}>
+                      <input type="hidden" name="id" value={l.id} />
+                      <input type="hidden" name="return_to" value="/" />
+                      <SubmitButton
+                        pendingText="…"
+                        className="text-[11px] text-gray-400 hover:text-red-600"
+                      >
+                        Hapus
+                      </SubmitButton>
+                    </form>
+                  </div>
                 </div>
               ))}
             </div>
