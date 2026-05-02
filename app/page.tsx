@@ -7,6 +7,8 @@ import { getCurrentBaby } from "@/lib/household/baby";
 import { LogModalTrigger, type LogSubtype } from "@/components/LogModal";
 import { LogsRealtime } from "@/components/LogsRealtime";
 import { SubmitButton } from "@/components/SubmitButton";
+import { OngoingCard } from "@/components/OngoingCard";
+import { StartOngoingButton } from "@/components/StartOngoingButtons";
 import { deleteLogAction } from "@/app/actions/logs";
 import {
   computeTodayStats,
@@ -20,6 +22,7 @@ type SearchParams = {
   logsaved?: string;
   logdeleted?: string;
   logerror?: string;
+  ongoingstarted?: string;
 };
 
 function formatAge(dob: string): string {
@@ -119,6 +122,12 @@ export default async function HomePage({
     .order("timestamp", { ascending: false });
 
   const logsArray: LogRow[] = (logs ?? []) as LogRow[];
+  const ongoing = logsArray.filter(
+    (l) =>
+      l.end_timestamp === null &&
+      (l.subtype === "sleep" || l.subtype === "pumping"),
+  );
+  const ongoingSubtypes = new Set(ongoing.map((l) => l.subtype));
   const stats = computeTodayStats(logsArray);
   const last = computeLastByType(logsArray);
   const recent = logsArray.slice(0, 6);
@@ -178,6 +187,59 @@ export default async function HomePage({
           {logerror}
         </div>
       ) : null}
+
+      {ongoing.length > 0 ? (
+        <section className="mt-5 space-y-2">
+          {ongoing.map((l) => (
+            <OngoingCard
+              key={l.id}
+              id={l.id}
+              subtype={l.subtype as "sleep" | "pumping"}
+              startIso={l.timestamp}
+            />
+          ))}
+        </section>
+      ) : null}
+
+      <section className="mt-5">
+        <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
+          Mulai Sekarang
+        </h2>
+        <div className="grid grid-cols-2 gap-2">
+          {!ongoingSubtypes.has("sleep") ? (
+            <StartOngoingButton
+              subtype="sleep"
+              label="Mulai Tidur"
+              emoji="🌙"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-rose-100 bg-rose-50/40 p-3 text-rose-400">
+              <span className="text-2xl" aria-hidden>
+                🌙
+              </span>
+              <span className="text-[11px] font-semibold">
+                Tidur berlangsung
+              </span>
+            </div>
+          )}
+          {!ongoingSubtypes.has("pumping") ? (
+            <StartOngoingButton
+              subtype="pumping"
+              label="Mulai Pumping"
+              emoji="💧"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-rose-100 bg-rose-50/40 p-3 text-rose-400">
+              <span className="text-2xl" aria-hidden>
+                💧
+              </span>
+              <span className="text-[11px] font-semibold">
+                Pumping berlangsung
+              </span>
+            </div>
+          )}
+        </div>
+      </section>
 
       <section className="mt-5">
         <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">

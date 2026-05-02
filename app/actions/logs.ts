@@ -149,6 +149,94 @@ export async function createLogAction(formData: FormData) {
   redirect(`${returnTo}?logsaved=${subtype}`);
 }
 
+export async function startOngoingLogAction(formData: FormData) {
+  const subtype = String(formData.get("subtype") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/");
+
+  if (subtype !== "sleep" && subtype !== "pumping") {
+    redirect(`${returnTo}?logerror=${encodeURIComponent("Subtype tidak mendukung ongoing.")}`);
+  }
+
+  const [user, baby] = await Promise.all([getCachedUser(), getCurrentBaby()]);
+  if (!user) redirect("/login");
+  if (!baby) redirect("/setup");
+
+  const supabase = createClient();
+  const { error } = await supabase.from("logs").insert({
+    baby_id: baby.id,
+    subtype,
+    timestamp: new Date().toISOString(),
+    end_timestamp: null,
+    created_by: user.id,
+  });
+
+  if (error) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent(`Gagal mulai: ${error.message}`)}`,
+    );
+  }
+
+  revalidatePath("/");
+  revalidatePath("/history");
+  redirect(`${returnTo}?ongoingstarted=${subtype}`);
+}
+
+export async function endOngoingSleepAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/");
+  if (!id) redirect(returnTo);
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("logs")
+    .update({ end_timestamp: new Date().toISOString() })
+    .eq("id", id)
+    .eq("subtype", "sleep")
+    .is("end_timestamp", null);
+
+  if (error) {
+    redirect(`${returnTo}?logerror=${encodeURIComponent(`Gagal stop: ${error.message}`)}`);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/history");
+  redirect(`${returnTo}?logsaved=sleep`);
+}
+
+export async function endOngoingPumpingAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/");
+  const l = num(formData, "amount_l_ml");
+  const r = num(formData, "amount_r_ml");
+
+  if (!id) redirect(returnTo);
+  if ((l === null || l <= 0) && (r === null || r <= 0)) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent("Isi jumlah pumping kiri atau kanan.")}`,
+    );
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("logs")
+    .update({
+      end_timestamp: new Date().toISOString(),
+      amount_l_ml: l,
+      amount_r_ml: r,
+    })
+    .eq("id", id)
+    .eq("subtype", "pumping")
+    .is("end_timestamp", null);
+
+  if (error) {
+    redirect(`${returnTo}?logerror=${encodeURIComponent(`Gagal stop: ${error.message}`)}`);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/history");
+  redirect(`${returnTo}?logsaved=pumping`);
+}
+
 export async function deleteLogAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/");
