@@ -43,7 +43,15 @@ const SUBTYPE_LABEL: Record<string, string> = {
 
 function logDetail(l: LogRow): string {
   if (l.subtype === "feeding") {
-    if (l.amount_ml != null) return `🍼 ${l.amount_ml} ml`;
+    if (l.amount_ml != null) {
+      const src =
+        l.bottle_content === "asi"
+          ? "ASI"
+          : l.bottle_content === "sufor"
+            ? "Sufor"
+            : null;
+      return src ? `🍼 ${src} ${l.amount_ml} ml` : `🍼 ${l.amount_ml} ml`;
+    }
     const lMin = l.duration_l_min ?? 0;
     const rMin = l.duration_r_min ?? 0;
     return `🤱 L ${lMin}m / R ${rMin}m`;
@@ -87,7 +95,7 @@ export default async function HistoryPage({
   let query = supabase
     .from("logs")
     .select(
-      "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, notes",
+      "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, notes",
     )
     .eq("baby_id", baby.id)
     .order("timestamp", { ascending: false })

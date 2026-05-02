@@ -247,6 +247,7 @@ export type Database = {
           amount_ml: number | null
           amount_r_ml: number | null
           baby_id: string
+          bottle_content: string | null
           created_at: string
           created_by: string | null
           duration_l_min: number | null
@@ -270,6 +271,7 @@ export type Database = {
           amount_ml?: number | null
           amount_r_ml?: number | null
           baby_id: string
+          bottle_content?: string | null
           created_at?: string
           created_by?: string | null
           duration_l_min?: number | null
@@ -293,6 +295,7 @@ export type Database = {
           amount_ml?: number | null
           amount_r_ml?: number | null
           baby_id?: string
+          bottle_content?: string | null
           created_at?: string
           created_by?: string | null
           duration_l_min?: number | null

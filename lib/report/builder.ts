@@ -29,6 +29,7 @@ export type LogRow = {
   temp_celsius: number | null;
   med_name: string | null;
   med_dose: string | null;
+  bottle_content: "sufor" | "asi" | null;
   notes: string | null;
 };
 
@@ -55,9 +56,16 @@ function csvRow(values: unknown[]): string {
   return values.map(csvEscape).join(",");
 }
 
+function feedingSource(l: LogRow): string {
+  if (l.bottle_content === "asi") return "ASI";
+  if (l.bottle_content === "sufor") return "Sufor";
+  return "Susu";
+}
+
 function logDetailCsv(l: LogRow): string {
   if (l.subtype === "feeding") {
-    if (l.amount_ml != null) return `Susu ${l.amount_ml} ml`;
+    if (l.amount_ml != null)
+      return `${feedingSource(l)} ${l.amount_ml} ml`;
     return `DBF L:${l.duration_l_min ?? 0}m R:${l.duration_r_min ?? 0}m`;
   }
   if (l.subtype === "pumping")
