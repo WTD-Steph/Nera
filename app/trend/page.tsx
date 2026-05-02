@@ -10,6 +10,10 @@ import {
   type FeedingIntervalBucket,
 } from "@/components/TrendCharts";
 import { TrendHighlights } from "@/components/TrendHighlights";
+import {
+  computeMilkTarget,
+  type DailyTarget,
+} from "@/lib/constants/daily-targets";
 import { getTargetForAge } from "@/lib/constants/daily-targets";
 import { dbfEstimateMl } from "@/lib/compute/dbf-estimate";
 import { type LogRow } from "@/lib/compute/stats";
@@ -74,12 +78,46 @@ export default async function TrendPage() {
 
   const logsArray: LogRow[] = (logs ?? []) as LogRow[];
 
+  // === Per-day target lookup based on baby's age at each date ===
+  // Age changes day by day across the 14-day window, so target ranges
+  // shift accordingly. For dates before birth → target = null.
+  function getTargetByAgeDays(days: number): DailyTarget | null {
+    if (days < 0) return null;
+    // Inline the age bucket lookup (DAILY_TARGETS imported indirectly)
+    // We rely on getTargetForAge but use a synthetic dob.
+    // Simpler: import DAILY_TARGETS directly. Defer to existing helper:
+    const fakeDobIso = new Date(
+      Date.now() - days * 86400000,
+    ).toISOString();
+    const t = getTargetForAge(fakeDobIso);
+    return t;
+  }
+  const dobMs = new Date(baby.dob).getTime();
+
   // Build the day buckets first so days with zero entries still appear.
   const days: DailyAgg[] = [];
   const dayIndex = new Map<string, DailyAgg>();
+  const dayBoundaryMs = new Map<string, { start: number; end: number }>();
   for (let i = DAYS_BACK - 1; i >= 0; i--) {
     const d = startOfDayJakarta(new Date(Date.now() - i * 86400000));
     const key = dayKey(d);
+    const startMs = d.getTime();
+    const endMs = startMs + 86400000;
+    // Baby's age (in days) at this date
+    const ageDays = Math.floor((startMs - dobMs) / 86400000);
+    const target = getTargetByAgeDays(ageDays);
+    // For milk target, use weight-aware calc when birth_weight_kg known.
+    // For the trend view we use birth_weight_kg as fallback (per-day weight
+    // would need historical growth data — overkill for v1).
+    const weightKg = baby.birth_weight_kg
+      ? Number(baby.birth_weight_kg)
+      : null;
+    const milkTarget =
+      target != null && weightKg != null && weightKg > 0
+        ? computeMilkTarget(target, weightKg)
+        : target != null
+          ? { min: target.milkMlMin, max: target.milkMlMax, source: "age" as const }
+          : null;
     const agg: DailyAgg = {
       date: key,
       short: shortLabel(d.toISOString()),
@@ -87,19 +125,26 @@ export default async function TrendPage() {
       dbfEstimateMl: 0,
       milkTotalMl: 0,
       pumpMl: 0,
+      pumpMlL: 0,
+      pumpMlR: 0,
       sleepMin: 0,
       peeCount: 0,
       poopCount: 0,
+      milkTargetMin: milkTarget ? milkTarget.min : null,
+      milkTargetMax: milkTarget ? milkTarget.max : null,
+      sleepHoursMin: target ? target.sleepHoursMin : null,
+      sleepHoursMax: target ? target.sleepHoursMax : null,
     };
     days.push(agg);
     dayIndex.set(key, agg);
+    dayBoundaryMs.set(key, { start: startMs, end: endMs });
   }
 
   for (const l of logsArray) {
     const key = dayKey(new Date(l.timestamp));
     const agg = dayIndex.get(key);
-    if (!agg) continue;
     if (l.subtype === "feeding") {
+      if (!agg) continue;
       if (l.amount_ml != null && l.amount_ml > 0) {
         agg.bottleMl += l.amount_ml;
       }
@@ -112,22 +157,40 @@ export default async function TrendPage() {
         agg.dbfEstimateMl += est.ml;
       }
     } else if (l.subtype === "pumping") {
-      agg.pumpMl += (l.amount_l_ml ?? 0) + (l.amount_r_ml ?? 0);
+      if (!agg) continue;
+      const lMl = l.amount_l_ml ?? 0;
+      const rMl = l.amount_r_ml ?? 0;
+      agg.pumpMlL += lMl;
+      agg.pumpMlR += rMl;
+      agg.pumpMl += lMl + rMl;
     } else if (l.subtype === "diaper") {
+      if (!agg) continue;
       if (l.has_pee) agg.peeCount += 1;
       if (l.has_poop) agg.poopCount += 1;
     } else if (l.subtype === "sleep" && l.end_timestamp) {
-      const min =
-        (new Date(l.end_timestamp).getTime() -
-          new Date(l.timestamp).getTime()) /
-        60000;
-      if (min > 0) agg.sleepMin += min;
+      // Cross-day split: distribute minutes to each day's bucket based on
+      // overlap with [dayStart, dayEnd]. Sleep that crosses midnight gets
+      // its actual time-on-each-day counted, not lumped to the start day.
+      const startMs = new Date(l.timestamp).getTime();
+      const endMs = new Date(l.end_timestamp).getTime();
+      if (endMs <= startMs) continue;
+      for (const d of days) {
+        const b = dayBoundaryMs.get(d.date);
+        if (!b) continue;
+        const overlap = Math.max(
+          0,
+          Math.min(endMs, b.end) - Math.max(startMs, b.start),
+        );
+        if (overlap > 0) d.sleepMin += overlap / 60000;
+      }
     }
   }
 
   // Round + finalize
   for (const d of days) {
     d.bottleMl = Math.round(d.bottleMl);
+    d.pumpMlL = Math.round(d.pumpMlL);
+    d.pumpMlR = Math.round(d.pumpMlR);
     d.dbfEstimateMl = Math.round(d.dbfEstimateMl);
     d.milkTotalMl = d.bottleMl + d.dbfEstimateMl;
     d.pumpMl = Math.round(d.pumpMl);

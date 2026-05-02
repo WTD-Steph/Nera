@@ -5,9 +5,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
   Line,
-  LineChart,
-  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -22,9 +21,17 @@ export type DailyAgg = {
   dbfEstimateMl: number;
   milkTotalMl: number;
   pumpMl: number;
+  pumpMlL: number;
+  pumpMlR: number;
   sleepMin: number;
   peeCount: number;
   poopCount: number;
+  /** Per-day target milk range — varies as baby ages over 14 days. */
+  milkTargetMin: number | null;
+  milkTargetMax: number | null;
+  /** Per-day target sleep hours range. */
+  sleepHoursMin: number | null;
+  sleepHoursMax: number | null;
 };
 
 export type SleepHeatmapRow = {
@@ -91,11 +98,11 @@ export function TrendCharts({
     <div className="space-y-4">
       <ChartCard
         title="🍼 Susu / hari"
-        subtitle={`Target ${targets.milkMin}–${targets.milkMax} ml`}
+        subtitle="Target naik seiring usia bayi"
         unit="ml"
       >
         <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={daily} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
+          <ComposedChart data={daily} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
             <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
             <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} />
@@ -107,42 +114,57 @@ export function TrendCharts({
                     ? "Botol"
                     : name === "dbfEstimateMl"
                       ? "DBF estimate"
-                      : String(name);
+                      : name === "milkTargetMin"
+                        ? "Target min"
+                        : name === "milkTargetMax"
+                          ? "Target max"
+                          : String(name);
                 return [`${v} ml`, label];
               }}
             />
-            <ReferenceArea
-              y1={targets.milkMin}
-              y2={targets.milkMax}
-              fill={EMERALD}
-              fillOpacity={0.08}
-            />
-            <ReferenceLine
-              y={targets.milkMin}
-              stroke={EMERALD}
-              strokeDasharray="3 3"
-              strokeOpacity={0.6}
-            />
             <Bar dataKey="bottleMl" stackId="m" fill={ROSE} />
             <Bar dataKey="dbfEstimateMl" stackId="m" fill={ROSE_LIGHT} />
-          </BarChart>
+            <Line
+              type="stepAfter"
+              dataKey="milkTargetMin"
+              stroke={EMERALD}
+              strokeDasharray="4 3"
+              strokeWidth={1.5}
+              dot={false}
+              activeDot={false}
+              connectNulls
+              isAnimationActive={false}
+            />
+            <Line
+              type="stepAfter"
+              dataKey="milkTargetMax"
+              stroke={EMERALD}
+              strokeDasharray="4 3"
+              strokeWidth={1.5}
+              strokeOpacity={0.5}
+              dot={false}
+              activeDot={false}
+              connectNulls
+              isAnimationActive={false}
+            />
+          </ComposedChart>
         </ResponsiveContainer>
         <Legend
           items={[
             { color: ROSE, label: "Botol (sufor + ASI)" },
             { color: ROSE_LIGHT, label: "DBF (estimate)" },
-            { color: EMERALD, label: "Target zone" },
+            { color: EMERALD, label: "Target min/max (per usia)" },
           ]}
         />
       </ChartCard>
 
       <ChartCard
         title="🌙 Tidur / hari"
-        subtitle={`Target ${targets.sleepHoursMin}–${targets.sleepHoursMax} jam`}
+        subtitle="Target naik seiring usia · cross-day di-split"
         unit="jam"
       >
         <ResponsiveContainer width="100%" height={200}>
-          <BarChart
+          <ComposedChart
             data={sleepHoursData}
             margin={{ top: 5, right: 8, left: -10, bottom: 5 }}
           >
@@ -151,28 +173,47 @@ export function TrendCharts({
             <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} />
             <Tooltip
               contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              formatter={(v) => [`${v} jam`, "Tidur"]}
-            />
-            <ReferenceArea
-              y1={targets.sleepHoursMin}
-              y2={targets.sleepHoursMax}
-              fill={EMERALD}
-              fillOpacity={0.08}
-            />
-            <ReferenceLine
-              y={targets.sleepHoursMin}
-              stroke={EMERALD}
-              strokeDasharray="3 3"
-              strokeOpacity={0.6}
+              formatter={(v, name) => {
+                const label =
+                  name === "sleepHours"
+                    ? "Tidur"
+                    : name === "sleepHoursMin"
+                      ? "Target min"
+                      : name === "sleepHoursMax"
+                        ? "Target max"
+                        : String(name);
+                return [`${v} jam`, label];
+              }}
             />
             <Bar dataKey="sleepHours" fill={SKY} radius={[4, 4, 0, 0]} />
-          </BarChart>
+            <Line
+              type="stepAfter"
+              dataKey="sleepHoursMin"
+              stroke={EMERALD}
+              strokeDasharray="4 3"
+              strokeWidth={1.5}
+              dot={false}
+              connectNulls
+              isAnimationActive={false}
+            />
+            <Line
+              type="stepAfter"
+              dataKey="sleepHoursMax"
+              stroke={EMERALD}
+              strokeDasharray="4 3"
+              strokeWidth={1.5}
+              strokeOpacity={0.5}
+              dot={false}
+              connectNulls
+              isAnimationActive={false}
+            />
+          </ComposedChart>
         </ResponsiveContainer>
       </ChartCard>
 
       <ChartCard
         title="💧 Pumping / hari"
-        subtitle="Output per hari (kiri + kanan)"
+        subtitle="Stacked Kiri (bawah) + Kanan (atas)"
         unit="ml"
       >
         <ResponsiveContainer width="100%" height={200}>
@@ -182,11 +223,26 @@ export function TrendCharts({
             <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} />
             <Tooltip
               contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              formatter={(v) => [`${v} ml`, "Pumping"]}
+              formatter={(v, name) => {
+                const label =
+                  name === "pumpMlL"
+                    ? "Kiri"
+                    : name === "pumpMlR"
+                      ? "Kanan"
+                      : String(name);
+                return [`${v} ml`, label];
+              }}
             />
-            <Bar dataKey="pumpMl" fill={AMBER} radius={[4, 4, 0, 0]} />
+            <Bar dataKey="pumpMlL" stackId="p" fill="#f59e0b" />
+            <Bar dataKey="pumpMlR" stackId="p" fill="#fbbf24" />
           </BarChart>
         </ResponsiveContainer>
+        <Legend
+          items={[
+            { color: "#f59e0b", label: "Kiri" },
+            { color: "#fbbf24", label: "Kanan" },
+          ]}
+        />
       </ChartCard>
 
       <ChartCard
