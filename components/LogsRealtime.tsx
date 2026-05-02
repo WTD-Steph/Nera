@@ -5,17 +5,21 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 /**
- * Mounts an invisible Supabase realtime subscription for logs of the current
- * baby. On any INSERT/UPDATE/DELETE event matching baby_id, triggers
- * router.refresh() — Next.js soft navigation re-runs server components,
- * dashboard + history re-fetch logs automatically.
+ * Cross-device sync for logs. Three layers of resilience:
  *
- * Tradeoff: full re-render on every event (simple, leverages existing server
- * data fetch). Volume rendah (handful logs/jam), latency ~200ms post-event,
- * acceptable. Optimistic insert (client-side dedup) di-defer ke PR follow-up.
+ * 1. Supabase realtime subscription — postgres_changes filtered by
+ *    baby_id, fires INSERT/UPDATE/DELETE events. Primary mechanism.
  *
- * RLS-aware: Supabase realtime respects table policies, jadi user hanya
- * dapat events untuk row yang dia bisa SELECT.
+ * 2. Visibility refresh — on iOS PWA / mobile, WebSocket drops when the
+ *    app goes to background. When user returns (visibilitychange:
+ *    visible), force router.refresh() to pull fresh data immediately.
+ *    Also catches "browser tab refocus" use case across desktop.
+ *
+ * 3. Online/online + interval poll fallback — when the realtime channel
+ *    silently fails (cell network flap, websocket blocked), a 30-second
+ *    poll while the page is visible keeps data within ~30s of accurate.
+ *
+ * RLS-aware: realtime + Supabase queries both respect row policies.
  */
 export function LogsRealtime({ babyId }: { babyId: string }) {
   const router = useRouter();
@@ -38,8 +42,28 @@ export function LogsRealtime({ babyId }: { babyId: string }) {
       )
       .subscribe();
 
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        router.refresh();
+      }
+    };
+    const onOnline = () => router.refresh();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("online", onOnline);
+
+    // Polling fallback: every 30s while tab visible. Cheap (server
+    // returns from cache or revalidates fast) and bounds staleness.
+    const pollId = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        router.refresh();
+      }
+    }, 30_000);
+
     return () => {
       void supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("online", onOnline);
+      clearInterval(pollId);
     };
   }, [babyId, router]);
 
