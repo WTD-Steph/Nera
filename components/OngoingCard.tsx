@@ -5,6 +5,7 @@ import {
   endOngoingSleepAction,
   endOngoingPumpingAction,
   endOngoingDbfAction,
+  endOngoingHiccupAction,
   pumpingPindahAction,
   pauseOngoingLogAction,
   resumeFromPauseAction,
@@ -13,18 +14,20 @@ import { Stopwatch } from "@/components/Stopwatch";
 import { SubmitButton } from "@/components/SubmitButton";
 import { FormCloser } from "@/components/FormCloser";
 
-type Subtype = "sleep" | "pumping" | "dbf";
+type Subtype = "sleep" | "pumping" | "dbf" | "hiccup";
 
 const TITLES: Record<Subtype, string> = {
   sleep: "Tidur",
   pumping: "Pumping",
   dbf: "DBF",
+  hiccup: "Cegukan",
 };
 
 const EMOJIS: Record<Subtype, string> = {
   sleep: "🌙",
   pumping: "💧",
   dbf: "🤱",
+  hiccup: "🤧",
 };
 
 // Default playlist if the household has not set their own. Spotify
@@ -80,11 +83,13 @@ export function OngoingCard({
       <div className="rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50 p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-rose-600">
-              <span aria-hidden>{emoji}</span>
-              <span>
+            <div className="flex items-center gap-2 text-rose-600">
+              <span className="text-xl" aria-hidden>{emoji}</span>
+              <span className="text-base font-bold">
                 {title}{" "}
-                {isPaused ? "dijeda" : "berlangsung"}
+                <span className="text-xs font-semibold uppercase tracking-wide">
+                  {isPaused ? "dijeda" : "berlangsung"}
+                </span>
               </span>
               {isPaused ? (
                 <span aria-hidden>⏸</span>
@@ -100,7 +105,7 @@ export function OngoingCard({
               {isPaused ? " · auto-end 10 menit kalau tetap dijeda" : ""}
             </div>
           </div>
-          {subtype !== "dbf" ? (
+          {subtype === "sleep" || subtype === "pumping" ? (
             <button
               type="button"
               onClick={() => setShowLamp(true)}
@@ -114,7 +119,9 @@ export function OngoingCard({
 
         <button
           type="button"
-          onClick={() => subtype !== "dbf" && setShowLamp(true)}
+          onClick={() =>
+            (subtype === "sleep" || subtype === "pumping") && setShowLamp(true)
+          }
           className="mt-2 block w-full text-left"
         >
           <Stopwatch
@@ -190,7 +197,7 @@ export function OngoingCard({
             endRAt={pumpEndRAt ?? null}
             onShowEnd={() => setShowPumpEnd(true)}
           />
-        ) : (
+        ) : subtype === "dbf" ? (
           <DbfControls
             id={id}
             startLAt={pumpStartLAt ?? null}
@@ -198,6 +205,8 @@ export function OngoingCard({
             startRAt={pumpStartRAt ?? null}
             endRAt={pumpEndRAt ?? null}
           />
+        ) : (
+          <HiccupControls id={id} />
         )}
       </div>
 
@@ -340,19 +349,20 @@ function NightLamp({
             <select
               name="sleep_quality"
               defaultValue=""
-              className="mb-2 w-full rounded-xl border border-red-900/40 bg-transparent px-2 py-1.5 text-xs text-red-700/80 outline-none"
+              style={{ colorScheme: "dark" }}
+              className="mb-2 w-full appearance-none rounded-xl border border-red-900/40 bg-black/60 px-3 py-2.5 text-sm text-red-700/90 outline-none focus:border-red-700/70"
             >
-              <option value="" className="bg-black text-red-700">
-                Kualitas (opsional)
+              <option value="" className="bg-black text-red-700/90">
+                — Kualitas (opsional) —
               </option>
-              <option value="nyenyak" className="bg-black text-red-700">
-                Nyenyak
+              <option value="nyenyak" className="bg-black text-red-700/90">
+                😴 Nyenyak
               </option>
-              <option value="gelisah" className="bg-black text-red-700">
-                Gelisah
+              <option value="gelisah" className="bg-black text-red-700/90">
+                😣 Gelisah
               </option>
-              <option value="sering_bangun" className="bg-black text-red-700">
-                Sering bangun
+              <option value="sering_bangun" className="bg-black text-red-700/90">
+                😢 Sering bangun
               </option>
             </select>
             <SubmitButton
@@ -574,6 +584,21 @@ function PindahForm({
         className="w-full rounded-xl border border-rose-200 bg-white py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50"
       >
         ⇄ Pindah ke {otherSide}
+      </SubmitButton>
+    </form>
+  );
+}
+
+function HiccupControls({ id }: { id: string }) {
+  return (
+    <form action={endOngoingHiccupAction} className="mt-3">
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="return_to" value="/" />
+      <SubmitButton
+        pendingText="Menyimpan…"
+        className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
+      >
+        Selesai · Simpan
       </SubmitButton>
     </form>
   );

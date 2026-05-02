@@ -17,7 +17,7 @@ export function StartOngoingButton({
   label,
   emoji,
 }: {
-  subtype: "sleep" | "pumping" | "feeding";
+  subtype: "sleep" | "pumping" | "feeding" | "hiccup";
   label: string;
   emoji: string;
 }) {
@@ -68,7 +68,7 @@ export function StartOngoingButton({
           </option>
         ))}
       </select>
-      {subtype === "sleep" ? (
+      {subtype === "sleep" || subtype === "hiccup" ? (
         <div className="grid grid-cols-1 gap-1.5">
           <SideChoice
             subtype={subtype}
@@ -124,19 +124,17 @@ function SideChoice({
   offsetMin,
   label,
 }: {
-  subtype: "sleep" | "pumping" | "feeding";
+  subtype: "sleep" | "pumping" | "feeding" | "hiccup";
   side: "kiri" | "kanan" | "both";
   offsetMin: number;
   label: string;
 }) {
-  // Sleep doesn't have a side concept; we still ship 'both' so the
-  // server action sees a valid side field, but it has no effect when
-  // subtype === 'sleep'.
+  // sleep + hiccup have no side concept; only pumping + feeding use sides.
   const sideField = subtype === "pumping" ? "pumping_side" : "dbf_side";
   return (
     <form action={startOngoingLogAction}>
       <input type="hidden" name="subtype" value={subtype} />
-      {subtype !== "sleep" ? (
+      {subtype === "pumping" || subtype === "feeding" ? (
         <input type="hidden" name={sideField} value={side} />
       ) : null}
       <input
