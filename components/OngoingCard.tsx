@@ -106,12 +106,12 @@ export function OngoingCard({
               {isPaused ? " · auto-end 10 menit kalau tetap dijeda" : ""}
             </div>
           </div>
-          {subtype === "sleep" || subtype === "pumping" ? (
+          {subtype !== "hiccup" ? (
             <button
               type="button"
               onClick={() => setShowLamp(true)}
               className="rounded-full bg-gray-900/5 p-2 text-gray-600 hover:bg-gray-900/10"
-              aria-label="Mode night lamp"
+              aria-label="Mode dark"
             >
               🌑
             </button>
@@ -120,9 +120,7 @@ export function OngoingCard({
 
         <button
           type="button"
-          onClick={() =>
-            (subtype === "sleep" || subtype === "pumping") && setShowLamp(true)
-          }
+          onClick={() => subtype !== "hiccup" && setShowLamp(true)}
           className="mt-2 block w-full text-left"
         >
           <Stopwatch
@@ -317,7 +315,7 @@ function NightLamp({
         Tutup ✕
       </button>
 
-      <LiveClock className="absolute left-4 top-4 font-mono text-base text-red-900/60 tabular-nums" />
+      <LiveClock className="absolute left-4 top-4 font-mono text-xl font-semibold tabular-nums text-red-700/80" />
 
       <div className="text-base font-bold uppercase tracking-[0.3em] text-red-700/80">
         {title}
@@ -326,7 +324,7 @@ function NightLamp({
         startIso={startIso}
         className="mt-4 font-mono text-7xl font-light tabular-nums text-red-700/90 sm:text-[8rem]"
       />
-      <div className="mt-2 text-[11px] tracking-widest text-red-900/50">
+      <div className="mt-2 text-sm font-medium tracking-widest text-red-700/70">
         Sejak {fmtClock(startIso)}
       </div>
 
@@ -373,6 +371,21 @@ function NightLamp({
               className="w-full rounded-2xl border border-red-900/40 bg-transparent py-3 text-sm font-medium text-red-700/90 hover:bg-red-950/30 active:bg-red-950/50"
             >
               Bangun · Stop
+            </SubmitButton>
+          </form>
+        ) : subtype === "dbf" ? (
+          <form
+            action={endOngoingDbfAction}
+            onSubmit={() => setTimeout(onClose, 0)}
+          >
+            <input type="hidden" name="id" value={id} />
+            <input type="hidden" name="return_to" value="/" />
+            <FormCloser onClose={onClose} />
+            <SubmitButton
+              pendingText="Menyimpan…"
+              className="w-full rounded-2xl border border-red-900/40 bg-transparent py-3 text-sm font-medium text-red-700/90 hover:bg-red-950/30 active:bg-red-950/50"
+            >
+              Selesai · Simpan
             </SubmitButton>
           </form>
         ) : (
@@ -620,10 +633,19 @@ function DbfControls({
   startRAt: string | null;
   endRAt: string | null;
 }) {
-  // DBF feeds one side at a time biologically. Selesai always ends
-  // the whole session — no Pindah option, no per-side cascade.
+  // Per-side state: bayi nyusu satu sisi pada satu waktu, tapi bisa
+  // pindah ke sisi lain dalam satu sesi. Pindah kalau sisi lain belum
+  // mulai. Selesai kapan pun → end whole session, durasi per-sisi
+  // dihitung dari start_X_at → end_X_at.
   const lActive = !!startLAt && !endLAt;
   const rActive = !!startRAt && !endRAt;
+  const canPindah = (lActive && !startRAt) || (rActive && !startLAt);
+  const fromSide: "kiri" | "kanan" | null = canPindah
+    ? lActive
+      ? "kiri"
+      : "kanan"
+    : null;
+  const otherSide = fromSide === "kiri" ? "Kanan" : "Kiri";
 
   return (
     <div className="mt-3 space-y-2">
@@ -642,6 +664,9 @@ function DbfControls({
           <span>Tidak ada sisi aktif — selesai untuk menyimpan</span>
         ) : null}
       </div>
+      {canPindah && fromSide ? (
+        <PindahForm id={id} fromSide={fromSide} otherSide={otherSide} />
+      ) : null}
       <form action={endOngoingDbfAction}>
         <input type="hidden" name="id" value={id} />
         <input type="hidden" name="return_to" value="/" />
