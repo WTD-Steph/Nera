@@ -5,6 +5,7 @@ import { startOngoingLogAction } from "@/app/actions/logs";
 import { SubmitButton } from "@/components/SubmitButton";
 
 const OFFSET_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: "Sekarang" },
   { value: 1, label: "1 menit lalu" },
   { value: 3, label: "3 menit lalu" },
   { value: 5, label: "5 menit lalu" },
@@ -22,7 +23,7 @@ export function StartOngoingButton({
   emoji: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [offsetMin, setOffsetMin] = useState(1);
+  const [offsetMin, setOffsetMin] = useState(0);
 
   if (!open) {
     return (
@@ -39,24 +40,29 @@ export function StartOngoingButton({
     );
   }
 
+  const close = () => {
+    setOpen(false);
+    setOffsetMin(0);
+  };
+
   return (
     <div className="rounded-2xl border border-rose-200 bg-rose-50/60 p-2 shadow-sm">
-      <div className="mb-1 flex items-center justify-between px-1">
+      <button
+        type="button"
+        onClick={close}
+        className="mb-1 flex w-full items-center justify-between rounded-lg px-1.5 py-1 hover:bg-rose-100/50 active:scale-[0.98]"
+        aria-label="Tutup pilihan"
+      >
         <span className="text-[11px] font-semibold text-rose-700">
           {emoji} {label}
         </span>
-        <button
-          type="button"
-          onClick={() => {
-            setOpen(false);
-            setOffsetMin(1);
-          }}
-          className="text-[11px] text-gray-400 hover:text-gray-600"
-          aria-label="Batal"
+        <span
+          aria-hidden
+          className="flex h-6 w-6 items-center justify-center rounded-full text-sm text-gray-500"
         >
           ✕
-        </button>
-      </div>
+        </span>
+      </button>
       <select
         value={offsetMin}
         onChange={(e) => setOffsetMin(Number(e.target.value))}

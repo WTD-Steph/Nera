@@ -3,7 +3,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
-import { TrendCharts, type DailyAgg } from "@/components/TrendCharts";
+import {
+  TrendCharts,
+  type DailyAgg,
+  type SleepHeatmapRow,
+  type FeedingIntervalBucket,
+} from "@/components/TrendCharts";
 import { getTargetForAge } from "@/lib/constants/daily-targets";
 import { dbfEstimateMl } from "@/lib/compute/dbf-estimate";
 import { type LogRow } from "@/lib/compute/stats";
@@ -128,6 +133,82 @@ export default async function TrendPage() {
     d.sleepMin = Math.round(d.sleepMin);
   }
 
+  // === Sleep heatmap: 14 days × 24 hours, minutes per hour bucket ===
+  const heatmapMap = new Map<string, number[]>();
+  for (const d of days) heatmapMap.set(d.date, new Array(24).fill(0));
+  const offsetMs = 7 * 60 * 60 * 1000;
+  function jakartaParts(d: Date): { key: string; hour: number } {
+    const local = new Date(d.getTime() + offsetMs);
+    const key = `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, "0")}-${String(local.getUTCDate()).padStart(2, "0")}`;
+    return { key, hour: local.getUTCHours() };
+  }
+  for (const l of logsArray) {
+    if (l.subtype !== "sleep" || !l.end_timestamp) continue;
+    let cursor = new Date(l.timestamp);
+    const end = new Date(l.end_timestamp);
+    while (cursor < end) {
+      const { key, hour } = jakartaParts(cursor);
+      const local = new Date(cursor.getTime() + offsetMs);
+      // Step end at next-hour boundary in Jakarta time
+      const nextLocal = new Date(local);
+      nextLocal.setUTCMinutes(0, 0, 0);
+      nextLocal.setUTCHours(local.getUTCHours() + 1);
+      const nextCursor = new Date(nextLocal.getTime() - offsetMs);
+      const segEnd = nextCursor < end ? nextCursor : end;
+      const mins = (segEnd.getTime() - cursor.getTime()) / 60000;
+      const arr = heatmapMap.get(key);
+      if (arr && hour >= 0 && hour < 24) {
+        arr[hour] = (arr[hour] ?? 0) + mins;
+      }
+      cursor = segEnd;
+    }
+  }
+  const sleepHeatmap: SleepHeatmapRow[] = days.map((d) => ({
+    date: d.date,
+    short: d.short,
+    hours: (heatmapMap.get(d.date) ?? new Array(24).fill(0)).map((m) =>
+      Math.round(m),
+    ),
+  }));
+
+  // === Feeding interval histogram ===
+  const feedings = logsArray
+    .filter((l) => l.subtype === "feeding")
+    .map((l) => new Date(l.timestamp).getTime())
+    .sort((a, b) => a - b);
+  const intervals: number[] = [];
+  for (let i = 1; i < feedings.length; i++) {
+    const a = feedings[i - 1];
+    const b = feedings[i];
+    if (a !== undefined && b !== undefined) {
+      intervals.push((b - a) / 60000);
+    }
+  }
+  const buckets: FeedingIntervalBucket[] = [
+    { label: "<1 jam", minMin: 0, maxMin: 60, count: 0 },
+    { label: "1–2 jam", minMin: 60, maxMin: 120, count: 0 },
+    { label: "2–3 jam", minMin: 120, maxMin: 180, count: 0 },
+    { label: "3–4 jam", minMin: 180, maxMin: 240, count: 0 },
+    { label: "4–6 jam", minMin: 240, maxMin: 360, count: 0 },
+    { label: ">6 jam", minMin: 360, maxMin: null, count: 0 },
+  ];
+  for (const m of intervals) {
+    for (const b of buckets) {
+      if (m >= b.minMin && (b.maxMin === null || m < b.maxMin)) {
+        b.count += 1;
+        break;
+      }
+    }
+  }
+  const feedingMedianMin = (() => {
+    if (intervals.length === 0) return null;
+    const sorted = [...intervals].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+      ? ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2
+      : sorted[mid] ?? null;
+  })();
+
   const target = getTargetForAge(baby.dob);
 
   return (
@@ -153,6 +234,9 @@ export default async function TrendPage() {
             poopMin: target.poopMin,
             poopMax: target.poopMax,
           }}
+          sleepHeatmap={sleepHeatmap}
+          feedingIntervals={buckets}
+          feedingMedianMin={feedingMedianMin}
         />
       </div>
 
