@@ -179,6 +179,112 @@ Recharts bundle ~100 kB. Diimport di components/GrowthChart.tsx (client componen
 - Atau alternative chart lib lebih kecil (chart.js, observable plot, victory)
 - Defer ke kalau perf jadi issue di production
 
+## 11. React hydration mismatch (#418/#423/#425) dari time-rendering
+
+**Symptom:**
+- Console errors: `Minified React error #425 / #418 / #423`
+- Client-side text differs dari server-rendered text
+- Often pada client components yang render times (`Stopwatch`, `OngoingCard` `fmtClock`, etc)
+
+**Root cause:**
+Server (Vercel UTC) dan client (browser local TZ, e.g. Asia/Jakarta UTC+7) menghasilkan `getHours()` / `Date.now()` value berbeda. SSR HTML pakai server result, React di-client expect same → mismatch saat hydrate.
+
+**Recovery:**
+- Untuk wall-clock display: pakai `toLocaleTimeString("en-GB", { timeZone: "Asia/Jakarta", ... })` di `lib/compute/format.ts` — explicit timezone bikin server + client output identical
+- Untuk runtime values (`Date.now()`, stopwatch elapsed): defer ke client. Initialize state ke `null` / placeholder (`--:--`), isi value di `useEffect` setelah mount
+- Lihat `components/Stopwatch.tsx` + `components/OngoingCard.tsx` `fmtClock` sebagai reference
+
+**Prevent:**
+- JANGAN pakai raw `new Date().getHours()` / `getMinutes()` di komponen yang render server-side
+- JANGAN pakai `useState(() => Date.now())` initial expression — server vs client run berbeda
+- Pakai helper di `lib/compute/format.ts` (TZ-locked) atau defer-to-mount pattern
+
+## 12. iOS PWA cache aggressively, no auto-update on deploy
+
+**Symptom:**
+- Vercel deploy fresh code, but iOS PWA standalone (Add to Home Screen) keeps showing old version
+- User force-refresh tidak help; close+reopen kadang help kadang tidak
+
+**Root cause:**
+Tidak ada service worker. iOS Safari standalone caches HTML aggressively. Tanpa SW, pure browser cache control via `Cache-Control` header — Vercel sets immutable on `_next/static/*` chunks (which is correct), tapi entry HTML can be stuck.
+
+**Recovery (for user):**
+- Force-quit dari app switcher (swipe up + flick card away), reopen → biasanya pull versi baru
+- Pull-to-refresh inside app sometimes works
+- Last resort: uninstall + re-add PWA dari Safari
+
+**Prevent / future fix:**
+- Implement service worker dengan `skipWaiting` + `clients.claim` (next-pwa atau workbox) — defer ke kalau update friction jadi keluhan rutin
+- Atau lighter: client-side polling endpoint `/__version` saat focus, prompt "Versi baru tersedia, refresh?"
+
+## 13. Future-dated sleep / log creates konfusi UX
+
+**Symptom:**
+- User sees "Tidur sedang berlangsung" tapi stopwatch shows `00:00` indefinitely
+- User confused "kenapa tidur selesai tiba2?"
+
+**Root cause:**
+LogModal Catat Cepat → Tidur memungkinkan enter both `Waktu` (start) dan `Bangun (kosongkan jika masih tidur)` (end). User typed both dengan times di future relative to current time, atau end yang masuk akal tapi entered as future. End-timestamp di-set, sleep terlihat "completed" walaupun start masih di future.
+
+**Diagnose:**
+```sql
+SELECT id, timestamp, end_timestamp, created_at, updated_at
+FROM public.logs
+WHERE subtype = 'sleep' AND end_timestamp IS NOT NULL
+  AND created_at = updated_at  -- single-INSERT, no later UPDATE
+ORDER BY timestamp DESC;
+```
+Rows dengan `created_at = updated_at` di-INSERT lengkap — biasanya manual entry, bukan ongoing-then-stopped.
+
+**Prevent / mitigate:**
+- Edukasi user: Mulai Tidur (Mulai Sekarang) untuk ongoing dengan stopwatch; Catat Cepat → Tidur untuk retroactive entry only
+- Kalau masalah jadi rutin: hapus Tidur dari Catat Cepat, atau warn kalau start > now()
+
+## 14. RLS update policy gotcha (households owner-only silent fail)
+
+**Symptom:**
+- Member (non-owner) updates a household-scoped field via the app → server action redirects "saved" tapi DB unchanged
+
+**Root cause:**
+`households_update_owner` RLS policy: `EXISTS (... AND hm.role = 'owner')`. Non-owner doesn't satisfy → RLS silently rejects (0 rows affected, no error).
+
+**Prevent:**
+- Server actions yang touch owner-only fields explicit check `current.role === 'owner'` dulu sebelum UPDATE — bukan rely RLS error. Lihat `app/more/household/actions.ts` `updateSleepPlaylistAction` sebagai reference
+
+## 15. Datetime-local form input parsed as UTC instead of Jakarta
+
+**Symptom:**
+- User types `14:30` (Jakarta) di `<input type="datetime-local">`
+- DB stores `14:30 UTC` (= `21:30` Jakarta) — 7-hour offset bug
+- Display shows `21:30` Jakarta time (correct rendering, wrong source)
+
+**Root cause:**
+`<input type="datetime-local">` value format `YYYY-MM-DDTHH:mm` no TZ suffix. Server (Vercel UTC) `new Date(raw)` interprets as UTC. User intended Jakarta local.
+
+**Recovery:**
+- Server actions append `+07:00` suffix sebelum `new Date()` — see `app/actions/logs.ts` + `app/actions/growth.ts` `isoOrNull` helper
+
+**Prevent:**
+- Setiap server action yang parse `datetime-local` HARUS pakai `isoOrNull` (atau equivalent) yang append TZ
+- Don't pass raw `new Date(formData.get(...))` ke DB
+
+## 16. iOS PWA white strip below status bar in night-lamp
+
+**Symptom:**
+- Night-lamp mode shows pure black bg
+- iPad PWA standalone: thin white/colored line right below the iOS status bar
+
+**Root cause:**
+`apple-mobile-web-app-status-bar-style: default` (or omitted) renders the iOS status bar with system tint. Page bg doesn't extend underneath. With `viewport-fit=cover` page extends visually but only into the safe-area below — top safe-area still drawn by system.
+
+**Recovery:**
+- Set `appleWebApp.statusBarStyle: "black-translucent"` in app/layout.tsx → iOS overlays status bar transparently on top of the page
+- Combined with html/body bg manipulation in NightLamp useEffect (paint black on mount, restore on unmount), the entire visible viewport including under the status bar is black
+
+**Prevent:**
+- Test full-screen black overlays on real iOS PWA, not just desktop browser
+- See `components/OngoingCard.tsx` NightLamp useEffect untuk pattern
+
 ## Diagnostic commands cheat-sheet
 
 ```bash
