@@ -19,17 +19,18 @@ export function Stopwatch({
   startIso: string;
   className?: string;
 }) {
-  const start = new Date(startIso).getTime();
-  const [now, setNow] = useState(() => Date.now());
+  // Render a stable placeholder on server; Date.now() differs between SSR
+  // and client hydration, which would cause a hydration mismatch. After
+  // mount, switch to the live ticking value.
+  const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  return (
-    <span className={className} suppressHydrationWarning>
-      {format(now - start)}
-    </span>
-  );
+  const start = new Date(startIso).getTime();
+  const display = now === null ? "--:--" : format(now - start);
+  return <span className={className}>{display}</span>;
 }
