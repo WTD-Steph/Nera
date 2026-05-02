@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { createLogAction } from "@/app/actions/logs";
+import { createLogAction, updateLogAction } from "@/app/actions/logs";
 import {
   addMedicationAction,
   type Medication,
@@ -19,6 +19,32 @@ export type LogSubtype =
   | "temp"
   | "med";
 
+export type EditLog = {
+  id: string;
+  subtype: string;
+  timestamp: string;
+  end_timestamp: string | null;
+  amount_ml: number | null;
+  amount_l_ml: number | null;
+  amount_r_ml: number | null;
+  duration_l_min: number | null;
+  duration_r_min: number | null;
+  has_pee: boolean | null;
+  has_poop: boolean | null;
+  poop_color: string | null;
+  poop_consistency: string | null;
+  temp_celsius: number | null;
+  med_name: string | null;
+  med_dose: string | null;
+  bottle_content: "sufor" | "asi" | null;
+  start_l_at: string | null;
+  end_l_at: string | null;
+  start_r_at: string | null;
+  end_r_at: string | null;
+  sleep_quality: string | null;
+  notes: string | null;
+};
+
 const SUBTYPE_LABEL: Record<LogSubtype, string> = {
   feeding: "Feeding",
   pumping: "Pumping",
@@ -34,6 +60,14 @@ const POOP_CONSISTENCY = ["lembek", "encer", "padat", "berbiji"];
 
 function nowDatetimeLocal(): string {
   const d = new Date();
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
+}
+
+function isoToDatetimeLocal(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "";
   const off = d.getTimezoneOffset();
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
 }
@@ -108,18 +142,70 @@ export function LogModalTrigger({
   );
 }
 
+export function EditLogModalTrigger({
+  log,
+  className,
+  children,
+  returnTo = "/",
+  medications,
+}: {
+  log: EditLog;
+  className?: string;
+  children: React.ReactNode;
+  returnTo?: string;
+  medications?: Medication[];
+}) {
+  const [open, setOpen] = useState(false);
+  if (!isEditableSubtype(log.subtype)) return null;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={className}
+      >
+        {children}
+      </button>
+      {open ? (
+        <LogModal
+          subtype={log.subtype as LogSubtype}
+          returnTo={returnTo}
+          onClose={() => setOpen(false)}
+          medications={medications ?? []}
+          asiBatches={[]}
+          editLog={log}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function isEditableSubtype(s: string): s is LogSubtype {
+  return (
+    s === "feeding" ||
+    s === "pumping" ||
+    s === "diaper" ||
+    s === "sleep" ||
+    s === "bath" ||
+    s === "temp" ||
+    s === "med"
+  );
+}
+
 function LogModal({
   subtype,
   returnTo,
   onClose,
   medications,
   asiBatches,
+  editLog,
 }: {
   subtype: LogSubtype;
   returnTo: string;
   onClose: () => void;
   medications: Medication[];
   asiBatches: AsiBatchOption[];
+  editLog?: EditLog;
 }) {
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
@@ -129,29 +215,44 @@ function LogModal({
     return () => window.removeEventListener("keydown", onEsc);
   }, [onClose]);
 
+  const isEdit = !!editLog;
+
   // Feeding sub-mode: 'sufor' (botol) atau 'dbf' (langsung)
-  const [feedingMode, setFeedingMode] = useState<"sufor" | "dbf">("sufor");
+  const [feedingMode, setFeedingMode] = useState<"sufor" | "dbf">(() => {
+    if (editLog?.subtype === "feeding") {
+      return editLog.amount_ml != null ? "sufor" : "dbf";
+    }
+    return "sufor";
+  });
   // Bottle content (only when feedingMode='sufor'): formula vs expressed ASI
-  const [bottleContent, setBottleContent] = useState<"sufor" | "asi">("sufor");
+  const [bottleContent, setBottleContent] = useState<"sufor" | "asi">(
+    editLog?.bottle_content === "asi" ? "asi" : "sufor",
+  );
   // ASI batch override: "" = auto FIFO (oldest first); else specific batch id
   const [asiBatchId, setAsiBatchId] = useState<string>("");
 
-  // Pumping per-side timestamps. Defaults: Kiri now → now+15, Kanan
-  // sequentially after (now+15 → now+30). When user edits Kiri's
-  // selesai, Kanan's mulai cascades to match (only as long as Kanan
-  // hasn't been manually touched).
+  // Pumping per-side timestamps. In create mode: Kiri now → now+15,
+  // Kanan sequentially after. In edit mode: pre-fill from existing row.
   const initialNow = nowDatetimeLocal();
-  const [pumpStartL, setPumpStartL] = useState<string>(initialNow);
+  const editStartL = isoToDatetimeLocal(editLog?.start_l_at ?? null);
+  const editEndL = isoToDatetimeLocal(editLog?.end_l_at ?? null);
+  const editStartR = isoToDatetimeLocal(editLog?.start_r_at ?? null);
+  const editEndR = isoToDatetimeLocal(editLog?.end_r_at ?? null);
+  const [pumpStartL, setPumpStartL] = useState<string>(
+    editStartL || initialNow,
+  );
   const [pumpEndL, setPumpEndL] = useState<string>(
-    addMinutesLocal(initialNow, 15),
+    editEndL || addMinutesLocal(initialNow, 15),
   );
   const [pumpStartR, setPumpStartR] = useState<string>(
-    addMinutesLocal(initialNow, 15),
+    editStartR || addMinutesLocal(initialNow, 15),
   );
   const [pumpEndR, setPumpEndR] = useState<string>(
-    addMinutesLocal(initialNow, 30),
+    editEndR || addMinutesLocal(initialNow, 30),
   );
-  const [pumpRTouched, setPumpRTouched] = useState(false);
+  // In edit mode, treat Kanan as already touched so cascade doesn't
+  // overwrite the existing per-side times when Kiri changes.
+  const [pumpRTouched, setPumpRTouched] = useState(isEdit);
   const updatePumpEndL = (v: string) => {
     setPumpEndL(v);
     if (!pumpRTouched) {
@@ -172,12 +273,16 @@ function LogModal({
   const markPumpRTouched = () => setPumpRTouched(true);
 
   // Diaper toggles
-  const [hasPee, setHasPee] = useState(false);
-  const [hasPoop, setHasPoop] = useState(false);
+  const [hasPee, setHasPee] = useState(!!editLog?.has_pee);
+  const [hasPoop, setHasPoop] = useState(!!editLog?.has_poop);
 
   // Poop sub-fields (chips)
-  const [poopColor, setPoopColor] = useState<string>("");
-  const [poopCons, setPoopCons] = useState<string>("");
+  const [poopColor, setPoopColor] = useState<string>(
+    editLog?.poop_color ?? "",
+  );
+  const [poopCons, setPoopCons] = useState<string>(
+    editLog?.poop_consistency ?? "",
+  );
 
   return (
     <div
@@ -198,19 +303,22 @@ function LogModal({
             ✕
           </button>
           <div className="text-sm font-semibold text-gray-800">
-            Catat {SUBTYPE_LABEL[subtype]}
+            {isEdit ? "Edit" : "Catat"} {SUBTYPE_LABEL[subtype]}
           </div>
           <span className="w-6" />
         </div>
 
         <form
-          action={createLogAction}
+          action={isEdit ? updateLogAction : createLogAction}
           onSubmit={() => setTimeout(onClose, 0)}
           className="space-y-4 p-4"
         >
           <FormCloser onClose={onClose} />
           <input type="hidden" name="subtype" value={subtype} />
           <input type="hidden" name="return_to" value={returnTo} />
+          {isEdit && editLog ? (
+            <input type="hidden" name="id" value={editLog.id} />
+          ) : null}
           {subtype === "feeding" ? (
             <>
               <input type="hidden" name="feeding_mode" value={feedingMode} />
@@ -240,7 +348,10 @@ function LogModal({
             <input
               type="datetime-local"
               name="timestamp"
-              defaultValue={nowDatetimeLocal()}
+              defaultValue={
+                isoToDatetimeLocal(editLog?.timestamp ?? null) ||
+                nowDatetimeLocal()
+              }
               required
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
             />
@@ -303,7 +414,7 @@ function LogModal({
                       </button>
                     </div>
                   </Field>
-                  {bottleContent === "asi" && asiBatches.length > 0 ? (
+                  {bottleContent === "asi" && !isEdit && asiBatches.length > 0 ? (
                     <Field label="Batch ASI">
                       <input
                         type="hidden"
@@ -340,7 +451,8 @@ function LogModal({
                       required
                       inputMode="numeric"
                       placeholder="60"
-                      autoFocus
+                      autoFocus={!isEdit}
+                      defaultValue={editLog?.amount_ml ?? undefined}
                       className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                     />
                   </Field>
@@ -356,6 +468,7 @@ function LogModal({
                       max="180"
                       inputMode="numeric"
                       placeholder="0"
+                      defaultValue={editLog?.duration_l_min ?? undefined}
                       className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                     />
                   </Field>
@@ -368,6 +481,7 @@ function LogModal({
                       max="180"
                       inputMode="numeric"
                       placeholder="0"
+                      defaultValue={editLog?.duration_r_min ?? undefined}
                       className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                     />
                   </Field>
@@ -415,7 +529,7 @@ function LogModal({
                     max="500"
                     inputMode="numeric"
                     placeholder="0"
-                    defaultValue={0}
+                    defaultValue={editLog?.amount_l_ml ?? 0}
                     className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                   />
                 </Field>
@@ -460,7 +574,7 @@ function LogModal({
                     max="500"
                     inputMode="numeric"
                     placeholder="0"
-                    defaultValue={0}
+                    defaultValue={editLog?.amount_r_ml ?? 0}
                     className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                   />
                 </Field>
@@ -527,13 +641,16 @@ function LogModal({
                 <input
                   type="datetime-local"
                   name="end_timestamp"
+                  defaultValue={isoToDatetimeLocal(
+                    editLog?.end_timestamp ?? null,
+                  )}
                   className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                 />
               </Field>
               <Field label="Kualitas tidur (opsional)">
                 <select
                   name="sleep_quality"
-                  defaultValue=""
+                  defaultValue={editLog?.sleep_quality ?? ""}
                   className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                 >
                   <option value="">—</option>
@@ -556,14 +673,19 @@ function LogModal({
                 required
                 inputMode="decimal"
                 placeholder="36.7"
-                autoFocus
+                autoFocus={!isEdit}
+                defaultValue={editLog?.temp_celsius ?? undefined}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
               />
             </Field>
           ) : null}
 
           {subtype === "med" ? (
-            <MedFields initialMeds={medications} />
+            <MedFields
+              initialMeds={medications}
+              editName={editLog?.med_name ?? null}
+              editDose={editLog?.med_dose ?? null}
+            />
           ) : null}
 
           <Field label="Catatan (opsional)">
@@ -571,13 +693,14 @@ function LogModal({
               name="notes"
               maxLength={500}
               rows={2}
+              defaultValue={editLog?.notes ?? ""}
               className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-rose-400"
             />
           </Field>
 
           <div className="sticky bottom-0 -mx-4 -mb-4 mt-2 border-t border-gray-100 bg-white/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80">
             <SubmitButton className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700">
-              Simpan
+              {isEdit ? "Update" : "Simpan"}
             </SubmitButton>
           </div>
         </form>
@@ -641,15 +764,38 @@ const UNITS: { value: MedUnit; label: string }[] = [
   { value: "sachet", label: "sachet" },
 ];
 
-function MedFields({ initialMeds }: { initialMeds: Medication[] }) {
+function parseDoseString(s: string | null): { value: string; unit: MedUnit } {
+  if (!s) return { value: "", unit: "ml" };
+  const parts = s.trim().split(/\s+/);
+  const last = parts[parts.length - 1] ?? "";
+  const unit: MedUnit = (UNITS.find((u) => u.value === last)?.value ?? "ml") as MedUnit;
+  const valueParts = unit === last ? parts.slice(0, -1) : parts;
+  return { value: valueParts.join(" "), unit };
+}
+
+function MedFields({
+  initialMeds,
+  editName,
+  editDose,
+}: {
+  initialMeds: Medication[];
+  editName?: string | null;
+  editDose?: string | null;
+}) {
   const [meds, setMeds] = useState<Medication[]>(initialMeds);
+  const editMatch = editName
+    ? initialMeds.find((m) => m.name === editName)
+    : undefined;
+  const editParsed = editDose ? parseDoseString(editDose) : null;
   const [selectedId, setSelectedId] = useState<string>(
-    initialMeds[0]?.id ?? "",
+    editMatch?.id ?? initialMeds[0]?.id ?? "",
   );
   const [doseValue, setDoseValue] = useState<string>(
-    initialMeds[0]?.default_dose ?? "",
+    editParsed?.value ?? initialMeds[0]?.default_dose ?? "",
   );
-  const [unit, setUnit] = useState<MedUnit>(initialMeds[0]?.unit ?? "ml");
+  const [unit, setUnit] = useState<MedUnit>(
+    editParsed?.unit ?? initialMeds[0]?.unit ?? "ml",
+  );
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDose, setNewDose] = useState("");
@@ -658,7 +804,7 @@ function MedFields({ initialMeds }: { initialMeds: Medication[] }) {
   const [error, setError] = useState<string | null>(null);
 
   const selected = meds.find((m) => m.id === selectedId);
-  const medName = selected?.name ?? "";
+  const medName = selected?.name ?? editName ?? "";
   const doseString =
     doseValue.trim() === "" ? "" : `${doseValue.trim()} ${unit}`;
 

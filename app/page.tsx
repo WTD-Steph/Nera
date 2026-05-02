@@ -4,7 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentHousehold } from "@/lib/household/current";
 import { getCurrentBaby } from "@/lib/household/baby";
-import { LogModalTrigger, type LogSubtype } from "@/components/LogModal";
+import {
+  LogModalTrigger,
+  EditLogModalTrigger,
+  type LogSubtype,
+} from "@/components/LogModal";
 import type { Medication } from "@/app/actions/medications";
 import { LogsRealtime } from "@/components/LogsRealtime";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -505,11 +509,18 @@ export default async function HomePage({
           ) : (
             <div className="divide-y divide-gray-50">
               {recent.map((l, idx) => {
-                // "Berlangsung" only applies to Mulai-flow sessions —
-                // manual Catat entries with NULL end_timestamp are
-                // incomplete data, not active sessions.
+                // "Berlangsung" only applies to Mulai-flow sessions of
+                // duration-based subtypes (sleep, pumping, feeding/DBF).
+                // Diaper/bath/temp/med are point-in-time events; never
+                // ongoing even with stale flags.
+                const isOngoingType =
+                  l.subtype === "sleep" ||
+                  l.subtype === "pumping" ||
+                  l.subtype === "feeding";
                 const ongoing =
-                  l.end_timestamp === null && l.started_with_stopwatch;
+                  isOngoingType &&
+                  l.end_timestamp === null &&
+                  l.started_with_stopwatch;
                 const paused = ongoing && l.paused_at !== null;
                 const rowBg = paused
                   ? "bg-amber-50/60 border-l-4 border-l-amber-300"
@@ -587,16 +598,28 @@ export default async function HomePage({
                         </form>
                       );
                     })()}
-                    <form action={deleteLogAction}>
-                      <input type="hidden" name="id" value={l.id} />
-                      <input type="hidden" name="return_to" value="/" />
-                      <SubmitButton
-                        pendingText="…"
-                        className="text-[11px] text-gray-400 hover:text-red-600"
-                      >
-                        Hapus
-                      </SubmitButton>
-                    </form>
+                    <div className="flex items-center gap-2">
+                      {!ongoing ? (
+                        <EditLogModalTrigger
+                          log={l}
+                          medications={medications}
+                          returnTo="/"
+                          className="text-[11px] text-gray-400 hover:text-rose-600"
+                        >
+                          Edit
+                        </EditLogModalTrigger>
+                      ) : null}
+                      <form action={deleteLogAction}>
+                        <input type="hidden" name="id" value={l.id} />
+                        <input type="hidden" name="return_to" value="/" />
+                        <SubmitButton
+                          pendingText="…"
+                          className="text-[11px] text-gray-400 hover:text-red-600"
+                        >
+                          Hapus
+                        </SubmitButton>
+                      </form>
+                    </div>
                   </div>
                 </div>
                 );

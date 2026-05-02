@@ -668,6 +668,252 @@ export async function resumeOngoingLogAction(formData: FormData) {
   redirect(`${returnTo}?logsaved=${row.subtype}`);
 }
 
+export async function updateLogAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/");
+  if (!id) {
+    redirect(`${returnTo}?logerror=${encodeURIComponent("ID log hilang.")}`);
+  }
+
+  const subtype = String(formData.get("subtype") ?? "");
+  if (!isValidSubtype(subtype)) {
+    redirect(`${returnTo}?logerror=${encodeURIComponent("Subtype tidak valid.")}`);
+  }
+
+  const [user, baby] = await Promise.all([getCachedUser(), getCurrentBaby()]);
+  if (!user) redirect("/login");
+  if (!baby) redirect("/setup");
+
+  const supabase = createClient();
+
+  // Read the existing row so we can detect ASI re-allocation needs and
+  // refuse edits on rows that don't belong to current baby.
+  const { data: existing } = await supabase
+    .from("logs")
+    .select(
+      "id, baby_id, subtype, bottle_content, amount_ml, end_timestamp",
+    )
+    .eq("id", id)
+    .single();
+
+  if (!existing || existing.baby_id !== baby.id) {
+    redirect(`${returnTo}?logerror=${encodeURIComponent("Log tidak ditemukan.")}`);
+  }
+
+  const timestamp =
+    isoOrNull(formData, "timestamp") ?? new Date().toISOString();
+
+  // Build the update payload from form fields. Same field shape as
+  // createLogAction, but without baby_id/created_by/started_with_stopwatch.
+  const payload: Record<string, unknown> = {
+    timestamp,
+    notes: str(formData, "notes"),
+  };
+
+  // Reset subtype-specific columns first to avoid stale fields when
+  // the user e.g. switches feeding sufor → DBF.
+  const resetByType: Record<Subtype, Record<string, unknown>> = {
+    feeding: {
+      amount_ml: null,
+      duration_l_min: null,
+      duration_r_min: null,
+      bottle_content: null,
+    },
+    pumping: {
+      amount_l_ml: null,
+      amount_r_ml: null,
+      start_l_at: null,
+      end_l_at: null,
+      start_r_at: null,
+      end_r_at: null,
+    },
+    diaper: {
+      has_pee: false,
+      has_poop: false,
+      poop_color: null,
+      poop_consistency: null,
+    },
+    sleep: { end_timestamp: null, sleep_quality: null },
+    bath: {},
+    temp: { temp_celsius: null },
+    med: { med_name: null, med_dose: null },
+  };
+  Object.assign(payload, resetByType[subtype]);
+
+  if (subtype === "feeding") {
+    const mode = String(formData.get("feeding_mode") ?? "sufor");
+    if (mode === "sufor") {
+      const amount = num(formData, "amount_ml");
+      if (amount === null || amount <= 0) {
+        redirect(
+          `${returnTo}?logerror=${encodeURIComponent("Jumlah susu harus diisi.")}`,
+        );
+      }
+      payload.amount_ml = amount;
+      const content = String(formData.get("bottle_content") ?? "sufor");
+      if (content !== "sufor" && content !== "asi") {
+        redirect(
+          `${returnTo}?logerror=${encodeURIComponent("Pilih ASI atau Sufor.")}`,
+        );
+      }
+      payload.bottle_content = content;
+    } else {
+      const l = num(formData, "duration_l_min");
+      const r = num(formData, "duration_r_min");
+      if ((l === null || l <= 0) && (r === null || r <= 0)) {
+        redirect(
+          `${returnTo}?logerror=${encodeURIComponent("Isi durasi DBF kiri atau kanan.")}`,
+        );
+      }
+      payload.duration_l_min = l;
+      payload.duration_r_min = r;
+    }
+  } else if (subtype === "pumping") {
+    const l = num(formData, "amount_l_ml");
+    const r = num(formData, "amount_r_ml");
+    if ((l === null || l <= 0) && (r === null || r <= 0)) {
+      redirect(
+        `${returnTo}?logerror=${encodeURIComponent("Isi jumlah pumping kiri atau kanan.")}`,
+      );
+    }
+    const lActive = l !== null && l > 0;
+    const rActive = r !== null && r > 0;
+    payload.amount_l_ml = lActive ? l : null;
+    payload.amount_r_ml = rActive ? r : null;
+    const startL = lActive ? isoOrNull(formData, "start_l_at") : null;
+    const endL = lActive ? isoOrNull(formData, "end_l_at") : null;
+    const startR = rActive ? isoOrNull(formData, "start_r_at") : null;
+    const endR = rActive ? isoOrNull(formData, "end_r_at") : null;
+    payload.start_l_at = startL;
+    payload.end_l_at = endL;
+    payload.start_r_at = startR;
+    payload.end_r_at = endR;
+    const starts = [startL, startR].filter((v): v is string => !!v).sort();
+    const ends = [endL, endR].filter((v): v is string => !!v).sort();
+    if (starts[0]) payload.timestamp = starts[0];
+    if (ends[ends.length - 1]) payload.end_timestamp = ends[ends.length - 1];
+  } else if (subtype === "diaper") {
+    const hasPee = bool(formData, "has_pee");
+    const hasPoop = bool(formData, "has_poop");
+    if (!hasPee && !hasPoop) {
+      redirect(
+        `${returnTo}?logerror=${encodeURIComponent("Pilih minimal pipis atau BAB.")}`,
+      );
+    }
+    payload.has_pee = hasPee;
+    payload.has_poop = hasPoop;
+    if (hasPoop) {
+      payload.poop_color = str(formData, "poop_color");
+      payload.poop_consistency = str(formData, "poop_consistency");
+    }
+  } else if (subtype === "sleep") {
+    payload.end_timestamp = isoOrNull(formData, "end_timestamp");
+    const quality = String(formData.get("sleep_quality") ?? "").trim();
+    if (
+      quality === "nyenyak" ||
+      quality === "gelisah" ||
+      quality === "sering_bangun"
+    ) {
+      payload.sleep_quality = quality;
+    }
+  } else if (subtype === "temp") {
+    const t = num(formData, "temp_celsius");
+    if (t === null || t < 30 || t > 45) {
+      redirect(
+        `${returnTo}?logerror=${encodeURIComponent("Suhu harus 30–45°C.")}`,
+      );
+    }
+    payload.temp_celsius = t;
+  } else if (subtype === "med") {
+    const name = str(formData, "med_name");
+    if (!name) {
+      redirect(
+        `${returnTo}?logerror=${encodeURIComponent("Nama obat harus diisi.")}`,
+      );
+    }
+    payload.med_name = name;
+    payload.med_dose = str(formData, "med_dose");
+  }
+
+  // ASI re-allocation: if old row was an ASI feed, refund first; if new
+  // row is also (or now) an ASI feed, allocate fresh. This keeps stock
+  // counts consistent when amount/content changes via Edit.
+  const wasAsiFeed =
+    existing.subtype === "feeding" &&
+    existing.bottle_content === "asi" &&
+    typeof existing.amount_ml === "number" &&
+    existing.amount_ml > 0;
+
+  if (wasAsiFeed) {
+    const { data: batches } = await supabase
+      .from("logs")
+      .select("id, amount_l_ml, amount_r_ml, consumed_ml, timestamp")
+      .eq("baby_id", baby.id)
+      .eq("subtype", "pumping")
+      .gt("consumed_ml", 0)
+      .order("timestamp", { ascending: false });
+
+    let toRefund = existing.amount_ml as number;
+    for (const b of batches ?? []) {
+      if (toRefund <= 0) break;
+      const consumed = b.consumed_ml ?? 0;
+      const give = Math.min(toRefund, consumed);
+      if (give <= 0) continue;
+      await supabase
+        .from("logs")
+        .update({ consumed_ml: consumed - give })
+        .eq("id", b.id);
+      toRefund -= give;
+    }
+  }
+
+  const { error } = await supabase
+    .from("logs")
+    .update(payload as never)
+    .eq("id", id);
+
+  if (error) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent(`Gagal update log: ${error.message}`)}`,
+    );
+  }
+
+  // Re-allocate ASI for the new row state
+  if (
+    subtype === "feeding" &&
+    payload.bottle_content === "asi" &&
+    typeof payload.amount_ml === "number" &&
+    payload.amount_ml > 0
+  ) {
+    const { data: batches } = await supabase
+      .from("logs")
+      .select("id, amount_l_ml, amount_r_ml, consumed_ml")
+      .eq("baby_id", baby.id)
+      .eq("subtype", "pumping")
+      .not("end_timestamp", "is", null)
+      .order("timestamp", { ascending: true });
+
+    let remaining = payload.amount_ml;
+    for (const b of batches ?? []) {
+      if (remaining <= 0) break;
+      const produced = (b.amount_l_ml ?? 0) + (b.amount_r_ml ?? 0);
+      const consumed = b.consumed_ml ?? 0;
+      const free = produced - consumed;
+      if (free <= 0) continue;
+      const take = Math.min(remaining, free);
+      await supabase
+        .from("logs")
+        .update({ consumed_ml: consumed + take })
+        .eq("id", b.id);
+      remaining -= take;
+    }
+  }
+
+  revalidatePath("/");
+  revalidatePath("/history");
+  redirect(`${returnTo}?logsaved=${subtype}`);
+}
+
 export async function deleteLogAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/");

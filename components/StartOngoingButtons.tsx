@@ -77,6 +77,21 @@ export function StartOngoingButton({
             label="Mulai"
           />
         </div>
+      ) : subtype === "feeding" ? (
+        <div className="grid grid-cols-2 gap-1.5">
+          <SideChoice
+            subtype={subtype}
+            side="kiri"
+            offsetMin={offsetMin}
+            label="🤱 Kiri"
+          />
+          <SideChoice
+            subtype={subtype}
+            side="kanan"
+            offsetMin={offsetMin}
+            label="🤱 Kanan"
+          />
+        </div>
       ) : (
         <div className="grid grid-cols-3 gap-1.5">
           <SideChoice
