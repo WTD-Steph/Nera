@@ -138,7 +138,7 @@ export function buildCsvReport({
     lines.push(
       csvRow([
         d.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" }),
-        d.toLocaleTimeString("id-ID", {
+        d.toLocaleTimeString("en-GB", {
           timeZone: "Asia/Jakarta",
           hour: "2-digit",
           minute: "2-digit",

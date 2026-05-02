@@ -22,9 +22,9 @@ const EMOJIS: Record<Subtype, string> = {
 };
 
 function fmtClock(iso: string): string {
-  // Locked to Asia/Jakarta so server (UTC) and client (any TZ) render
-  // identically — no hydration mismatch.
-  return new Date(iso).toLocaleTimeString("id-ID", {
+  // Locked to Asia/Jakarta with en-GB locale (uses colon) so server
+  // and client render identically as "HH:MM" — no hydration mismatch.
+  return new Date(iso).toLocaleTimeString("en-GB", {
     timeZone: "Asia/Jakarta",
     hour: "2-digit",
     minute: "2-digit",
