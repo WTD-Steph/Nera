@@ -8,6 +8,7 @@ import { getCurrentHousehold } from "@/lib/household/current";
 
 export async function startHandoverAction(formData: FormData) {
   const returnTo = String(formData.get("return_to") ?? "/");
+  const formSleeperId = String(formData.get("sleeper_id") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim() || null;
 
   const [user, household] = await Promise.all([
@@ -19,8 +20,25 @@ export async function startHandoverAction(formData: FormData) {
 
   const supabase = createClient();
 
-  // Skip if there's already an active handover for this household — partial
-  // unique index would reject anyway, but check first to avoid the error.
+  // Resolve sleeper: either the form-specified household member (acting
+  // on behalf of partner) or default to current user. Server-side lookup
+  // ensures email is canonical (not trustable from form).
+  let sleeperId = user.id;
+  let sleeperEmail = user.email ?? "unknown";
+  if (formSleeperId && formSleeperId !== user.id) {
+    const { data: members } = await supabase.rpc("list_household_members", {
+      h_id: household.household_id,
+    });
+    const sleeper = (
+      members as { user_id: string; email: string }[] | null
+    )?.find((m) => m.user_id === formSleeperId);
+    if (!sleeper) redirect(returnTo);
+    sleeperId = sleeper.user_id;
+    sleeperEmail = sleeper.email;
+  }
+
+  // Skip if there's already an active handover — partial unique index
+  // would reject anyway, this avoids the noisy error.
   const { data: active } = await supabase
     .from("handovers")
     .select("id")
@@ -34,8 +52,8 @@ export async function startHandoverAction(formData: FormData) {
 
   await supabase.from("handovers").insert({
     household_id: household.household_id,
-    started_by: user.id,
-    started_by_email: user.email ?? "unknown",
+    started_by: sleeperId,
+    started_by_email: sleeperEmail,
     notes,
   });
 

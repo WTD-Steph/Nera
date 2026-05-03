@@ -88,6 +88,14 @@ function parseJakartaDate(s: string | undefined): number | null {
   return utcMs - offsetMs;
 }
 
+/** Capitalize email local-part for display: "putri@..." → "Putri". */
+function nameFromEmail(email: string | null | undefined): string {
+  if (!email) return "Partner";
+  const local = email.split("@")[0] ?? "user";
+  if (local.length === 0) return "Partner";
+  return local.charAt(0).toUpperCase() + local.slice(1);
+}
+
 function jakartaDayKey(ms: number): string {
   const offsetMs = 7 * 60 * 60 * 1000;
   const local = new Date(ms + offsetMs);
@@ -345,6 +353,7 @@ export default async function HomePage({
     { data: stockData },
     { data: latestWeightData },
     { data: activeHandoverData },
+    { data: householdMembersData },
   ] = await Promise.all([
       supabase
         .from("logs")
@@ -383,6 +392,9 @@ export default async function HomePage({
         .order("started_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase.rpc("list_household_members", {
+        h_id: household.household_id,
+      }),
     ]);
   const medications = (medsData ?? []) as Medication[];
   const stockBatches = (stockData ?? []).map((b) => {
@@ -621,7 +633,18 @@ export default async function HomePage({
       )
     : 0;
   const handoverPartnerName = activeHandover
-    ? activeHandover.started_by_email.split("@")[0] ?? "partner"
+    ? nameFromEmail(activeHandover.started_by_email)
+    : null;
+  const householdPartner = (() => {
+    const members = householdMembersData as
+      | { user_id: string; email: string }[]
+      | null;
+    if (!members) return null;
+    const other = members.find((m) => m.user_id !== user.id);
+    return other ? { user_id: other.user_id, email: other.email } : null;
+  })();
+  const partnerDisplayName = householdPartner
+    ? nameFromEmail(householdPartner.email)
     : null;
 
   const feedingReminder = (() => {
@@ -1090,16 +1113,37 @@ export default async function HomePage({
           )}
         </div>
         {!activeHandover ? (
-          <form action={startHandoverAction} className="mt-2">
-            <input type="hidden" name="return_to" value="/" />
-            <SubmitButton
-              pendingText="…"
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white py-2 text-xs font-semibold text-indigo-600 shadow-sm hover:bg-indigo-50"
-            >
-              <span aria-hidden>🌙</span>
-              Saya tidur dulu
-            </SubmitButton>
-          </form>
+          <div
+            className={`mt-2 grid gap-2 ${householdPartner ? "grid-cols-2" : "grid-cols-1"}`}
+          >
+            <form action={startHandoverAction}>
+              <input type="hidden" name="return_to" value="/" />
+              <SubmitButton
+                pendingText="…"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white py-2 text-xs font-semibold text-indigo-600 shadow-sm hover:bg-indigo-50"
+              >
+                <span aria-hidden>🌙</span>
+                Saya tidur dulu
+              </SubmitButton>
+            </form>
+            {householdPartner ? (
+              <form action={startHandoverAction}>
+                <input type="hidden" name="return_to" value="/" />
+                <input
+                  type="hidden"
+                  name="sleeper_id"
+                  value={householdPartner.user_id}
+                />
+                <SubmitButton
+                  pendingText="…"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white py-2 text-xs font-semibold text-indigo-600 shadow-sm hover:bg-indigo-50"
+                >
+                  <span aria-hidden>🌙</span>
+                  {partnerDisplayName} tidur dulu
+                </SubmitButton>
+              </form>
+            ) : null}
+          </div>
         ) : null}
       </section>
 
