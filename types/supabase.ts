@@ -67,6 +67,41 @@ export type Database = {
           },
         ]
       }
+      custom_milestones: {
+        Row: {
+          achieved_at: string
+          baby_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          text: string
+        }
+        Insert: {
+          achieved_at?: string
+          baby_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          text: string
+        }
+        Update: {
+          achieved_at?: string
+          baby_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_milestones_baby_id_fkey"
+            columns: ["baby_id"]
+            isOneToOne: false
+            referencedRelation: "babies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       growth_measurements: {
         Row: {
           baby_id: string

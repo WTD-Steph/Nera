@@ -5,9 +5,12 @@ import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
 import { MILESTONES_LIST } from "@/lib/constants/milestones";
 import { ageInMonths } from "@/lib/constants/who-percentiles";
-import { fmtDate } from "@/lib/compute/format";
-import { toggleMilestoneAction } from "@/app/actions/milestone";
 import { ProgressRealtime } from "@/components/ProgressRealtime";
+import { MilestoneRow } from "@/components/MilestoneRow";
+import {
+  CustomMilestoneAdd,
+  CustomMilestoneRow,
+} from "@/components/CustomMilestone";
 
 export default async function MilestonePage() {
   const user = await getCachedUser();
@@ -18,16 +21,24 @@ export default async function MilestonePage() {
 
   const supabase = createClient();
 
-  const { data: progress } = await supabase
-    .from("milestone_progress")
-    .select("milestone_key, achieved_at")
-    .eq("baby_id", baby.id);
+  const [{ data: progress }, { data: customs }] = await Promise.all([
+    supabase
+      .from("milestone_progress")
+      .select("milestone_key, achieved_at")
+      .eq("baby_id", baby.id),
+    supabase
+      .from("custom_milestones")
+      .select("id, text, achieved_at")
+      .eq("baby_id", baby.id)
+      .order("achieved_at", { ascending: false }),
+  ]);
 
   const achievedMap = new Map<string, string>();
   for (const p of progress ?? []) {
     achievedMap.set(p.milestone_key, p.achieved_at);
   }
 
+  const customList = customs ?? [];
   const currentMonth = Math.floor(ageInMonths(baby.dob));
   const totalAchieved = achievedMap.size;
   const totalMilestones = MILESTONES_LIST.length;
@@ -44,6 +55,7 @@ export default async function MilestonePage() {
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl lg:max-w-3xl">
       <ProgressRealtime babyId={baby.id} table="milestone_progress" />
+      <ProgressRealtime babyId={baby.id} table="custom_milestones" />
       <header className="flex items-center justify-between">
         <Link href="/" className="text-sm text-rose-600 hover:underline">
           ← Beranda
@@ -74,6 +86,22 @@ export default async function MilestonePage() {
             style={{ width: `${(totalAchieved / totalMilestones) * 100}%` }}
           />
         </div>
+      </section>
+
+      <section className="mt-4 space-y-2">
+        <CustomMilestoneAdd />
+        {customList.length > 0 ? (
+          <div className="space-y-1.5">
+            {customList.map((c) => (
+              <CustomMilestoneRow
+                key={c.id}
+                id={c.id}
+                text={c.text}
+                achievedAt={c.achieved_at}
+              />
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <section className="mt-4 space-y-3">
@@ -109,73 +137,14 @@ export default async function MilestonePage() {
                 </div>
               </div>
               <div className="divide-y divide-gray-100">
-                {items.map((item) => {
-                  const achievedAt = achievedMap.get(item.id);
-                  const checked = !!achievedAt;
-                  return (
-                    <form
-                      key={item.id}
-                      action={toggleMilestoneAction}
-                      className="hover:bg-gray-50 active:bg-gray-100"
-                    >
-                      <input
-                        type="hidden"
-                        name="milestone_key"
-                        value={item.id}
-                      />
-                      <input
-                        type="hidden"
-                        name="achieved"
-                        value={checked ? "1" : "0"}
-                      />
-                      <input
-                        type="hidden"
-                        name="return_to"
-                        value="/milestone"
-                      />
-                      <button
-                        type="submit"
-                        className="flex w-full items-start gap-3 px-4 py-3 text-left"
-                      >
-                        <div
-                          className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
-                            checked
-                              ? "border-rose-500 bg-rose-500 text-white"
-                              : "border-gray-300"
-                          }`}
-                        >
-                          {checked ? (
-                            <svg
-                              className="h-3 w-3"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                          ) : null}
-                        </div>
-                        <div className="flex-1">
-                          <div
-                            className={`text-sm leading-snug ${
-                              checked ? "text-gray-800" : "text-gray-700"
-                            }`}
-                          >
-                            {item.text}
-                          </div>
-                          {achievedAt ? (
-                            <div className="mt-0.5 text-[11px] text-rose-500">
-                              tercapai {fmtDate(achievedAt)}
-                            </div>
-                          ) : null}
-                        </div>
-                      </button>
-                    </form>
-                  );
-                })}
+                {items.map((item) => (
+                  <MilestoneRow
+                    key={item.id}
+                    milestoneKey={item.id}
+                    text={item.text}
+                    achievedAt={achievedMap.get(item.id) ?? null}
+                  />
+                ))}
               </div>
             </div>
           );
