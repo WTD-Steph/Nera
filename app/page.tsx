@@ -712,7 +712,7 @@ export default async function HomePage({
       {activeHandover ? (
         handoverByMe ? (
           // I'm started_by — I'm the sleeper. Open app = waking up.
-          // Show the recap banner so I see what partner did during my shift.
+          // Show the recap so I see what partner did during my sleep.
           <section className="flash-in mt-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
             <div className="flex items-start gap-2">
               <span className="text-xl" aria-hidden>
@@ -720,28 +720,27 @@ export default async function HomePage({
               </span>
               <div className="flex-1">
                 <div className="text-sm font-bold text-indigo-900">
-                  Selamat bangun!
+                  Yang terjadi selama kamu tidur
                 </div>
                 <div className="text-[11px] text-indigo-700/80">
-                  Sejak kamu istirahat {fmtTime(activeHandover.started_at)} ·{" "}
-                  {fmtDuration(handoverDurationMins)} lalu
+                  Tidur sejak {fmtTime(activeHandover.started_at)} ·{" "}
+                  {fmtDuration(handoverDurationMins)}
                 </div>
                 {handoverSummary && handoverSummary.bullets.length > 0 ? (
                   <div className="mt-2 space-y-0.5 text-[12px] text-indigo-900">
-                    <div className="font-semibold">Selama itu:</div>
                     {handoverSummary.bullets.map((b, i) => (
                       <div key={i}>· {b}</div>
                     ))}
                   </div>
                 ) : (
                   <div className="mt-2 text-[12px] italic text-indigo-700/80">
-                    Belum ada aktivitas tercatat.
+                    Belum ada catatan.
                   </div>
                 )}
                 {handoverSummary && handoverSummary.recent.length > 0 ? (
                   <details className="mt-2 text-[11px]">
                     <summary className="cursor-pointer text-indigo-700/80 hover:text-indigo-900">
-                      Lihat riwayat ({handoverSummary.total})
+                      Lihat detail ({handoverSummary.total})
                     </summary>
                     <div className="mt-1 space-y-0.5 text-indigo-800/90">
                       {handoverSummary.recent.map((r, i) => (
@@ -762,7 +761,7 @@ export default async function HomePage({
                     pendingText="…"
                     className="w-full rounded-xl bg-indigo-500 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-600"
                   >
-                    ✓ Saya bangun, akhiri handover
+                    ✓ Saya sudah bangun
                   </SubmitButton>
                 </form>
               </div>
@@ -770,8 +769,8 @@ export default async function HomePage({
           </section>
         ) : (
           // Partner is started_by → partner is sleeping, I'm on duty.
-          // Just a small informational pill — I don't need a recap (I'm
-          // the one logging things). End button kept for safety.
+          // Small informational pill — no recap needed (I'm the one
+          // logging). End button kept for safety / cross-device.
           <form
             action={endHandoverAction}
             className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 shadow-sm"
@@ -780,18 +779,18 @@ export default async function HomePage({
             <input type="hidden" name="return_to" value="/" />
             <div className="text-[11px] text-indigo-800">
               <div className="font-semibold">
-                📋 {handoverPartnerName} sedang istirahat sejak{" "}
-                {fmtTime(activeHandover.started_at)}
+                🌙 {handoverPartnerName} sedang tidur (sejak{" "}
+                {fmtTime(activeHandover.started_at)})
               </div>
               <div className="text-indigo-600/70">
-                {fmtDuration(handoverDurationMins)} lalu · kamu on duty
+                {fmtDuration(handoverDurationMins)} · kamu yang jaga
               </div>
             </div>
             <SubmitButton
               pendingText="…"
               className="rounded-full border border-indigo-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50"
             >
-              Akhiri
+              Tandai bangun
             </SubmitButton>
           </form>
         )
@@ -803,7 +802,7 @@ export default async function HomePage({
       ) : null}
       {searchParams.handover === "ended" ? (
         <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-800">
-          ✓ Handover ditutup. Selamat lanjut beraktivitas!
+          ✓ Sudah ditandai bangun.
         </div>
       ) : null}
       {logerror ? (
@@ -1098,7 +1097,7 @@ export default async function HomePage({
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white py-2 text-xs font-semibold text-indigo-600 shadow-sm hover:bg-indigo-50"
             >
               <span aria-hidden>🌙</span>
-              Saya tidur dulu (mulai handover)
+              Saya tidur dulu
             </SubmitButton>
           </form>
         ) : null}
