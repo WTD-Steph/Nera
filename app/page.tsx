@@ -711,39 +711,19 @@ export default async function HomePage({
 
       {activeHandover ? (
         handoverByMe ? (
-          <form
-            action={endHandoverAction}
-            className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 shadow-sm"
-          >
-            <input type="hidden" name="id" value={activeHandover.id} />
-            <input type="hidden" name="return_to" value="/" />
-            <div className="text-[11px] text-indigo-800">
-              <div className="font-semibold">
-                🌙 Kamu shift istirahat sejak {fmtTime(activeHandover.started_at)}
-              </div>
-              <div className="text-indigo-600/70">
-                {fmtDuration(handoverDurationMins)} lalu
-              </div>
-            </div>
-            <SubmitButton
-              pendingText="…"
-              className="rounded-full bg-indigo-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-600"
-            >
-              ✓ Saya bangun
-            </SubmitButton>
-          </form>
-        ) : (
+          // I'm started_by — I'm the sleeper. Open app = waking up.
+          // Show the recap banner so I see what partner did during my shift.
           <section className="flash-in mt-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
             <div className="flex items-start gap-2">
               <span className="text-xl" aria-hidden>
-                📋
+                🌙
               </span>
               <div className="flex-1">
                 <div className="text-sm font-bold text-indigo-900">
-                  {handoverPartnerName} shift istirahat
+                  Selamat bangun!
                 </div>
                 <div className="text-[11px] text-indigo-700/80">
-                  Sejak {fmtTime(activeHandover.started_at)} ·{" "}
+                  Sejak kamu istirahat {fmtTime(activeHandover.started_at)} ·{" "}
                   {fmtDuration(handoverDurationMins)} lalu
                 </div>
                 {handoverSummary && handoverSummary.bullets.length > 0 ? (
@@ -782,12 +762,38 @@ export default async function HomePage({
                     pendingText="…"
                     className="w-full rounded-xl bg-indigo-500 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-600"
                   >
-                    ✓ {handoverPartnerName} sudah bangun, akhiri handover
+                    ✓ Saya bangun, akhiri handover
                   </SubmitButton>
                 </form>
               </div>
             </div>
           </section>
+        ) : (
+          // Partner is started_by → partner is sleeping, I'm on duty.
+          // Just a small informational pill — I don't need a recap (I'm
+          // the one logging things). End button kept for safety.
+          <form
+            action={endHandoverAction}
+            className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 shadow-sm"
+          >
+            <input type="hidden" name="id" value={activeHandover.id} />
+            <input type="hidden" name="return_to" value="/" />
+            <div className="text-[11px] text-indigo-800">
+              <div className="font-semibold">
+                📋 {handoverPartnerName} sedang istirahat sejak{" "}
+                {fmtTime(activeHandover.started_at)}
+              </div>
+              <div className="text-indigo-600/70">
+                {fmtDuration(handoverDurationMins)} lalu · kamu on duty
+              </div>
+            </div>
+            <SubmitButton
+              pendingText="…"
+              className="rounded-full border border-indigo-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50"
+            >
+              Akhiri
+            </SubmitButton>
+          </form>
         )
       ) : null}
       {welcomeMsg ? (
