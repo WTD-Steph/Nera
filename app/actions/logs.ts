@@ -666,6 +666,75 @@ export async function endOngoingDbfAction(formData: FormData) {
   );
 }
 
+/**
+ * Log Haakaa-style passive collection on the OPPOSITE side during DBF.
+ * Inserts a pumping batch row with amount_X_ml + per-side timestamps
+ * matching the DBF window — auto-flows into ASI stock for FIFO allocation.
+ */
+export async function logDbfTampunganAction(formData: FormData) {
+  const dbfId = String(formData.get("dbf_id") ?? "");
+  const side = String(formData.get("side") ?? "");
+  const ml = Number(formData.get("ml") ?? 0);
+  const returnTo = String(formData.get("return_to") ?? "/");
+
+  if (!dbfId) redirect(returnTo);
+  if (!Number.isFinite(ml) || ml <= 0 || ml > 500) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent("Tampungan: ml harus 1–500.")}`,
+    );
+  }
+  if (side !== "kiri" && side !== "kanan") redirect(returnTo);
+
+  const [user, baby] = await Promise.all([getCachedUser(), getCurrentBaby()]);
+  if (!user) redirect("/login");
+  if (!baby) redirect("/setup");
+
+  const supabase = createClient();
+
+  const { data: dbfRow } = await supabase
+    .from("logs")
+    .select("timestamp, end_timestamp, baby_id, subtype")
+    .eq("id", dbfId)
+    .single();
+  if (!dbfRow || dbfRow.subtype !== "feeding" || dbfRow.baby_id !== baby.id) {
+    redirect(returnTo);
+  }
+
+  const startAt = dbfRow.timestamp;
+  const endAt = dbfRow.end_timestamp ?? new Date().toISOString();
+
+  const payload: Record<string, unknown> = {
+    baby_id: baby.id,
+    subtype: "pumping",
+    timestamp: startAt,
+    end_timestamp: endAt,
+    created_by: user.id,
+    started_with_stopwatch: false,
+    notes: `Tampungan ${side} (Haakaa) saat DBF`,
+  };
+  if (side === "kiri") {
+    payload.amount_l_ml = ml;
+    payload.start_l_at = startAt;
+    payload.end_l_at = endAt;
+  } else {
+    payload.amount_r_ml = ml;
+    payload.start_r_at = startAt;
+    payload.end_r_at = endAt;
+  }
+
+  const { error } = await supabase.from("logs").insert(payload as never);
+  if (error) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent(`Gagal simpan tampungan: ${error.message}`)}`,
+    );
+  }
+
+  revalidatePath("/");
+  revalidatePath("/history");
+  revalidatePath("/stock");
+  redirect(`${returnTo}?logsaved=tampungan`);
+}
+
 export async function endOngoingHiccupAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/");
