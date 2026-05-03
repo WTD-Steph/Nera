@@ -19,6 +19,7 @@ import {
   deleteLogAction,
   resumeOngoingLogAction,
   expireStalePausedLogs,
+  bulkUpdateDbfRateAction,
 } from "@/app/actions/logs";
 import {
   computeTodayStats,
@@ -962,6 +963,42 @@ export default async function HomePage({
             </Link>
           ) : null}
         </div>
+        {activeAct === "dbf" && recent.length > 0 ? (
+          <form
+            action={bulkUpdateDbfRateAction}
+            className="mb-2 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2"
+          >
+            <input
+              type="hidden"
+              name="ids"
+              value={recent.map((l) => l.id).join(",")}
+            />
+            <input
+              type="hidden"
+              name="return_to"
+              value="/?act=dbf#aktivitas"
+            />
+            <span className="text-[11px] font-semibold text-amber-800">
+              Mass edit · {recent.length} row →
+            </span>
+            <input
+              type="number"
+              name="dbf_rate_override"
+              step="0.1"
+              min="0.1"
+              max="30"
+              inputMode="decimal"
+              placeholder="ml/menit"
+              className="w-24 flex-1 rounded-lg border border-amber-200 bg-white px-2 py-1 text-xs outline-none focus:border-amber-400"
+            />
+            <SubmitButton
+              pendingText="…"
+              className="rounded-lg bg-amber-500 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-amber-600"
+            >
+              Terapkan
+            </SubmitButton>
+          </form>
+        ) : null}
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           {recent.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-gray-400">
