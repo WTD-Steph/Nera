@@ -546,7 +546,12 @@ export default async function HomePage({
             </div>
           )}
           {!ongoingSubtypes.has("dbf") ? (
-            <StartOngoingButton subtype="feeding" label="DBF" emoji="🤱" />
+            <StartOngoingButton
+              subtype="feeding"
+              label="DBF"
+              emoji="🤱"
+              pumpingOngoing={ongoingSubtypes.has("pumping")}
+            />
           ) : (
             <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-rose-100 bg-rose-50/40 p-3 text-rose-400">
               <span className="text-2xl" aria-hidden>

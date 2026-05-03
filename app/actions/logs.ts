@@ -322,6 +322,30 @@ export async function startOngoingLogAction(formData: FormData) {
     );
   }
 
+  // Combo: when starting DBF, optionally also start pumping on the
+  // opposite side in the same atomic flow. Common scenario: nursing
+  // baby di Kiri sambil capture letdown reflex pump di Kanan.
+  if (subtype === "feeding") {
+    const comboPumpSide = String(formData.get("combo_pump_side") ?? "");
+    if (comboPumpSide === "kiri" || comboPumpSide === "kanan") {
+      const pumpPayload: Record<string, unknown> = {
+        baby_id: baby.id,
+        subtype: "pumping",
+        timestamp: now,
+        end_timestamp: null,
+        created_by: user.id,
+        started_with_stopwatch: true,
+      };
+      if (comboPumpSide === "kiri") {
+        pumpPayload.start_l_at = now;
+      } else {
+        pumpPayload.start_r_at = now;
+      }
+      await supabase.from("logs").insert(pumpPayload as never);
+      // Best-effort: combo pump insert error doesn't roll back DBF.
+    }
+  }
+
   revalidatePath("/");
   revalidatePath("/history");
   redirect(`${returnTo}?ongoingstarted=${subtype}`);
@@ -823,6 +847,11 @@ export async function updateLogAction(formData: FormData) {
       duration_l_min: null,
       duration_r_min: null,
       bottle_content: null,
+      // Reset per-side DBF timestamps too — set fresh below if provided
+      start_l_at: null,
+      end_l_at: null,
+      start_r_at: null,
+      end_r_at: null,
     },
     pumping: {
       amount_l_ml: null,
@@ -864,15 +893,53 @@ export async function updateLogAction(formData: FormData) {
       }
       payload.bottle_content = content;
     } else {
-      const l = num(formData, "duration_l_min");
-      const r = num(formData, "duration_r_min");
+      // DBF mode in EDIT modal: per-side Mulai/Selesai datetimes →
+      // auto-compute duration. Falls back to direct duration input
+      // if no per-side fields provided (legacy).
+      const startL = isoOrNull(formData, "dbf_start_l_at");
+      const endL = isoOrNull(formData, "dbf_end_l_at");
+      const startR = isoOrNull(formData, "dbf_start_r_at");
+      const endR = isoOrNull(formData, "dbf_end_r_at");
+      const usePerSide =
+        startL !== null || endL !== null || startR !== null || endR !== null;
+      const minutesBetween = (a: string, b: string) => {
+        const ms = new Date(b).getTime() - new Date(a).getTime();
+        return ms > 0 ? Math.round(ms / 60000) : 0;
+      };
+      let l: number | null = null;
+      let r: number | null = null;
+      if (usePerSide) {
+        if (startL && endL) {
+          payload.start_l_at = startL;
+          payload.end_l_at = endL;
+          l = minutesBetween(startL, endL);
+          payload.duration_l_min = l;
+        }
+        if (startR && endR) {
+          payload.start_r_at = startR;
+          payload.end_r_at = endR;
+          r = minutesBetween(startR, endR);
+          payload.duration_r_min = r;
+        }
+        const allStarts = [startL, startR].filter((v): v is string => !!v);
+        const allEnds = [endL, endR].filter((v): v is string => !!v);
+        if (allStarts.length > 0) {
+          payload.timestamp = allStarts.sort()[0]!;
+        }
+        if (allEnds.length > 0) {
+          payload.end_timestamp = allEnds.sort()[allEnds.length - 1]!;
+        }
+      } else {
+        l = num(formData, "duration_l_min");
+        r = num(formData, "duration_r_min");
+        payload.duration_l_min = l;
+        payload.duration_r_min = r;
+      }
       if ((l === null || l <= 0) && (r === null || r <= 0)) {
         redirect(
           `${returnTo}?logerror=${encodeURIComponent("Isi durasi DBF kiri atau kanan.")}`,
         );
       }
-      payload.duration_l_min = l;
-      payload.duration_r_min = r;
     }
   } else if (subtype === "pumping") {
     const l = num(formData, "amount_l_ml");
