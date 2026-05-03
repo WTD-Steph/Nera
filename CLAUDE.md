@@ -226,7 +226,7 @@ CLAUDE.md                   # this file
 - **Daily targets WHO/IDAI/AAP** (`lib/constants/daily-targets.ts`) — age bucket × per-kg/hari × current weight. Per-day target lines on /trend (step-after dashed)
 - **Trend page** (`/trend`): 6 charts — Susu (stacked ASI vs Sufor + target line), Tidur (cross-day-split bar + target), Pumping (stacked L/R), Diaper (pee + poop), Sleep heatmap (14d × 24h indigo gradient), Feeding interval histogram (5-min cluster dedup). Plus narrative Highlights bullets with status icons.
 - **Date picker on home**: `?date=YYYY-MM-DD` (Jakarta) for Total Hari Ini + Aktivitas Terbaru. ‹ › nav + "Hari ini" reset.
-- **Mode Jam (idle clock)**: fullscreen kiosk view with big jam, date, sejak terakhir cards, compact total hari ini, mulai shortcuts, reminder pill, dim/bright toggle. Accessible via 🕐 icon in header (always visible) + full button when no ongoing.
+- **Mode Jam (idle clock)**: fullscreen kiosk view with big jam, date, sejak terakhir cards, compact total hari ini, mulai shortcuts, reminder pill, dim/bright toggle. Accessible via ⏰ icon in header (always visible) + full button when no ongoing.
 - **Cross-device sync resilience** (`LogsRealtime`): postgres_changes subscription + visibilitychange + online listener + 30s poll fallback. Handles iOS PWA WebSocket drops.
 - **Sejak Terakhir Tidur** anchored at `end_timestamp` (waktu bangun), bukan `timestamp` (waktu mulai tidur). Ongoing → "sedang berjalan".
 - **Server-side guard** vs duplicate ongoing rows of same subtype.

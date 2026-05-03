@@ -8,7 +8,7 @@ import {
 
 const PRESETS: { id: PromptType; label: string; emoji: string }[] = [
   { id: "growth", label: "Analisis pertumbuhan", emoji: "📈" },
-  { id: "feeding-sleep", label: "Pola makan & tidur", emoji: "🌙" },
+  { id: "feeding-sleep", label: "Pola makan & tidur", emoji: "😴" },
   { id: "diaper", label: "Pola pipis & poop", emoji: "🧷" },
   { id: "age-tips", label: "Saran usia ini", emoji: "💡" },
 ];

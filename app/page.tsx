@@ -114,7 +114,7 @@ const ACT_LABEL: Record<ActFilter, string> = {
   bottle: "🍼 Susu",
   dbf: "🤱 DBF",
   pumping: "💧 Pumping",
-  sleep: "🌙 Tidur",
+  sleep: "😴 Tidur",
   diaper: "🧷 Diaper",
 };
 function parseAct(s: string | undefined): ActFilter | null {
@@ -169,10 +169,10 @@ const QUICK_PRIMARY: { subtype: LogSubtype; label: string; emoji: string }[] = [
   { subtype: "feeding", label: "Feeding", emoji: "🍼" },
   { subtype: "pumping", label: "Pumping", emoji: "💧" },
   { subtype: "diaper", label: "Diaper", emoji: "🧷" },
-  { subtype: "sleep", label: "Tidur", emoji: "🌙" },
+  { subtype: "sleep", label: "Tidur", emoji: "😴" },
 ];
 const QUICK_SECONDARY: { subtype: LogSubtype; label: string; emoji: string }[] = [
-  { subtype: "bath", label: "Mandi", emoji: "🛁" },
+  { subtype: "bath", label: "Mandi", emoji: "🫧" },
   { subtype: "temp", label: "Suhu", emoji: "🌡️" },
   { subtype: "med", label: "Obat", emoji: "💊" },
 ];
@@ -789,12 +789,12 @@ export default async function HomePage({
             <StartOngoingButton
               subtype="sleep"
               label="Tidur"
-              emoji="🌙"
+              emoji="😴"
             />
           ) : (
             <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-rose-100 bg-rose-50/40 p-3 text-rose-400">
               <span className="text-2xl" aria-hidden>
-                🌙
+                😴
               </span>
               <span className="text-[11px] font-semibold text-center leading-tight">
                 Tidur berlangsung
@@ -838,12 +838,12 @@ export default async function HomePage({
             <StartOngoingButton
               subtype="hiccup"
               label="Cegukan"
-              emoji="🤧"
+              emoji="🫨"
             />
           ) : (
             <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-rose-100 bg-rose-50/40 p-3 text-rose-400">
               <span className="text-2xl" aria-hidden>
-                🤧
+                🫨
               </span>
               <span className="text-[11px] font-semibold text-center leading-tight">
                 Cegukan berlangsung
@@ -1006,7 +1006,7 @@ export default async function HomePage({
             />
           ) : null}
           <StatRow
-            label="🌙 Tidur"
+            label="😴 Tidur"
             value={fmtDuration(stats.sleepMin)}
             sub={`${target.sleepHoursMin}–${target.sleepHoursMax} jam`}
             progress={stats.sleepMin / 60 / target.sleepHoursMin}
