@@ -1208,6 +1208,11 @@ export default async function HomePage({
           </div>
         </div>
         <div className="space-y-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="-mt-1 mb-1 px-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+              👶 {baby.name}
+            </span>
+          </div>
           <StatRow
             label="🍼 Susu"
             value={`${milkTotalMl} ml`}
@@ -1220,27 +1225,6 @@ export default async function HomePage({
             active={activeAct === "bottle"}
             trendAnchor="susu"
           />
-          {stats.dbfCount > 0 || activeAct === "dbf" ? (
-            <StatRow
-              label="🤱 DBF"
-              value={fmtDuration(stats.dbfMinTotal)}
-              sub={`≈${dbfEst.ml} ml`}
-              detail={`${stats.dbfCount} sesi · rate ${dbfEst.mlPerMin.toFixed(1)} ml/m (${
-                dbfEst.source === "row"
-                  ? "snapshot/override"
-                  : dbfEst.source === "multiplier"
-                    ? `${baby.dbf_pumping_multiplier}× pumping`
-                    : dbfEst.source === "fixed"
-                      ? "fixed Profile"
-                      : dbfEst.source === "pumping"
-                        ? "auto pumping"
-                        : "default"
-              })`}
-              href="/?act=dbf#aktivitas"
-              active={activeAct === "dbf"}
-              trendAnchor="susu"
-            />
-          ) : null}
           <StatRow
             label="😴 Tidur"
             value={fmtDuration(stats.sleepMin)}
@@ -1271,85 +1255,96 @@ export default async function HomePage({
             active={activeAct === "diaper"}
             trendAnchor="diaper"
           />
-          {stats.pumpCount > 0
-            ? (() => {
-                const pumpTotalMin = stats.pumpMinL + stats.pumpMinR;
-                const pumpRateOverall =
-                  pumpTotalMin > 0 ? stats.pumpML / pumpTotalMin : 0;
-                const lRate =
-                  stats.pumpMinL > 0 ? stats.pumpMlL / stats.pumpMinL : 0;
-                const rRate =
-                  stats.pumpMinR > 0 ? stats.pumpMlR / stats.pumpMinR : 0;
-                const lFmt =
-                  stats.pumpMlL > 0
-                    ? `Kiri ${stats.pumpMlL} ml / ${fmtDuration(stats.pumpMinL)} (${lRate.toFixed(1)} ml/m)`
-                    : "";
-                const rFmt =
-                  stats.pumpMlR > 0
-                    ? `Kanan ${stats.pumpMlR} ml / ${fmtDuration(stats.pumpMinR)} (${rRate.toFixed(1)} ml/m)`
-                    : "";
-                return (
-                  <div className="border-t border-gray-100 pt-3">
-                    <StatRow
-                      label={`💧 Pumping${pumpRateOverall > 0 ? ` (${pumpRateOverall.toFixed(1)} ml/m)` : ""}`}
-                      value={`${stats.pumpML} ml`}
-                      sub={`${stats.pumpCount} batch`}
-                      detail={[lFmt, rFmt].filter(Boolean).join(" | ")}
-                      href="/?act=pumping#aktivitas"
-                      active={activeAct === "pumping"}
-                      trendAnchor="pumping"
-                    />
-                  </div>
-                );
-              })()
-            : null}
-          {totalBoobsLMin > 0 || totalBoobsRMin > 0 ? (
-            <div className="border-t border-gray-100 pt-3">
-              <StatRow
-                label="🤱 Total Boobs"
-                value={`L ${fmtDuration(totalBoobsLMin)} | R ${fmtDuration(totalBoobsRMin)}`}
-              />
-              {(() => {
-                const counts: string[] = [];
-                if (stats.pumpCount > 0) counts.push(`${stats.pumpCount}× pumping`);
-                if (stats.dbfCount > 0) counts.push(`${stats.dbfCount}× DBF`);
-                return counts.length > 0 ? (
-                  <div className="mt-1 text-[11px] font-medium text-gray-600">
-                    {counts.join(" · ")}
-                  </div>
-                ) : null;
-              })()}
-              <div className="mt-1.5 space-y-0.5 text-[11px] text-gray-500">
-                <div>
-                  <span className="font-semibold">Kiri:</span>{" "}
-                  {stats.pumpMlL} ml pumping (actual)
-                  {stats.dbfMinL > 0
-                    ? ` + ≈${Math.round(stats.dbfMinL * dbfEst.mlPerMin)} ml DBF (estimasi)`
-                    : ""}
-                  {" = "}
-                  <span className="font-semibold">
-                    ≈
-                    {stats.pumpMlL +
-                      Math.round(stats.dbfMinL * dbfEst.mlPerMin)}{" "}
-                    ml
-                  </span>
-                </div>
-                <div>
-                  <span className="font-semibold">Kanan:</span>{" "}
-                  {stats.pumpMlR} ml pumping (actual)
-                  {stats.dbfMinR > 0
-                    ? ` + ≈${Math.round(stats.dbfMinR * dbfEst.mlPerMin)} ml DBF (estimasi)`
-                    : ""}
-                  {" = "}
-                  <span className="font-semibold">
-                    ≈
-                    {stats.pumpMlR +
-                      Math.round(stats.dbfMinR * dbfEst.mlPerMin)}{" "}
-                    ml
-                  </span>
-                </div>
+          {stats.pumpCount > 0 ||
+          totalBoobsLMin > 0 ||
+          totalBoobsRMin > 0 ? (
+            <>
+              <div className="border-t border-gray-100 pt-3 px-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                  🤱 Putri (produksi ASI)
+                </span>
               </div>
-            </div>
+              {stats.pumpCount > 0
+                ? (() => {
+                    const pumpTotalMin = stats.pumpMinL + stats.pumpMinR;
+                    const pumpRateOverall =
+                      pumpTotalMin > 0 ? stats.pumpML / pumpTotalMin : 0;
+                    const lRate =
+                      stats.pumpMinL > 0 ? stats.pumpMlL / stats.pumpMinL : 0;
+                    const rRate =
+                      stats.pumpMinR > 0 ? stats.pumpMlR / stats.pumpMinR : 0;
+                    const lFmt =
+                      stats.pumpMlL > 0
+                        ? `Kiri ${stats.pumpMlL} ml / ${fmtDuration(stats.pumpMinL)} (${lRate.toFixed(1)} ml/m)`
+                        : "";
+                    const rFmt =
+                      stats.pumpMlR > 0
+                        ? `Kanan ${stats.pumpMlR} ml / ${fmtDuration(stats.pumpMinR)} (${rRate.toFixed(1)} ml/m)`
+                        : "";
+                    return (
+                      <StatRow
+                        label={`💧 Pumping${pumpRateOverall > 0 ? ` (${pumpRateOverall.toFixed(1)} ml/m)` : ""}`}
+                        value={`${stats.pumpML} ml`}
+                        sub={`${stats.pumpCount} batch`}
+                        detail={[lFmt, rFmt].filter(Boolean).join(" | ")}
+                        href="/?act=pumping#aktivitas"
+                        active={activeAct === "pumping"}
+                        trendAnchor="pumping"
+                      />
+                    );
+                  })()
+                : null}
+              {totalBoobsLMin > 0 || totalBoobsRMin > 0 ? (
+                <div>
+                  <StatRow
+                    label="🤱 Total Payudara (pump + DBF)"
+                    value={`L ${fmtDuration(totalBoobsLMin)} | R ${fmtDuration(totalBoobsRMin)}`}
+                  />
+                  {(() => {
+                    const counts: string[] = [];
+                    if (stats.pumpCount > 0)
+                      counts.push(`${stats.pumpCount}× pumping`);
+                    if (stats.dbfCount > 0)
+                      counts.push(`${stats.dbfCount}× DBF`);
+                    return counts.length > 0 ? (
+                      <div className="mt-1 text-[11px] font-medium text-gray-600">
+                        {counts.join(" · ")}
+                      </div>
+                    ) : null;
+                  })()}
+                  <div className="mt-1.5 space-y-0.5 text-[11px] text-gray-500">
+                    <div>
+                      <span className="font-semibold">Kiri:</span>{" "}
+                      {stats.pumpMlL} ml pumping (actual)
+                      {stats.dbfMinL > 0
+                        ? ` + ≈${Math.round(stats.dbfMinL * dbfEst.mlPerMin)} ml DBF (estimasi)`
+                        : ""}
+                      {" = "}
+                      <span className="font-semibold">
+                        ≈
+                        {stats.pumpMlL +
+                          Math.round(stats.dbfMinL * dbfEst.mlPerMin)}{" "}
+                        ml
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-semibold">Kanan:</span>{" "}
+                      {stats.pumpMlR} ml pumping (actual)
+                      {stats.dbfMinR > 0
+                        ? ` + ≈${Math.round(stats.dbfMinR * dbfEst.mlPerMin)} ml DBF (estimasi)`
+                        : ""}
+                      {" = "}
+                      <span className="font-semibold">
+                        ≈
+                        {stats.pumpMlR +
+                          Math.round(stats.dbfMinR * dbfEst.mlPerMin)}{" "}
+                        ml
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </>
           ) : null}
           <p className="border-t border-gray-100 pt-2 text-[10px] leading-snug text-gray-400">
             Target referensi WHO/IDAI/AAP usia{" "}
