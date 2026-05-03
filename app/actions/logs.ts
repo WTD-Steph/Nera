@@ -225,6 +225,8 @@ export async function createLogAction(formData: FormData) {
     payload.bath_pijat_ilu = formData.get("bath_pijat_ilu") === "1";
     payload.bath_clean_tali_pusat =
       formData.get("bath_clean_tali_pusat") === "1";
+  } else if (subtype === "hiccup" || subtype === "tummy") {
+    payload.end_timestamp = isoOrNull(formData, "end_timestamp");
   }
 
   const { error } = await supabase.from("logs").insert(payload as never);
@@ -1236,6 +1238,8 @@ export async function updateLogAction(formData: FormData) {
     payload.bath_pijat_ilu = formData.get("bath_pijat_ilu") === "1";
     payload.bath_clean_tali_pusat =
       formData.get("bath_clean_tali_pusat") === "1";
+  } else if (subtype === "hiccup" || subtype === "tummy") {
+    payload.end_timestamp = isoOrNull(formData, "end_timestamp");
   }
 
   // ASI re-allocation: if old row was an ASI feed, refund first; if new

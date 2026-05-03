@@ -660,6 +660,21 @@ export default async function HomePage({
       tone: minsSince >= 480 ? ("urgent" as const) : ("warning" as const),
     };
   })();
+  // Diaper reminder: warn at 4h, urgent at 6h. Newborn pee target ~6-8×
+  // per day → ~3-4h average gap. >4h is worth checking.
+  const diaperReminder = (() => {
+    if (!last.diaper) return null;
+    const minsSince =
+      (Date.now() - new Date(last.diaper.timestamp).getTime()) / 60000;
+    if (minsSince < 240) return null;
+    const hours = Math.floor(minsSince / 60);
+    const mins = Math.round(minsSince % 60);
+    const text = `Cek diaper — sudah ${hours}j ${mins}m`;
+    return {
+      text,
+      tone: minsSince >= 360 ? ("urgent" as const) : ("warning" as const),
+    };
+  })();
   const activeAct = parseAct(searchParams.act);
   // Filter logs by selected day:
   // - Today + no filter: 36-hour rolling window (default home view)
@@ -815,6 +830,34 @@ export default async function HomePage({
       {logerror ? (
         <div className="mt-3 rounded-2xl border border-red-100 bg-red-50 p-3 text-xs text-red-700">
           {logerror}
+        </div>
+      ) : null}
+      {feedingReminder || diaperReminder ? (
+        <div className="mt-3 space-y-1.5">
+          {feedingReminder ? (
+            <div
+              className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium ${
+                feedingReminder.tone === "urgent"
+                  ? "border-red-200 bg-red-50 text-red-800"
+                  : "border-amber-200 bg-amber-50 text-amber-800"
+              }`}
+            >
+              <span aria-hidden>🍼</span>
+              <span>{feedingReminder.text}</span>
+            </div>
+          ) : null}
+          {diaperReminder ? (
+            <div
+              className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium ${
+                diaperReminder.tone === "urgent"
+                  ? "border-red-200 bg-red-50 text-red-800"
+                  : "border-amber-200 bg-amber-50 text-amber-800"
+              }`}
+            >
+              <span aria-hidden>🧷</span>
+              <span>{diaperReminder.text}</span>
+            </div>
+          ) : null}
         </div>
       ) : null}
       {pumpRateBanner ? (
@@ -1340,7 +1383,9 @@ export default async function HomePage({
                       }`}
                     >
                       💧 Pumping
-                      {stats.pumpCount > 0 ? ` (${stats.pumpCount}×)` : ""}
+                      {stats.pumpCount > 0
+                        ? ` (${stats.pumpCount}× · ${fmtDuration(stats.pumpMinL + stats.pumpMinR)})`
+                        : ""}
                     </Link>
                     <div className="text-right">
                       <div className="font-medium text-gray-800">
@@ -1372,7 +1417,9 @@ export default async function HomePage({
                       }`}
                     >
                       🤱 DBF
-                      {stats.dbfCount > 0 ? ` (${stats.dbfCount}×)` : ""}
+                      {stats.dbfCount > 0
+                        ? ` (${stats.dbfCount}× · ${fmtDuration(stats.dbfMinTotal)})`
+                        : ""}
                     </Link>
                     <div className="text-right">
                       <div className="font-medium text-gray-800">
