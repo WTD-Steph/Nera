@@ -10,7 +10,7 @@ export type HighlightsData = {
   dbfMin: number;
   dbfEstimateMl: number;
   dbfRate: number;
-  dbfRateSource: "fixed" | "multiplier" | "pumping" | "default";
+  dbfRateSource: "row" | "fixed" | "multiplier" | "pumping" | "default";
   sleepMin: number;
   sleepTargetHoursMin: number;
   sleepTargetHoursMax: number;
@@ -126,13 +126,15 @@ function buildBullets(d: HighlightsData): { tone: Tone; text: string }[] {
   // anything below 3 as potentially under-counting milk intake.
   if (d.dbfMin > 0 && d.dbfRate < 3) {
     const sourceLabel =
-      d.dbfRateSource === "fixed"
-        ? "fixed override"
-        : d.dbfRateSource === "multiplier"
-          ? "multiplier × pumping"
-          : d.dbfRateSource === "pumping"
-            ? "dari pumping terakhir"
-            : "default literatur";
+      d.dbfRateSource === "row"
+        ? "per-row override"
+        : d.dbfRateSource === "fixed"
+          ? "fixed override"
+          : d.dbfRateSource === "multiplier"
+            ? "multiplier × pumping"
+            : d.dbfRateSource === "pumping"
+              ? "dari pumping terakhir"
+              : "default literatur";
     bullets.push({
       tone: "info",
       text: `ℹ Rate DBF ${d.dbfRate.toFixed(1)} ml/menit (${sourceLabel}) di bawah literatur 3–5 ml/menit. Estimasi mungkin under-count. Bisa adjust di Profile → Estimasi DBF.`,

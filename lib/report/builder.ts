@@ -39,6 +39,7 @@ export type LogRow = {
   started_with_stopwatch: boolean;
   sleep_quality: string | null;
   effectiveness: string | null;
+  dbf_rate_override: number | null;
   notes: string | null;
 };
 

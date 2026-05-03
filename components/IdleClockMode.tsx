@@ -386,6 +386,7 @@ export function IdleClockToggle({
   reminder,
   stats,
   ongoingSubtypes,
+  variant = "full",
 }: {
   sinceFeeding?: string | null;
   sinceDiaper?: string | null;
@@ -393,6 +394,8 @@ export function IdleClockToggle({
   reminder: IdleClockReminder | null;
   stats: IdleClockStats;
   ongoingSubtypes: string[];
+  /** "full" = wide button row; "icon" = circular icon for header. */
+  variant?: "full" | "icon";
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -400,10 +403,22 @@ export function IdleClockToggle({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 active:scale-[0.99]"
+        className={
+          variant === "icon"
+            ? "flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-base shadow-sm hover:bg-gray-50 active:scale-95"
+            : "flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 active:scale-[0.99]"
+        }
+        aria-label="Mode Jam"
+        title="Mode Jam"
       >
-        <span aria-hidden>🕐</span>
-        <span>Mode Jam</span>
+        {variant === "icon" ? (
+          <span aria-hidden>🕐</span>
+        ) : (
+          <>
+            <span aria-hidden>🕐</span>
+            <span>Mode Jam</span>
+          </>
+        )}
       </button>
       {open ? (
         <IdleClockMode
