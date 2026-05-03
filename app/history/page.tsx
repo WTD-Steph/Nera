@@ -130,9 +130,17 @@ export default async function HistoryPage({
   const { data: logs } = await query;
   const logsArray: LogRow[] = (logs ?? []) as LogRow[];
 
+  // Group by Jakarta-local date (YYYY-MM-DD). Server runs UTC, so naive
+  // toDateString() puts timestamps 21:00–23:59 UTC (= 04:00–06:59 next
+  // day Jakarta) into the wrong bucket. Force +07:00 shift first.
+  const offsetMs = 7 * 60 * 60 * 1000;
+  function jakartaDayKey(iso: string): string {
+    const local = new Date(new Date(iso).getTime() + offsetMs);
+    return `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, "0")}-${String(local.getUTCDate()).padStart(2, "0")}`;
+  }
   const byDate = new Map<string, LogRow[]>();
   for (const l of logsArray) {
-    const key = new Date(l.timestamp).toDateString();
+    const key = jakartaDayKey(l.timestamp);
     const arr = byDate.get(key) ?? [];
     arr.push(l);
     byDate.set(key, arr);
@@ -177,7 +185,7 @@ export default async function HistoryPage({
           {[...byDate.entries()].map(([dateKey, dayLogs]) => (
             <div key={dateKey}>
               <div className="mb-1 px-2 text-xs font-semibold text-gray-500">
-                {fmtDate(new Date(dateKey).toISOString())}
+                {fmtDate(`${dateKey}T12:00:00+07:00`)}
               </div>
               <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
                 <div className="divide-y divide-gray-50">
