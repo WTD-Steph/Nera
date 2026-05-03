@@ -13,7 +13,7 @@ export function ProgressRealtime({
   table,
 }: {
   babyId: string;
-  table: "milestone_progress" | "immunization_progress";
+  table: "milestone_progress" | "immunization_progress" | "custom_milestones";
 }) {
   const router = useRouter();
 
