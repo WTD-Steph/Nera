@@ -34,9 +34,28 @@ Dokumen lengkap insiden + fix: [docs/troubleshooting.md](docs/troubleshooting.md
 - `babies.gender` enum: `'female' | 'male'` (CHECK constraint). Tidak ada non-binary di v1
 - `household_members.role`: `'owner' | 'member'` (CHECK constraint)
 - `household_invitations.role`: same enum, default `'member'`
-- `households.sleep_playlist_url` nullable — per-household override untuk night-lamp Spotify link. NULL = default Baby Sleep playlist (`37i9dQZF1DX0DxcHtn4Hwo`)
+- `households.sleep_playlist_url` nullable — DORMANT (Spotify integration removed PR #60). Column kept untuk avoid migration churn.
 - `medications` table per household — `(household_id, name, default_dose, unit)` dengan `unit IN ('ml','drop','gr','tab','sachet')`. Dropdown options di LogModal med subtype. UNIQUE(household_id, name)
 - `immunization_progress.doctor_name` nullable — datalist autocomplete dari past entries
+- `babies.dbf_ml_per_min` nullable — fixed mode override for DBF rate. CHECK 0 < x ≤ 30
+- `babies.dbf_pumping_multiplier` nullable — multiplier mode for DBF rate (× pumping). CHECK 0 < x ≤ 5
+- `logs.effectiveness` nullable — DBF efektivitas: `'efektif'` (100%) / `'sedang'` (80%) / `'kurang_efektif'` (60%). Used to scale ml estimate.
+- `logs.dbf_rate_override` nullable — per-row DBF rate snapshot/override (ml/menit). Auto-saved at row creation/end (forward-only behavior). Edit modal field lets user override per-session. CHECK 0 < x ≤ 30.
+
+## DBF rate priority chain
+
+Saat compute ml estimate (`lib/compute/dbf-estimate.ts`):
+1. **`logs.dbf_rate_override`** (per-row) — paling spesifik. Auto-snapshot saat row dibuat (forward-only). User bisa edit/clear via Edit modal atau mass edit di filter `?act=dbf`.
+2. **`babies.dbf_pumping_multiplier × pumping rate`** — Profile Multiplier mode. Pumping rate dari most-recent meaningful pumping (≥5 ml & ≥10 mnt).
+3. **`babies.dbf_ml_per_min`** — Profile Fixed mode. Constant ml/menit.
+4. **Auto pumping rate** — ketika kedua di atas null (Profile Auto mode). Pumping rate kalau ada, else fallback default.
+5. **Default 4 ml/menit** — literatur lactation (Hartmann/Geddes for 0–6mo).
+
+Mode #2/#3/#4 mutually exclusive di Profile (3-tab picker di /more/profile).
+
+Effective ml = `duration_total × rate × effectivenessFactor` (effectiveness 1.0/0.8/0.6).
+
+Per-feed expected target untuk top-up suggestion: `milkTargetMin / typicalFeedsPerDay(target)` — feeds 10/7/6/5 per age bucket (AAP/IDAI).
 
 ## Wall-clock TZ commitment
 
@@ -112,37 +131,53 @@ app/                        # Next.js App Router
   setup/                    # onboarding (household → baby)
   invite/[token]/           # accept invite
   more/                     # secondary nav
-    household/              # member management + Preferensi (sleep playlist URL)
-    profile/                # baby profile edit
+    household/              # member management
+    profile/                # baby profile edit + DBF estimate mode picker
   growth/                   # /growth chart + history
   milestone/                # KPSP/IDAI checklist
   imunisasi/                # vaccine schedule + facility/doctor datalist
-  history/                  # log riwayat dengan filter
+  history/                  # log riwayat dengan filter (Jakarta TZ-grouped)
   report/                   # CSV export + AI prompt copier
   stock/                    # ASI batch ledger (pumping batches with FIFO consumption)
+  trend/                    # 14-hari charts + Highlights insights
   api/
     invite/, export/        # POST invite, GET CSV
   actions/                  # server actions per domain
-    logs.ts                 # createLogAction, startOngoingLogAction,
-                            # endOngoingSleepAction, endOngoingPumpingAction,
-                            # pumpingPindahAction, deleteLogAction
+    logs.ts                 # create/update/delete + start/end/pause/resume
+                            # ongoing + pindah + bulkUpdateDbfRateAction
     growth.ts, milestone.ts, imunisasi.ts, medications.ts
-  page.tsx                  # main dashboard
+  page.tsx                  # main dashboard (date picker, top-up banner,
+                            # mode jam icon, mass edit DBF when act=dbf)
   layout.tsx                # root layout + PWA meta (statusBarStyle: black-translucent)
   manifest.ts               # PWA manifest (Next 14 file convention)
   icon.tsx, apple-icon.tsx  # PWA icons via ImageResponse
   globals.css               # Tailwind + flash-in keyframes
 
 components/                 # client components
-  LogModal.tsx              # log entry modal: subtype-aware, MedFields dropdown,
-                            # bottle ASI/Sufor + batch picker, per-side pumping
-  OngoingCard.tsx           # ongoing sleep/pumping card + NightLamp overlay +
-                            # PumpingControls (Pindah/Selesai), EndPumpingModal
-  StartOngoingButtons.tsx   # Mulai Tidur + Mulai Pumping side picker
+  LogModal.tsx              # log entry modal: subtype-aware, MedFields,
+                            # bottle ASI/Sufor + batch picker, per-side
+                            # pumping, DbfEditPerSide (start/end + auto-
+                            # duration), DBF rate override field, MlInput
+                            # (chip + stepper)
+  OngoingCard.tsx           # ongoing sleep/pumping/dbf/hiccup card +
+                            # NightLamp overlay (clock + dim toggle) +
+                            # PumpingControls (Pindah/Selesai) + DbfControls
+                            # (effectiveness 2-step, combo pump shortcut) +
+                            # HiccupControls + EndPumpingModal
+  StartOngoingButtons.tsx   # Mulai picker w/ offset + side choice + combo
+                            # pump toggle (DBF) + duplicate guard
   Stopwatch.tsx             # client tick component (defer Date.now to mount)
+  LiveClock.tsx             # current jam (Jakarta) + LiveDate (Indonesian
+                            # day + tanggal). Hydration-safe via deferred mount.
+  IdleClockMode.tsx         # fullscreen Mode Jam (kiosk view) + IdleClockToggle
+                            # variant: full | icon (header circular)
+  TrendCharts.tsx           # 4 daily bar charts (Susu stacked ASI/Sufor +
+                            # target step line, Tidur, Pumping stacked L/R,
+                            # Diaper) + SleepHeatmap + Interval histogram
+  TrendHighlights.tsx       # narrative bullet insights with status icons
   FormCloser.tsx            # auto-close modal on form submission complete
   SubmitButton.tsx          # useFormStatus pending state + spinner
-  LogsRealtime.tsx          # logs realtime subscription → router.refresh()
+  LogsRealtime.tsx          # 3-layer sync: realtime + visibility + 30s poll
   GrowthChart.tsx           # recharts WHO percentile
   GrowthMeasureModal.tsx    # ukur form
   GrowthRealtime.tsx, ProgressRealtime.tsx
@@ -153,8 +188,11 @@ lib/
   supabase/                 # browser/server/middleware client
   auth/                     # getCachedUser (React cache() wrapped auth.getUser)
   household/                # getCurrentHousehold + getCurrentBaby (cached)
-  compute/                  # pure helpers (format, stats) — Asia/Jakarta TZ-locked
-  constants/                # WHO percentile, milestone, imunisasi
+  compute/                  # format (Asia/Jakarta TZ-locked), stats
+                            # (jakartaDayStartMs), dbf-estimate (priority chain),
+                            # dbf-effectiveness (research-backed model + top-up)
+  constants/                # WHO percentile, milestone, imunisasi,
+                            # daily-targets (per-age bands + per-kg ml calc)
   report/                   # CSV + AI prompt builders
 
 supabase/migrations/        # SQL files, version controlled
@@ -174,17 +212,25 @@ CLAUDE.md                   # this file
 - [docs/troubleshooting.md](docs/troubleshooting.md) — known issues + recovery procedures (SEGV, PGRST stuck, MCP scope, env vars)
 - [docs/operations.md](docs/operations.md) — env vars, Supabase + Vercel config, deploy procedure
 
-## Major features added post-launch (PRs #14–#34)
+## Major features added post-launch
 
 - **Auto-close + sticky Simpan modal pattern**: useFormStatus + onSubmit setTimeout for instant close, sticky footer so Simpan never falls off-screen on tablet landscape
-- **Asia/Jakarta TZ-locked formatters** + datetime-local parsing with `+07:00` suffix
-- **Ongoing sleep/pumping** with live Stopwatch, NightLamp overlay (Spotify link + per-household URL pref), Pumping side picker (Kiri/Kanan/Dua) + Pindah action
-- **ASI stock batching**: pumping rows = batches; consumed_ml tracks ASI bottle feeds. Auto FIFO allocation in createLogAction; manual per-batch picker via dropdown. `/stock` page lists batches with progress bar
-- **Bottle content (sufor / asi)** + per-side pumping timestamps (start_l_at, end_l_at, start_r_at, end_r_at)
-- **Medications dropdown** (per-household, with units ml/drop/gr/tab/sachet); Vitamin D seeded
-- **Imunisasi facility + doctor** as datalist autocomplete from past entries
-- **Total Hari Ini** with DBF L/R + Pumping per-side + batch count detail
-- **Flash-in animation** on first Aktivitas Terbaru row after submit
+- **Asia/Jakarta TZ-locked formatters** + datetime-local parsing with `+07:00` suffix. `jakartaDayStartMs` for "today" boundary. History page Jakarta-grouped.
+- **Ongoing flow** w/ live Stopwatch, pause/resume (timestamp-shift on resume — pause time excluded), NightLamp overlay (live clock, dim/bright toggle), Cegukan/Hiccup subtype, edit + delete in Aktivitas Terbaru, "berlangsung" only for stopwatch-flow rows
+- **DBF combo flow**: Pindah ke sisi lain, "Sambil pump sisi sebaliknya" toggle in Mulai picker (combo_pump_side) + inline shortcut button when DBF active without pumping
+- **DBF effectiveness 2-step** (efektif/sedang/kurang_efektif × 100/80/60% factor) — research-backed (LLLI/IBCLC/AAP markers). Saved per-row as `logs.effectiveness`. Charts + estimate factor it in.
+- **Top-up suggestion banner**: post-DBF redirect with `?dbf_id=...` → home page computes `expectedPerFeed - effectiveMl` against age-bucketed feeds-per-day → actionable banner with "Catat botol top-up" → opens LogModal
+- **DBF rate priority chain**: row override (auto-snapshot at create/end → forward-only) > Profile multiplier × pumping > Profile fixed > pumping rate > default 4 ml/menit. Mass edit affordance in `?act=dbf` filter.
+- **ASI stock batching**: pumping rows = batches; consumed_ml tracks ASI bottle feeds. Auto FIFO allocation in createLogAction; manual per-batch picker via dropdown. `/stock` page
+- **Bottle content (sufor / asi)** + per-side pumping timestamps (start_l_at, end_l_at, start_r_at, end_r_at). Edit modal supports per-side edit for both pumping AND DBF (with auto-duration compute)
+- **Daily targets WHO/IDAI/AAP** (`lib/constants/daily-targets.ts`) — age bucket × per-kg/hari × current weight. Per-day target lines on /trend (step-after dashed)
+- **Trend page** (`/trend`): 6 charts — Susu (stacked ASI vs Sufor + target line), Tidur (cross-day-split bar + target), Pumping (stacked L/R), Diaper (pee + poop), Sleep heatmap (14d × 24h indigo gradient), Feeding interval histogram (5-min cluster dedup). Plus narrative Highlights bullets with status icons.
+- **Date picker on home**: `?date=YYYY-MM-DD` (Jakarta) for Total Hari Ini + Aktivitas Terbaru. ‹ › nav + "Hari ini" reset.
+- **Mode Jam (idle clock)**: fullscreen kiosk view with big jam, date, sejak terakhir cards, compact total hari ini, mulai shortcuts, reminder pill, dim/bright toggle. Accessible via 🕐 icon in header (always visible) + full button when no ongoing.
+- **Cross-device sync resilience** (`LogsRealtime`): postgres_changes subscription + visibilitychange + online listener + 30s poll fallback. Handles iOS PWA WebSocket drops.
+- **Sejak Terakhir Tidur** anchored at `end_timestamp` (waktu bangun), bukan `timestamp` (waktu mulai tidur). Ongoing → "sedang berjalan".
+- **Server-side guard** vs duplicate ongoing rows of same subtype.
+- **Display polish**: pumping/DBF row uses `|` separator antara L/R, skip null sides, sub-minute durations show seconds. Notes display inline italic in Aktivitas Terbaru. Profile saved alert prominent dengan checkmark.
 
 ## Active follow-ups
 
