@@ -185,6 +185,8 @@ const SUBTYPE_LABEL: Record<string, string> = {
   bath: "Mandi",
   temp: "Suhu",
   med: "Obat / Suplemen",
+  hiccup: "Cegukan",
+  tummy: "Tummy Time",
 };
 
 function logDetail(l: LogRow, dbfRate: number): string {
@@ -388,7 +390,8 @@ export default async function HomePage({
       (l.subtype === "sleep" ||
         l.subtype === "pumping" ||
         l.subtype === "feeding" ||
-        l.subtype === "hiccup"),
+        l.subtype === "hiccup" ||
+        l.subtype === "tummy"),
   );
   const ongoingSubtypes = new Set(
     ongoing.map((l) =>
@@ -742,10 +745,15 @@ export default async function HomePage({
       {ongoing.length > 0 ? (
         <section className="mt-5 space-y-2">
           {ongoing.map((l, idx) => {
-            const cardSubtype: "sleep" | "pumping" | "dbf" | "hiccup" =
+            const cardSubtype:
+              | "sleep"
+              | "pumping"
+              | "dbf"
+              | "hiccup"
+              | "tummy" =
               l.subtype === "feeding"
                 ? "dbf"
-                : (l.subtype as "sleep" | "pumping" | "hiccup");
+                : (l.subtype as "sleep" | "pumping" | "hiccup" | "tummy");
             // Auto-open dark lamp once after manual sleep submit with
             // empty Bangun. Match by subtype, only first such row.
             const shouldAutoOpenLamp =
@@ -776,7 +784,7 @@ export default async function HomePage({
         <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
           Mulai Sekarang
         </h2>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {!ongoingSubtypes.has("sleep") ? (
             <StartOngoingButton
               subtype="sleep"
@@ -839,6 +847,22 @@ export default async function HomePage({
               </span>
               <span className="text-[11px] font-semibold text-center leading-tight">
                 Cegukan berlangsung
+              </span>
+            </div>
+          )}
+          {!ongoingSubtypes.has("tummy") ? (
+            <StartOngoingButton
+              subtype="tummy"
+              label="Tummy"
+              emoji="🐢"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-rose-100 bg-rose-50/40 p-3 text-rose-400">
+              <span className="text-2xl" aria-hidden>
+                🐢
+              </span>
+              <span className="text-[11px] font-semibold text-center leading-tight">
+                Tummy berlangsung
               </span>
             </div>
           )}
@@ -1183,7 +1207,9 @@ export default async function HomePage({
                 const isOngoingType =
                   l.subtype === "sleep" ||
                   l.subtype === "pumping" ||
-                  l.subtype === "feeding";
+                  l.subtype === "feeding" ||
+                  l.subtype === "hiccup" ||
+                  l.subtype === "tummy";
                 const ongoing =
                   isOngoingType &&
                   l.end_timestamp === null &&

@@ -17,6 +17,7 @@ const SUBTYPES = [
   "temp",
   "med",
   "hiccup",
+  "tummy",
 ] as const;
 type Subtype = (typeof SUBTYPES)[number];
 
@@ -296,7 +297,8 @@ export async function startOngoingLogAction(formData: FormData) {
     subtype !== "sleep" &&
     subtype !== "pumping" &&
     subtype !== "feeding" &&
-    subtype !== "hiccup"
+    subtype !== "hiccup" &&
+    subtype !== "tummy"
   ) {
     redirect(`${returnTo}?logerror=${encodeURIComponent("Subtype tidak mendukung ongoing.")}`);
   }
@@ -693,6 +695,37 @@ export async function endOngoingHiccupAction(formData: FormData) {
   redirect(`${returnTo}?logsaved=hiccup`);
 }
 
+export async function endOngoingTummyAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/");
+  if (!id) redirect(returnTo);
+
+  const supabase = createClient();
+  const { data: row } = await supabase
+    .from("logs")
+    .select("paused_at")
+    .eq("id", id)
+    .single();
+  const endIso = row?.paused_at ?? new Date().toISOString();
+
+  const { error } = await supabase
+    .from("logs")
+    .update({ end_timestamp: endIso, paused_at: null } as never)
+    .eq("id", id)
+    .eq("subtype", "tummy")
+    .is("end_timestamp", null);
+
+  if (error) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent(`Gagal stop: ${error.message}`)}`,
+    );
+  }
+
+  revalidatePath("/");
+  revalidatePath("/history");
+  redirect(`${returnTo}?logsaved=tummy`);
+}
+
 export async function pauseOngoingLogAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/");
@@ -969,6 +1002,7 @@ export async function updateLogAction(formData: FormData) {
     temp: { temp_celsius: null },
     med: { med_name: null, med_dose: null },
     hiccup: { end_timestamp: null },
+    tummy: { end_timestamp: null },
   };
   Object.assign(payload, resetByType[subtype]);
 

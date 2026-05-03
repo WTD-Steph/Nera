@@ -6,6 +6,7 @@ import {
   endOngoingPumpingAction,
   endOngoingDbfAction,
   endOngoingHiccupAction,
+  endOngoingTummyAction,
   pumpingPindahAction,
   pauseOngoingLogAction,
   resumeFromPauseAction,
@@ -16,13 +17,14 @@ import { LiveClock } from "@/components/LiveClock";
 import { SubmitButton } from "@/components/SubmitButton";
 import { FormCloser } from "@/components/FormCloser";
 
-type Subtype = "sleep" | "pumping" | "dbf" | "hiccup";
+type Subtype = "sleep" | "pumping" | "dbf" | "hiccup" | "tummy";
 
 const TITLES: Record<Subtype, string> = {
   sleep: "Tidur",
   pumping: "Pumping",
   dbf: "DBF",
   hiccup: "Cegukan",
+  tummy: "Tummy Time",
 };
 
 const EMOJIS: Record<Subtype, string> = {
@@ -30,6 +32,7 @@ const EMOJIS: Record<Subtype, string> = {
   pumping: "💧",
   dbf: "🤱",
   hiccup: "🤧",
+  tummy: "🐢",
 };
 
 function fmtClock(iso: string): string {
@@ -107,7 +110,7 @@ export function OngoingCard({
               {isPaused ? " · auto-end 10 menit kalau tetap dijeda" : ""}
             </div>
           </div>
-          {subtype !== "hiccup" ? (
+          {subtype !== "hiccup" && subtype !== "tummy" ? (
             <button
               type="button"
               onClick={() => setShowLamp(true)}
@@ -121,7 +124,11 @@ export function OngoingCard({
 
         <button
           type="button"
-          onClick={() => subtype !== "hiccup" && setShowLamp(true)}
+          onClick={() =>
+            subtype !== "hiccup" &&
+            subtype !== "tummy" &&
+            setShowLamp(true)
+          }
           className="mt-2 block w-full text-left"
         >
           <Stopwatch
@@ -172,8 +179,10 @@ export function OngoingCard({
             endRAt={pumpEndRAt ?? null}
             otherPumpingOngoing={!!otherPumpingOngoing}
           />
-        ) : (
+        ) : subtype === "hiccup" ? (
           <HiccupControls id={id} />
+        ) : (
+          <TummyControls id={id} />
         )}
       </div>
 
@@ -905,6 +914,21 @@ function SleepLightControls({ id }: { id: string }) {
 function HiccupControls({ id }: { id: string }) {
   return (
     <form action={endOngoingHiccupAction} className="mt-3">
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="return_to" value="/" />
+      <SubmitButton
+        pendingText="Menyimpan…"
+        className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
+      >
+        Selesai · Simpan
+      </SubmitButton>
+    </form>
+  );
+}
+
+function TummyControls({ id }: { id: string }) {
+  return (
+    <form action={endOngoingTummyAction} className="mt-3">
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="return_to" value="/" />
       <SubmitButton

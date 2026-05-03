@@ -19,7 +19,7 @@ export function StartOngoingButton({
   emoji,
   pumpingOngoing,
 }: {
-  subtype: "sleep" | "pumping" | "feeding" | "hiccup";
+  subtype: "sleep" | "pumping" | "feeding" | "hiccup" | "tummy";
   label: string;
   emoji: string;
   /** When subtype=feeding, used to gate the combo "+ pump sisi lain"
@@ -79,7 +79,7 @@ export function StartOngoingButton({
           </option>
         ))}
       </select>
-      {subtype === "sleep" || subtype === "hiccup" ? (
+      {subtype === "sleep" || subtype === "hiccup" || subtype === "tummy" ? (
         <div className="grid grid-cols-1 gap-1.5">
           <SideChoice
             subtype={subtype}
@@ -154,7 +154,7 @@ function SideChoice({
   label,
   comboPump,
 }: {
-  subtype: "sleep" | "pumping" | "feeding" | "hiccup";
+  subtype: "sleep" | "pumping" | "feeding" | "hiccup" | "tummy";
   side: "kiri" | "kanan" | "both";
   offsetMin: number;
   label: string;
