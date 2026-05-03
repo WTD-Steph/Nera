@@ -15,11 +15,47 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #fda4af 0%, #f472b6 100%)",
-          fontSize: 120,
+          background: "linear-gradient(135deg, #fce7f3 0%, #f9a8d4 55%, #ec4899 100%)",
+          position: "relative",
         }}
       >
-        👶
+        <div
+          style={{
+            width: 130,
+            height: 130,
+            borderRadius: "50%",
+            background: "rgba(255, 252, 254, 0.92)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 86,
+            boxShadow: "inset 0 -6px 14px rgba(244,114,182,0.18)",
+          }}
+        >
+          🍼
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            top: 16,
+            right: 20,
+            fontSize: 28,
+            display: "flex",
+          }}
+        >
+          ✨
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            bottom: 20,
+            left: 22,
+            fontSize: 22,
+            display: "flex",
+          }}
+        >
+          💗
+        </div>
       </div>
     ),
     size,

@@ -9,6 +9,7 @@ import {
 } from "@/app/actions/medications";
 import { SubmitButton } from "@/components/SubmitButton";
 import { FormCloser } from "@/components/FormCloser";
+import { IluInfoButton } from "@/components/IluMassageDiagram";
 
 export type LogSubtype =
   | "feeding"
@@ -755,12 +756,13 @@ function LogModal({
                     defaultChecked={editLog?.bath_pijat_ilu ?? false}
                     className="mt-0.5 flex-shrink-0 h-4 w-4 accent-rose-500"
                   />
-                  <span>
+                  <span className="flex-1">
                     <span className="font-semibold">Pijat I-L-U</span>
                     <span className="ml-1 text-[11px] text-gray-500">
                       — bantu kentut & cerna
                     </span>
                   </span>
+                  <IluInfoButton />
                 </label>
                 <label className="flex items-start gap-2 rounded-lg border border-gray-200 bg-white p-2.5 text-[13px] hover:border-rose-300">
                   <input
