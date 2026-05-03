@@ -196,11 +196,31 @@ function logDetail(l: LogRow, dbfRate: number): string {
       if (rActive) return `🤱 Kanan aktif`;
       return `🤱 berlangsung`;
     }
-    const lMin = l.duration_l_min ?? 0;
-    const rMin = l.duration_r_min ?? 0;
-    const lMl = Math.round(lMin * dbfRate);
-    const rMl = Math.round(rMin * dbfRate);
-    return `🤱 L ${lMin}m (≈${lMl} ml) | R ${rMin}m (≈${rMl} ml)`;
+    // Show only sides that were actually used (duration set or per-side
+    // timestamp recorded). Avoids "L 0m / R 0m" when only one side was
+    // active. For sub-minute sessions (rounded to 0), show seconds.
+    const fmtSide = (
+      mins: number | null,
+      startAt: string | null,
+      endAt: string | null,
+    ): string | null => {
+      if (mins == null && !startAt) return null;
+      const m = mins ?? 0;
+      if (m === 0 && startAt && endAt) {
+        const sec = Math.round(
+          (new Date(endAt).getTime() - new Date(startAt).getTime()) / 1000,
+        );
+        if (sec >= 1 && sec < 60) return `${sec}s (≈0 ml)`;
+      }
+      const ml = Math.round(m * dbfRate);
+      return `${m}m (≈${ml} ml)`;
+    };
+    const lFmt = fmtSide(l.duration_l_min, l.start_l_at, l.end_l_at);
+    const rFmt = fmtSide(l.duration_r_min, l.start_r_at, l.end_r_at);
+    if (!lFmt && !rFmt) return `🤱 (kosong)`;
+    if (!lFmt) return `🤱 R ${rFmt}`;
+    if (!rFmt) return `🤱 L ${lFmt}`;
+    return `🤱 L ${lFmt} | R ${rFmt}`;
   }
   if (l.subtype === "pumping") {
     if (isOngoing) {
@@ -211,12 +231,20 @@ function logDetail(l: LogRow, dbfRate: number): string {
       if (rActive) return `Kanan aktif`;
       return `berlangsung`;
     }
+    // Skip side that wasn't pumped (no ml + no start_X_at).
     const lDur = pumpDur(l.start_l_at, l.end_l_at);
     const rDur = pumpDur(l.start_r_at, l.end_r_at);
-    const lFmt =
-      `L ${l.amount_l_ml ?? 0} ml` + (lDur ? ` · ${lDur} mnt` : "");
-    const rFmt =
-      `R ${l.amount_r_ml ?? 0} ml` + (rDur ? ` · ${rDur} mnt` : "");
+    const lUsed = l.amount_l_ml != null || !!l.start_l_at;
+    const rUsed = l.amount_r_ml != null || !!l.start_r_at;
+    const lFmt = lUsed
+      ? `L ${l.amount_l_ml ?? 0} ml` + (lDur ? ` · ${lDur} mnt` : "")
+      : null;
+    const rFmt = rUsed
+      ? `R ${l.amount_r_ml ?? 0} ml` + (rDur ? ` · ${rDur} mnt` : "")
+      : null;
+    if (!lFmt && !rFmt) return "(kosong)";
+    if (!lFmt) return rFmt!;
+    if (!rFmt) return lFmt;
     return `${lFmt} | ${rFmt}`;
   }
   if (l.subtype === "diaper") {
