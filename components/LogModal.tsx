@@ -274,6 +274,17 @@ function LogModal({
   };
   const markPumpRTouched = () => setPumpRTouched(true);
 
+  // DBF effectiveness — same enum as endOngoingDbfAction
+  const [dbfEffectiveness, setDbfEffectiveness] = useState<
+    "efektif" | "sedang" | "kurang_efektif" | ""
+  >(
+    editLog?.effectiveness === "efektif" ||
+      editLog?.effectiveness === "sedang" ||
+      editLog?.effectiveness === "kurang_efektif"
+      ? editLog.effectiveness
+      : "",
+  );
+
   // Diaper toggles
   const [hasPee, setHasPee] = useState(!!editLog?.has_pee);
   const [hasPoop, setHasPoop] = useState(!!editLog?.has_poop);
@@ -502,25 +513,69 @@ function LogModal({
                 </div>
               )}
               {feedingMode === "dbf" ? (
-                <Field label="Estimasi flow override (opsional, ml/menit)">
+                <>
                   <input
-                    type="number"
-                    name="dbf_rate_override"
-                    step="0.1"
-                    min="0.1"
-                    max="30"
-                    inputMode="decimal"
-                    placeholder="Pakai default Profile (auto/multiplier/fixed)"
-                    defaultValue={editLog?.dbf_rate_override ?? ""}
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                    type="hidden"
+                    name="effectiveness"
+                    value={dbfEffectiveness}
                   />
-                  <p className="mt-1 text-[11px] text-gray-400">
-                    Override rate ml/menit untuk SESI INI saja. Kosong = pakai
-                    setting Profile (multiplier × pumping / fixed / default
-                    4). Berguna kalau session tertentu sangat efektif (e.g.
-                    5 ml/m) atau tidak (e.g. 1 ml/m).
-                  </p>
-                </Field>
+                  <Field label="Efektivitas DBF (opsional)">
+                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                      {(
+                        [
+                          { value: "", label: "Skip", emoji: "—" },
+                          {
+                            value: "efektif",
+                            label: "Efektif",
+                            emoji: "😊",
+                          },
+                          { value: "sedang", label: "Sedang", emoji: "😐" },
+                          {
+                            value: "kurang_efektif",
+                            label: "Kurang",
+                            emoji: "😟",
+                          },
+                        ] as const
+                      ).map((opt) => (
+                        <button
+                          key={opt.value || "skip"}
+                          type="button"
+                          onClick={() => setDbfEffectiveness(opt.value)}
+                          className={`flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2 text-[11px] font-medium transition-colors ${
+                            dbfEffectiveness === opt.value
+                              ? "border-rose-400 bg-rose-50 text-rose-700"
+                              : "border-gray-200 bg-white text-gray-600"
+                          }`}
+                        >
+                          <span aria-hidden>{opt.emoji}</span>
+                          <span>{opt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-[11px] text-gray-400">
+                      Efektif=100% / Sedang=80% / Kurang=60% multiplier untuk
+                      ml estimate. Skip = default 100%.
+                    </p>
+                  </Field>
+                  <Field label="Estimasi flow override (opsional, ml/menit)">
+                    <input
+                      type="number"
+                      name="dbf_rate_override"
+                      step="0.1"
+                      min="0.1"
+                      max="30"
+                      inputMode="decimal"
+                      placeholder="Pakai default Profile (auto/multiplier/fixed)"
+                      defaultValue={editLog?.dbf_rate_override ?? ""}
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                    />
+                    <p className="mt-1 text-[11px] text-gray-400">
+                      Override rate ml/menit untuk SESI INI saja. Kosong =
+                      pakai setting Profile (multiplier × pumping / fixed /
+                      default 4).
+                    </p>
+                  </Field>
+                </>
               ) : null}
             </>
           ) : null}
