@@ -28,6 +28,8 @@ export type LogRow = {
   sleep_quality: "nyenyak" | "gelisah" | "sering_bangun" | null;
   effectiveness: "efektif" | "sedang" | "kurang_efektif" | null;
   dbf_rate_override: number | null;
+  bath_pijat_ilu: boolean | null;
+  bath_clean_tali_pusat: boolean | null;
   notes: string | null;
 };
 
