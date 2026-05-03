@@ -17,13 +17,18 @@ export function StartOngoingButton({
   subtype,
   label,
   emoji,
+  pumpingOngoing,
 }: {
   subtype: "sleep" | "pumping" | "feeding" | "hiccup";
   label: string;
   emoji: string;
+  /** When subtype=feeding, used to gate the combo "+ pump sisi lain"
+   *  toggle — only meaningful when no pumping is ongoing yet. */
+  pumpingOngoing?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [offsetMin, setOffsetMin] = useState(0);
+  const [comboPump, setComboPump] = useState(false);
 
   if (!open) {
     return (
@@ -84,20 +89,38 @@ export function StartOngoingButton({
           />
         </div>
       ) : subtype === "feeding" ? (
-        <div className="grid grid-cols-2 gap-1.5">
-          <SideChoice
-            subtype={subtype}
-            side="kiri"
-            offsetMin={offsetMin}
-            label="🤱 Kiri"
-          />
-          <SideChoice
-            subtype={subtype}
-            side="kanan"
-            offsetMin={offsetMin}
-            label="🤱 Kanan"
-          />
-        </div>
+        <>
+          <div className="grid grid-cols-2 gap-1.5">
+            <SideChoice
+              subtype={subtype}
+              side="kiri"
+              offsetMin={offsetMin}
+              label="🤱 Kiri"
+              comboPump={comboPump && !pumpingOngoing}
+            />
+            <SideChoice
+              subtype={subtype}
+              side="kanan"
+              offsetMin={offsetMin}
+              label="🤱 Kanan"
+              comboPump={comboPump && !pumpingOngoing}
+            />
+          </div>
+          {!pumpingOngoing ? (
+            <label className="mt-1.5 flex items-start gap-2 rounded-lg bg-amber-50 p-2 text-[10px] leading-snug text-amber-800">
+              <input
+                type="checkbox"
+                checked={comboPump}
+                onChange={(e) => setComboPump(e.target.checked)}
+                className="mt-0.5 flex-shrink-0 h-3 w-3 accent-amber-600"
+              />
+              <span>
+                💧 <span className="font-semibold">Sekalian pump sisi lain</span>{" "}
+                — Capture letdown reflex saat nyusu di satu sisi.
+              </span>
+            </label>
+          ) : null}
+        </>
       ) : (
         <div className="grid grid-cols-3 gap-1.5">
           <SideChoice
@@ -129,11 +152,14 @@ function SideChoice({
   side,
   offsetMin,
   label,
+  comboPump,
 }: {
   subtype: "sleep" | "pumping" | "feeding" | "hiccup";
   side: "kiri" | "kanan" | "both";
   offsetMin: number;
   label: string;
+  /** Feeding only — when true, also start pumping on opposite side. */
+  comboPump?: boolean;
 }) {
   // sleep + hiccup have no side concept; only pumping + feeding use sides.
   const sideField = subtype === "pumping" ? "pumping_side" : "dbf_side";
@@ -148,12 +174,25 @@ function SideChoice({
         name="start_offset_min"
         value={String(offsetMin)}
       />
+      {subtype === "feeding" && comboPump && side !== "both" ? (
+        <input
+          type="hidden"
+          name="combo_pump_side"
+          value={side === "kiri" ? "kanan" : "kiri"}
+        />
+      ) : null}
       <input type="hidden" name="return_to" value="/" />
       <SubmitButton
         pendingText="…"
-        className="flex w-full items-center justify-center gap-1 rounded-xl border border-rose-200 bg-white px-2 py-2.5 text-[10px] font-semibold text-rose-700 shadow-sm transition-transform active:scale-95"
+        className={`flex w-full items-center justify-center gap-1 rounded-xl border px-2 py-2.5 text-[10px] font-semibold shadow-sm transition-transform active:scale-95 ${
+          comboPump && subtype === "feeding"
+            ? "border-amber-300 bg-amber-50 text-amber-700"
+            : "border-rose-200 bg-white text-rose-700"
+        }`}
       >
-        {label}
+        {comboPump && subtype === "feeding"
+          ? `${label} + 💧`
+          : label}
       </SubmitButton>
     </form>
   );

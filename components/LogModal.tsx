@@ -467,6 +467,10 @@ function LogModal({
                     />
                   </Field>
                 </>
+              ) : editLog ? (
+                // Edit mode: per-side Mulai/Selesai for precision. Duration
+                // computed on save. Use case: fix sesi yg di-stop kecepetan.
+                <DbfEditPerSide editLog={editLog} />
               ) : (
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Kiri (menit)">
@@ -478,7 +482,6 @@ function LogModal({
                       max="180"
                       inputMode="numeric"
                       placeholder="0"
-                      defaultValue={editLog?.duration_l_min ?? undefined}
                       className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                     />
                   </Field>
@@ -491,7 +494,6 @@ function LogModal({
                       max="180"
                       inputMode="numeric"
                       placeholder="0"
-                      defaultValue={editLog?.duration_r_min ?? undefined}
                       className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                     />
                   </Field>
@@ -723,6 +725,98 @@ function Field({
       </span>
       {children}
     </label>
+  );
+}
+
+function DbfEditPerSide({ editLog }: { editLog: EditLog }) {
+  // Pre-fill from start/end_X_at if available; else derive from
+  // timestamp anchored with duration_X_min for legacy manual entries.
+  const lStart = editLog.start_l_at;
+  const lEnd = editLog.end_l_at;
+  const rStart = editLog.start_r_at;
+  const rEnd = editLog.end_r_at;
+
+  const [kiriMulai, setKiriMulai] = useState(
+    isoToDatetimeLocal(lStart ?? null),
+  );
+  const [kiriSelesai, setKiriSelesai] = useState(
+    isoToDatetimeLocal(lEnd ?? null),
+  );
+  const [kananMulai, setKananMulai] = useState(
+    isoToDatetimeLocal(rStart ?? null),
+  );
+  const [kananSelesai, setKananSelesai] = useState(
+    isoToDatetimeLocal(rEnd ?? null),
+  );
+
+  const computeMin = (mulai: string, selesai: string): number | null => {
+    if (!mulai || !selesai) return null;
+    const ms = new Date(selesai).getTime() - new Date(mulai).getTime();
+    if (!Number.isFinite(ms) || ms <= 0) return null;
+    return Math.round(ms / 60000);
+  };
+  const lMin = computeMin(kiriMulai, kiriSelesai);
+  const rMin = computeMin(kananMulai, kananSelesai);
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[11px] text-gray-500">
+        Edit waktu Mulai + Selesai per sisi. Durasi dihitung otomatis.
+        Kosongkan kedua field untuk mengabaikan sisi.
+      </p>
+      <div className="space-y-3 rounded-2xl border border-gray-100 bg-gray-50/40 p-4">
+        <div className="text-xs font-semibold text-gray-700">🤱 Kiri</div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Mulai">
+            <input
+              type="datetime-local"
+              name="dbf_start_l_at"
+              value={kiriMulai}
+              onChange={(e) => setKiriMulai(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+            />
+          </Field>
+          <Field label="Selesai">
+            <input
+              type="datetime-local"
+              name="dbf_end_l_at"
+              value={kiriSelesai}
+              onChange={(e) => setKiriSelesai(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+            />
+          </Field>
+        </div>
+        <div className="text-[11px] text-gray-500">
+          Durasi: {lMin != null ? `${lMin} menit` : "—"}
+        </div>
+      </div>
+      <div className="space-y-3 rounded-2xl border border-gray-100 bg-gray-50/40 p-4">
+        <div className="text-xs font-semibold text-gray-700">🤱 Kanan</div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Mulai">
+            <input
+              type="datetime-local"
+              name="dbf_start_r_at"
+              value={kananMulai}
+              onChange={(e) => setKananMulai(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+            />
+          </Field>
+          <Field label="Selesai">
+            <input
+              type="datetime-local"
+              name="dbf_end_r_at"
+              value={kananSelesai}
+              onChange={(e) => setKananSelesai(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+            />
+          </Field>
+        </div>
+        <div className="text-[11px] text-gray-500">
+          Durasi: {rMin != null ? `${rMin} menit` : "—"}
+        </div>
+      </div>
+    </div>
   );
 }
 
