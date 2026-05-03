@@ -32,14 +32,16 @@ function pumpSessionMinutes(p: LogRow): number {
 }
 
 /**
- * Returns ml/min from the most recent meaningful pumping session — one
- * with at least 5 ml total and 10 minutes duration. Tiny sessions
- * (test pumps, interrupted feeds) skew the rate unrealistically low
- * (e.g. 10 ml / 21 min = 0.5 ml/min) when they're not representative.
+ * Returns ml/min as the **median** of up to N most-recent meaningful
+ * pumping sessions (≥5 ml AND ≥10 min). Median (vs single-most-recent)
+ * is robust against outlier sessions — e.g. a single low-yield 10 ml /
+ * 20 min session technically passes the threshold but isn't
+ * representative; median across 5 sessions ignores it gracefully.
  * Returns null if no qualifying session exists yet.
  */
 const MIN_PUMP_ML = 5;
 const MIN_PUMP_MIN = 10;
+const SAMPLE_COUNT = 5;
 export function pumpingMlPerMin(logs: LogRow[]): number | null {
   const candidates = [...logs]
     .filter((l) => l.subtype === "pumping" && l.end_timestamp != null)
@@ -47,14 +49,24 @@ export function pumpingMlPerMin(logs: LogRow[]): number | null {
       (a, b) =>
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
+  const rates: number[] = [];
   for (const p of candidates) {
     const totalMl = (p.amount_l_ml ?? 0) + (p.amount_r_ml ?? 0);
     const totalMin = pumpSessionMinutes(p);
     if (totalMl >= MIN_PUMP_ML && totalMin >= MIN_PUMP_MIN) {
-      return totalMl / totalMin;
+      rates.push(totalMl / totalMin);
+      if (rates.length >= SAMPLE_COUNT) break;
     }
   }
-  return null;
+  if (rates.length === 0) return null;
+  rates.sort((a, b) => a - b);
+  const mid = Math.floor(rates.length / 2);
+  if (rates.length % 2 === 0) {
+    const a = rates[mid - 1] ?? 0;
+    const b = rates[mid] ?? 0;
+    return (a + b) / 2;
+  }
+  return rates[mid] ?? 0;
 }
 
 export type DbfEstimateOverrides = {
