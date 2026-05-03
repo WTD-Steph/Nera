@@ -32,7 +32,11 @@ export async function startHandoverAction(formData: FormData) {
     const sleeper = (
       members as { user_id: string; email: string }[] | null
     )?.find((m) => m.user_id === formSleeperId);
-    if (!sleeper) redirect(returnTo);
+    if (!sleeper) {
+      redirect(
+        `${returnTo}?logerror=${encodeURIComponent("Member tidak ditemukan di household ini.")}`,
+      );
+    }
     sleeperId = sleeper.user_id;
     sleeperEmail = sleeper.email;
   }
@@ -50,12 +54,17 @@ export async function startHandoverAction(formData: FormData) {
     redirect(returnTo);
   }
 
-  await supabase.from("handovers").insert({
+  const { error } = await supabase.from("handovers").insert({
     household_id: household.household_id,
     started_by: sleeperId,
     started_by_email: sleeperEmail,
     notes,
   });
+  if (error) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent(`Gagal mulai handover: ${error.message}`)}`,
+    );
+  }
 
   revalidatePath("/");
   redirect(`${returnTo}?handover=started`);

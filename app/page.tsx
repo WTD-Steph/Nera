@@ -733,90 +733,74 @@ export default async function HomePage({
       </header>
 
       {activeHandover ? (
-        handoverByMe ? (
-          // I'm started_by — I'm the sleeper. Open app = waking up.
-          // Show the recap so I see what partner did during my sleep.
-          <section className="flash-in mt-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
-            <div className="flex items-start gap-2">
-              <span className="text-xl" aria-hidden>
-                🌙
-              </span>
-              <div className="flex-1">
-                <div className="text-sm font-bold text-indigo-900">
-                  Yang terjadi selama kamu tidur
-                </div>
-                <div className="text-[11px] text-indigo-700/80">
-                  Tidur sejak {fmtTime(activeHandover.started_at)} ·{" "}
-                  {fmtDuration(handoverDurationMins)}
-                </div>
-                {handoverSummary && handoverSummary.bullets.length > 0 ? (
-                  <div className="mt-2 space-y-0.5 text-[12px] text-indigo-900">
-                    {handoverSummary.bullets.map((b, i) => (
-                      <div key={i}>· {b}</div>
-                    ))}
+        // Unified banner — always shows the recap regardless of which user
+        // is logged in. iPad use case: shared device, partner returns and
+        // taps banner directly (no need to switch login). Title + button
+        // use sleeper's name (or "kamu" for self) so context is clear.
+        (() => {
+          const sleeperName = handoverByMe
+            ? "kamu"
+            : (handoverPartnerName ?? "Partner");
+          const buttonName = handoverByMe
+            ? "Saya"
+            : (handoverPartnerName ?? "Partner");
+          return (
+            <section className="flash-in mt-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
+              <div className="flex items-start gap-2">
+                <span className="text-xl" aria-hidden>
+                  🌙
+                </span>
+                <div className="flex-1">
+                  <div className="text-sm font-bold text-indigo-900">
+                    Yang terjadi sejak {sleeperName} tidur
                   </div>
-                ) : (
-                  <div className="mt-2 text-[12px] italic text-indigo-700/80">
-                    Belum ada catatan.
+                  <div className="text-[11px] text-indigo-700/80">
+                    Tidur sejak {fmtTime(activeHandover.started_at)} ·{" "}
+                    {fmtDuration(handoverDurationMins)}
                   </div>
-                )}
-                {handoverSummary && handoverSummary.recent.length > 0 ? (
-                  <details className="mt-2 text-[11px]">
-                    <summary className="cursor-pointer text-indigo-700/80 hover:text-indigo-900">
-                      Lihat detail ({handoverSummary.total})
-                    </summary>
-                    <div className="mt-1 space-y-0.5 text-indigo-800/90">
-                      {handoverSummary.recent.map((r, i) => (
-                        <div key={i}>
-                          <span className="font-medium text-indigo-700">
-                            {r.time}
-                          </span>{" "}
-                          · {r.text}
-                        </div>
+                  {handoverSummary && handoverSummary.bullets.length > 0 ? (
+                    <div className="mt-2 space-y-0.5 text-[12px] text-indigo-900">
+                      {handoverSummary.bullets.map((b, i) => (
+                        <div key={i}>· {b}</div>
                       ))}
                     </div>
-                  </details>
-                ) : null}
-                <form action={endHandoverAction} className="mt-3">
-                  <input type="hidden" name="id" value={activeHandover.id} />
-                  <input type="hidden" name="return_to" value="/" />
-                  <SubmitButton
-                    pendingText="…"
-                    className="w-full rounded-xl bg-indigo-500 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-600"
-                  >
-                    ✓ Saya sudah bangun
-                  </SubmitButton>
-                </form>
+                  ) : (
+                    <div className="mt-2 text-[12px] italic text-indigo-700/80">
+                      Belum ada catatan.
+                    </div>
+                  )}
+                  {handoverSummary && handoverSummary.recent.length > 0 ? (
+                    <details className="mt-2 text-[11px]">
+                      <summary className="cursor-pointer text-indigo-700/80 hover:text-indigo-900">
+                        Lihat detail ({handoverSummary.total})
+                      </summary>
+                      <div className="mt-1 space-y-0.5 text-indigo-800/90">
+                        {handoverSummary.recent.map((r, i) => (
+                          <div key={i}>
+                            <span className="font-medium text-indigo-700">
+                              {r.time}
+                            </span>{" "}
+                            · {r.text}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  ) : null}
+                  <form action={endHandoverAction} className="mt-3">
+                    <input type="hidden" name="id" value={activeHandover.id} />
+                    <input type="hidden" name="return_to" value="/" />
+                    <SubmitButton
+                      pendingText="…"
+                      className="w-full rounded-xl bg-indigo-500 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-600"
+                    >
+                      ✓ {buttonName} sudah bangun
+                    </SubmitButton>
+                  </form>
+                </div>
               </div>
-            </div>
-          </section>
-        ) : (
-          // Partner is started_by → partner is sleeping, I'm on duty.
-          // Small informational pill — no recap needed (I'm the one
-          // logging). End button kept for safety / cross-device.
-          <form
-            action={endHandoverAction}
-            className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 shadow-sm"
-          >
-            <input type="hidden" name="id" value={activeHandover.id} />
-            <input type="hidden" name="return_to" value="/" />
-            <div className="text-[11px] text-indigo-800">
-              <div className="font-semibold">
-                🌙 {handoverPartnerName} sedang tidur (sejak{" "}
-                {fmtTime(activeHandover.started_at)})
-              </div>
-              <div className="text-indigo-600/70">
-                {fmtDuration(handoverDurationMins)} · kamu yang jaga
-              </div>
-            </div>
-            <SubmitButton
-              pendingText="…"
-              className="rounded-full border border-indigo-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50"
-            >
-              Tandai bangun
-            </SubmitButton>
-          </form>
-        )
+            </section>
+          );
+        })()
       ) : null}
       {welcomeMsg ? (
         <div className="mt-3 rounded-2xl border border-rose-100 bg-rose-50 p-3 text-sm text-rose-800">
