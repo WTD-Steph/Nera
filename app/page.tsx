@@ -1264,86 +1264,107 @@ export default async function HomePage({
                   🤱 Putri (produksi ASI)
                 </span>
               </div>
-              {stats.pumpCount > 0
-                ? (() => {
-                    const pumpTotalMin = stats.pumpMinL + stats.pumpMinR;
-                    const pumpRateOverall =
-                      pumpTotalMin > 0 ? stats.pumpML / pumpTotalMin : 0;
-                    const lRate =
-                      stats.pumpMinL > 0 ? stats.pumpMlL / stats.pumpMinL : 0;
-                    const rRate =
-                      stats.pumpMinR > 0 ? stats.pumpMlR / stats.pumpMinR : 0;
-                    const lFmt =
-                      stats.pumpMlL > 0
-                        ? `Kiri ${stats.pumpMlL} ml / ${fmtDuration(stats.pumpMinL)} (${lRate.toFixed(1)} ml/m)`
-                        : "";
-                    const rFmt =
-                      stats.pumpMlR > 0
-                        ? `Kanan ${stats.pumpMlR} ml / ${fmtDuration(stats.pumpMinR)} (${rRate.toFixed(1)} ml/m)`
-                        : "";
-                    return (
-                      <StatRow
-                        label={`💧 Pumping${pumpRateOverall > 0 ? ` (${pumpRateOverall.toFixed(1)} ml/m)` : ""}`}
-                        value={`${stats.pumpML} ml`}
-                        sub={`${stats.pumpCount} batch`}
-                        detail={[lFmt, rFmt].filter(Boolean).join(" | ")}
-                        href="/?act=pumping#aktivitas"
-                        active={activeAct === "pumping"}
-                        trendAnchor="pumping"
-                      />
-                    );
-                  })()
-                : null}
-              {totalBoobsLMin > 0 || totalBoobsRMin > 0 ? (
-                <div>
-                  <StatRow
-                    label="🤱 Total Payudara (pump + DBF)"
-                    value={`L ${fmtDuration(totalBoobsLMin)} | R ${fmtDuration(totalBoobsRMin)}`}
-                  />
-                  {(() => {
-                    const counts: string[] = [];
-                    if (stats.pumpCount > 0)
-                      counts.push(`${stats.pumpCount}× pumping`);
-                    if (stats.dbfCount > 0)
-                      counts.push(`${stats.dbfCount}× DBF`);
-                    return counts.length > 0 ? (
-                      <div className="mt-1 text-[11px] font-medium text-gray-600">
-                        {counts.join(" · ")}
-                      </div>
-                    ) : null;
-                  })()}
-                  <div className="mt-1.5 space-y-0.5 text-[11px] text-gray-500">
-                    <div>
-                      <span className="font-semibold">Kiri:</span>{" "}
-                      {stats.pumpMlL} ml pumping (actual)
-                      {stats.dbfMinL > 0
-                        ? ` + ≈${Math.round(stats.dbfMinL * dbfEst.mlPerMin)} ml DBF (estimasi)`
-                        : ""}
-                      {" = "}
-                      <span className="font-semibold">
-                        ≈
-                        {stats.pumpMlL +
-                          Math.round(stats.dbfMinL * dbfEst.mlPerMin)}{" "}
-                        ml
-                      </span>
+              {(() => {
+                const lRate =
+                  stats.pumpMinL > 0 ? stats.pumpMlL / stats.pumpMinL : 0;
+                const rRate =
+                  stats.pumpMinR > 0 ? stats.pumpMlR / stats.pumpMinR : 0;
+                const dbfEstL = Math.round(stats.dbfMinL * dbfEst.mlPerMin);
+                const dbfEstR = Math.round(stats.dbfMinR * dbfEst.mlPerMin);
+                const totalL = stats.pumpMlL + dbfEstL;
+                const totalR = stats.pumpMlR + dbfEstR;
+                const totalLMin = stats.pumpMinL + stats.dbfMinL;
+                const totalRMin = stats.pumpMinR + stats.dbfMinR;
+                return (
+                  <div className="grid grid-cols-[auto_1fr_1fr] gap-x-3 gap-y-2 text-[12px]">
+                    <div />
+                    <div className="text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                      Kiri
                     </div>
-                    <div>
-                      <span className="font-semibold">Kanan:</span>{" "}
-                      {stats.pumpMlR} ml pumping (actual)
-                      {stats.dbfMinR > 0
-                        ? ` + ≈${Math.round(stats.dbfMinR * dbfEst.mlPerMin)} ml DBF (estimasi)`
-                        : ""}
-                      {" = "}
-                      <span className="font-semibold">
-                        ≈
-                        {stats.pumpMlR +
-                          Math.round(stats.dbfMinR * dbfEst.mlPerMin)}{" "}
-                        ml
-                      </span>
+                    <div className="text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                      Kanan
+                    </div>
+
+                    <div className="self-start text-gray-600">Total</div>
+                    <div className="text-right">
+                      <div className="font-bold text-gray-900">
+                        ≈{totalL} ml
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {totalLMin > 0 ? fmtDuration(totalLMin) : "—"}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-gray-900">
+                        ≈{totalR} ml
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {totalRMin > 0 ? fmtDuration(totalRMin) : "—"}
+                      </div>
+                    </div>
+
+                    <Link
+                      href="/?act=pumping#aktivitas"
+                      className={`self-start hover:text-rose-600 ${
+                        activeAct === "pumping"
+                          ? "font-semibold text-rose-600"
+                          : "text-gray-600"
+                      }`}
+                    >
+                      💧 Pumping
+                      {stats.pumpCount > 0 ? ` (${stats.pumpCount}×)` : ""}
+                    </Link>
+                    <div className="text-right">
+                      <div className="font-medium text-gray-800">
+                        {stats.pumpMlL} ml
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {stats.pumpMinL > 0
+                          ? `${fmtDuration(stats.pumpMinL)} · ${lRate.toFixed(1)} ml/m`
+                          : "—"}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium text-gray-800">
+                        {stats.pumpMlR} ml
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {stats.pumpMinR > 0
+                          ? `${fmtDuration(stats.pumpMinR)} · ${rRate.toFixed(1)} ml/m`
+                          : "—"}
+                      </div>
+                    </div>
+
+                    <Link
+                      href="/?act=dbf#aktivitas"
+                      className={`self-start hover:text-rose-600 ${
+                        activeAct === "dbf"
+                          ? "font-semibold text-rose-600"
+                          : "text-gray-600"
+                      }`}
+                    >
+                      🤱 DBF
+                      {stats.dbfCount > 0 ? ` (${stats.dbfCount}×)` : ""}
+                    </Link>
+                    <div className="text-right">
+                      <div className="font-medium text-gray-800">
+                        ≈{dbfEstL} ml
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {stats.dbfMinL > 0 ? fmtDuration(stats.dbfMinL) : "—"}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium text-gray-800">
+                        ≈{dbfEstR} ml
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {stats.dbfMinR > 0 ? fmtDuration(stats.dbfMinR) : "—"}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : null}
+                );
+              })()}
             </>
           ) : null}
           <p className="border-t border-gray-100 pt-2 text-[10px] leading-snug text-gray-400">
