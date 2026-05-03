@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
+import { dbfEstimateMl } from "@/lib/compute/dbf-estimate";
+import type { LogRow } from "@/lib/compute/stats";
 
 const SUBTYPES = [
   "feeding",
@@ -102,12 +104,37 @@ export async function createLogAction(formData: FormData) {
       }
       payload.duration_l_min = l;
       payload.duration_r_min = r;
-      // Per-row rate override (ml/menit) — applies to this session only.
+      // Per-row rate snapshot. Forward-only behavior: if user provides
+      // explicit override, use it; else snapshot the current Profile-
+      // derived rate so future Profile changes don't retroactively alter
+      // this row's estimate.
       const rateRaw = String(formData.get("dbf_rate_override") ?? "").trim();
       if (rateRaw !== "") {
         const rate = Number(rateRaw);
         if (Number.isFinite(rate) && rate > 0 && rate <= 30) {
           payload.dbf_rate_override = rate;
+        }
+      } else {
+        // Snapshot current Profile-derived rate
+        const dbfMin = (l ?? 0) + (r ?? 0);
+        if (dbfMin > 0) {
+          // Need recent logs to compute pumping rate (most recent
+          // meaningful pump). Cheap query — just last few pumping rows.
+          const { data: pumpLogs } = await supabase
+            .from("logs")
+            .select(
+              "subtype, amount_l_ml, amount_r_ml, start_l_at, end_l_at, start_r_at, end_r_at, end_timestamp, timestamp",
+            )
+            .eq("baby_id", baby.id)
+            .eq("subtype", "pumping")
+            .not("end_timestamp", "is", null)
+            .order("timestamp", { ascending: false })
+            .limit(20);
+          const est = dbfEstimateMl(dbfMin, (pumpLogs ?? []) as LogRow[], {
+            fixedMlPerMin: baby.dbf_ml_per_min,
+            pumpingMultiplier: baby.dbf_pumping_multiplier,
+          });
+          payload.dbf_rate_override = est.mlPerMin;
         }
       }
     }
@@ -569,6 +596,32 @@ export async function endOngoingDbfAction(formData: FormData) {
   if (existing.start_r_at && endR) {
     durRMin = minutesBetween(existing.start_r_at, endR);
     updates.duration_r_min = durRMin;
+  }
+
+  // Snapshot current Profile-derived rate at end → forward-only behavior.
+  // If user later changes Profile multiplier/fixed, this row keeps its
+  // rate at end-time. To recompute with new rate, edit row + clear
+  // override field (or use mass edit).
+  const dbfMin = durLMin + durRMin;
+  if (dbfMin > 0) {
+    const baby2 = await getCurrentBaby();
+    if (baby2) {
+      const { data: pumpLogs } = await supabase
+        .from("logs")
+        .select(
+          "subtype, amount_l_ml, amount_r_ml, start_l_at, end_l_at, start_r_at, end_r_at, end_timestamp, timestamp",
+        )
+        .eq("baby_id", baby2.id)
+        .eq("subtype", "pumping")
+        .not("end_timestamp", "is", null)
+        .order("timestamp", { ascending: false })
+        .limit(20);
+      const est = dbfEstimateMl(dbfMin, (pumpLogs ?? []) as LogRow[], {
+        fixedMlPerMin: baby2.dbf_ml_per_min,
+        pumpingMultiplier: baby2.dbf_pumping_multiplier,
+      });
+      updates.dbf_rate_override = est.mlPerMin;
+    }
   }
 
   const { error } = await supabase
@@ -1126,6 +1179,58 @@ export async function updateLogAction(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/history");
   redirect(`${returnTo}?logsaved=${subtype}`);
+}
+
+/**
+ * Bulk-update dbf_rate_override across multiple DBF rows. Used by the
+ * mass-edit affordance on the home page when filtered to act=dbf.
+ *
+ * Rate empty → clears overrides for all selected rows (revert to
+ * Profile chain).
+ */
+export async function bulkUpdateDbfRateAction(formData: FormData) {
+  const idsRaw = String(formData.get("ids") ?? "");
+  const rateRaw = String(formData.get("dbf_rate_override") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "/");
+
+  const ids = idsRaw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  if (ids.length === 0) {
+    redirect(`${returnTo}?logerror=${encodeURIComponent("Tidak ada row.")}`);
+  }
+
+  const newRate: number | null = (() => {
+    if (rateRaw === "") return null;
+    const n = Number(rateRaw);
+    if (!Number.isFinite(n) || n <= 0 || n > 30) return null;
+    return n;
+  })();
+  // Treat invalid input as null (clear) — matches the input validation
+  // on the per-row override field.
+
+  const [user, baby] = await Promise.all([getCachedUser(), getCurrentBaby()]);
+  if (!user) redirect("/login");
+  if (!baby) redirect("/setup");
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("logs")
+    .update({ dbf_rate_override: newRate } as never)
+    .in("id", ids)
+    .eq("baby_id", baby.id)
+    .eq("subtype", "feeding");
+
+  if (error) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent(`Gagal update: ${error.message}`)}`,
+    );
+  }
+
+  revalidatePath("/");
+  revalidatePath("/history");
+  redirect(returnTo);
 }
 
 export async function deleteLogAction(formData: FormData) {
