@@ -501,7 +501,8 @@ export async function endOngoingPumpingAction(formData: FormData) {
 
   revalidatePath("/");
   revalidatePath("/history");
-  redirect(`${returnTo}?logsaved=pumping`);
+  // Pass pump_id so home page can show rate-comparison banner.
+  redirect(`${returnTo}?logsaved=pumping&pump_id=${id}`);
 }
 
 export async function pumpingPindahAction(formData: FormData) {
