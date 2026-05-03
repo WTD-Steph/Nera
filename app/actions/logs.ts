@@ -104,6 +104,17 @@ export async function createLogAction(formData: FormData) {
       }
       payload.duration_l_min = l;
       payload.duration_r_min = r;
+      // Effectiveness picker (efektif / sedang / kurang_efektif) — same
+      // semantics as endOngoingDbfAction. Skip / empty = NULL (default
+      // 100%). Saved per-row.
+      const effRaw = String(formData.get("effectiveness") ?? "").trim();
+      if (
+        effRaw === "efektif" ||
+        effRaw === "sedang" ||
+        effRaw === "kurang_efektif"
+      ) {
+        payload.effectiveness = effRaw;
+      }
       // Per-row rate snapshot. Forward-only behavior: if user provides
       // explicit override, use it; else snapshot the current Profile-
       // derived rate so future Profile changes don't retroactively alter
@@ -935,6 +946,8 @@ export async function updateLogAction(formData: FormData) {
       end_l_at: null,
       start_r_at: null,
       end_r_at: null,
+      // Reset effectiveness — re-set from form below for DBF mode
+      effectiveness: null,
     },
     pumping: {
       amount_l_ml: null,
@@ -1022,6 +1035,18 @@ export async function updateLogAction(formData: FormData) {
         redirect(
           `${returnTo}?logerror=${encodeURIComponent("Isi durasi DBF kiri atau kanan.")}`,
         );
+      }
+      // Effectiveness picker — persist as nullable enum. Empty / unknown
+      // value = NULL (default 100%). Same shape as endOngoingDbfAction.
+      const effRaw = String(formData.get("effectiveness") ?? "").trim();
+      if (
+        effRaw === "efektif" ||
+        effRaw === "sedang" ||
+        effRaw === "kurang_efektif"
+      ) {
+        payload.effectiveness = effRaw;
+      } else {
+        payload.effectiveness = null;
       }
       // Per-row rate override (ml/menit) — applies to this DBF row only.
       // Empty/null = clear override (revert to baby-level setting).
