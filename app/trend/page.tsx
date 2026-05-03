@@ -16,6 +16,10 @@ import {
 } from "@/lib/constants/daily-targets";
 import { getTargetForAge } from "@/lib/constants/daily-targets";
 import { dbfEstimateMl } from "@/lib/compute/dbf-estimate";
+import {
+  effectivenessFactor,
+  type EffectivenessLevel,
+} from "@/lib/compute/dbf-effectiveness";
 import { type LogRow } from "@/lib/compute/stats";
 
 const DAYS_BACK = 14;
@@ -70,7 +74,7 @@ export default async function TrendPage() {
   const { data: logs } = await supabase
     .from("logs")
     .select(
-      "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, paused_at, started_with_stopwatch, sleep_quality, notes",
+      "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, paused_at, started_with_stopwatch, sleep_quality, effectiveness, notes",
     )
     .eq("baby_id", baby.id)
     .gte("timestamp", since)
@@ -164,9 +168,14 @@ export default async function TrendPage() {
           fixedMlPerMin: baby.dbf_ml_per_min,
           pumpingMultiplier: baby.dbf_pumping_multiplier,
         });
-        agg.dbfEstimateMl += est.ml;
-        // DBF = breastmilk → asi total
-        agg.asiMl += est.ml;
+        // Apply effectiveness factor (1.0/0.8/0.6) per-row so chart
+        // reflects actual transfer estimate.
+        const factor = effectivenessFactor(
+          (l.effectiveness ?? null) as EffectivenessLevel | null,
+        );
+        const adjustedMl = Math.round(est.ml * factor);
+        agg.dbfEstimateMl += adjustedMl;
+        agg.asiMl += adjustedMl;
       }
     } else if (l.subtype === "pumping") {
       if (!agg) continue;

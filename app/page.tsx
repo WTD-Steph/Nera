@@ -38,6 +38,12 @@ import {
   computeMilkTarget,
 } from "@/lib/constants/daily-targets";
 import { dbfEstimateMl } from "@/lib/compute/dbf-estimate";
+import {
+  EFFECTIVENESS_EMOJIS,
+  EFFECTIVENESS_LABELS,
+  suggestTopUp,
+  type EffectivenessLevel,
+} from "@/lib/compute/dbf-effectiveness";
 
 type SearchParams = {
   welcome?: string;
@@ -48,6 +54,10 @@ type SearchParams = {
   darklamp?: string;
   /** YYYY-MM-DD (Asia/Jakarta). Default = today. */
   date?: string;
+  /** ID of just-completed DBF row → show top-up suggestion banner. */
+  dbf_id?: string;
+  /** Total minutes of that DBF (kiri+kanan). */
+  dbf_dur?: string;
 };
 
 function parseJakartaDate(s: string | undefined): number | null {
@@ -217,10 +227,13 @@ function logDetail(l: LogRow, dbfRate: number): string {
     };
     const lFmt = fmtSide(l.duration_l_min, l.start_l_at, l.end_l_at);
     const rFmt = fmtSide(l.duration_r_min, l.start_r_at, l.end_r_at);
-    if (!lFmt && !rFmt) return `🤱 (kosong)`;
-    if (!lFmt) return `🤱 R ${rFmt}`;
-    if (!rFmt) return `🤱 L ${lFmt}`;
-    return `🤱 L ${lFmt} | R ${rFmt}`;
+    const effSuffix = l.effectiveness
+      ? ` · ${EFFECTIVENESS_EMOJIS[l.effectiveness as EffectivenessLevel]}`
+      : "";
+    if (!lFmt && !rFmt) return `🤱 (kosong)${effSuffix}`;
+    if (!lFmt) return `🤱 R ${rFmt}${effSuffix}`;
+    if (!rFmt) return `🤱 L ${lFmt}${effSuffix}`;
+    return `🤱 L ${lFmt} | R ${rFmt}${effSuffix}`;
   }
   if (l.subtype === "pumping") {
     if (isOngoing) {
@@ -315,7 +328,7 @@ export default async function HomePage({
       supabase
         .from("logs")
         .select(
-          "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, paused_at, started_with_stopwatch, sleep_quality, notes",
+          "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, paused_at, started_with_stopwatch, sleep_quality, effectiveness, notes",
         )
         .eq("baby_id", baby.id)
         .gte("timestamp", since)
@@ -417,6 +430,31 @@ export default async function HomePage({
     milkBreakdownParts.length > 0 ? milkBreakdownParts.join(" · ") : undefined;
   const totalBoobsLMin = stats.dbfMinL + stats.pumpMinL;
   const totalBoobsRMin = stats.dbfMinR + stats.pumpMinR;
+  // Top-up suggestion after DBF Selesai. dbf_id + dbf_dur passed via
+  // redirect from endOngoingDbfAction. Looks up effectiveness from the
+  // row, computes suggestion using dbf-effectiveness research model.
+  const topUpSuggestion = (() => {
+    const dbfId = searchParams.dbf_id;
+    const dbfDur = Number(searchParams.dbf_dur ?? 0);
+    if (!dbfId || !Number.isFinite(dbfDur) || dbfDur <= 0) return null;
+    const dbfRow = logsArray.find((l) => l.id === dbfId);
+    if (!dbfRow || dbfRow.subtype !== "feeding") return null;
+    const effectiveness = (dbfRow.effectiveness ??
+      null) as EffectivenessLevel | null;
+    return suggestTopUp({
+      durationMins: dbfDur,
+      baseRate: dbfEst.mlPerMin,
+      effectiveness,
+      milkTargetMin: milkTarget.min,
+      target,
+    });
+  })();
+  const dbfRowEffectiveness = (() => {
+    if (!searchParams.dbf_id) return null;
+    const row = logsArray.find((l) => l.id === searchParams.dbf_id);
+    return (row?.effectiveness ?? null) as EffectivenessLevel | null;
+  })();
+
   const feedingReminder = (() => {
     if (!last.feeding) return null;
     const minsSince =
@@ -488,6 +526,47 @@ export default async function HomePage({
       {logerror ? (
         <div className="mt-3 rounded-2xl border border-red-100 bg-red-50 p-3 text-xs text-red-700">
           {logerror}
+        </div>
+      ) : null}
+      {topUpSuggestion ? (
+        <div className="flash-in mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+          <div className="flex items-start gap-2">
+            <span aria-hidden className="text-xl">
+              💡
+            </span>
+            <div className="flex-1 text-sm text-amber-900">
+              <div className="font-semibold">
+                Saran top-up ≈{topUpSuggestion.recommendMl} ml
+              </div>
+              <div className="mt-0.5 text-[12px] leading-snug text-amber-800/90">
+                DBF{" "}
+                {dbfRowEffectiveness
+                  ? `${EFFECTIVENESS_EMOJIS[dbfRowEffectiveness]} ${EFFECTIVENESS_LABELS[dbfRowEffectiveness]}`
+                  : "estimasi"}{" "}
+                ≈{topUpSuggestion.effectiveMl} ml dari target per feed{" "}
+                {topUpSuggestion.expectedPerFeed} ml.
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <LogModalTrigger
+                  subtype="feeding"
+                  asiBatches={asiBatchOptions}
+                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-sm hover:bg-amber-100"
+                >
+                  🍼 Catat botol top-up
+                </LogModalTrigger>
+                <Link
+                  href="/"
+                  className="inline-flex items-center rounded-full px-3 py-1.5 text-xs text-amber-700/70 hover:text-amber-900"
+                >
+                  Skip
+                </Link>
+              </div>
+              <p className="mt-2 text-[10px] leading-snug text-amber-700/70">
+                Saran berbasis WHO/AAP/IDAI per-kg/hari × usia ÷ feeds/hari.
+                Bukan instruksi medis — ikuti panduan DSA.
+              </p>
+            </div>
+          </div>
         </div>
       ) : null}
 

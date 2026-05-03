@@ -42,6 +42,7 @@ export type EditLog = {
   start_r_at: string | null;
   end_r_at: string | null;
   sleep_quality: string | null;
+  effectiveness: string | null;
   notes: string | null;
 };
 

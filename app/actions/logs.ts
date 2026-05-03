@@ -529,9 +529,20 @@ export async function endOngoingDbfAction(formData: FormData) {
   const now = existing.paused_at ?? new Date().toISOString();
   const endL = existing.end_l_at ?? (existing.start_l_at ? now : null);
   const endR = existing.end_r_at ?? (existing.start_r_at ? now : null);
+  // Effectiveness assessment (efektif / sedang / kurang_efektif).
+  // NULL when user skipped → defaults to 100% (efektif) in computations.
+  const effectivenessRaw = String(formData.get("effectiveness") ?? "").trim();
+  const effectiveness =
+    effectivenessRaw === "efektif" ||
+    effectivenessRaw === "sedang" ||
+    effectivenessRaw === "kurang_efektif"
+      ? effectivenessRaw
+      : null;
+
   const updates: Record<string, unknown> = {
     end_timestamp: now,
     paused_at: null,
+    effectiveness,
   };
   if (existing.start_l_at && !existing.end_l_at) updates.end_l_at = now;
   if (existing.start_r_at && !existing.end_r_at) updates.end_r_at = now;
@@ -541,11 +552,15 @@ export async function endOngoingDbfAction(formData: FormData) {
       0,
       Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000),
     );
+  let durLMin = 0;
+  let durRMin = 0;
   if (existing.start_l_at && endL) {
-    updates.duration_l_min = minutesBetween(existing.start_l_at, endL);
+    durLMin = minutesBetween(existing.start_l_at, endL);
+    updates.duration_l_min = durLMin;
   }
   if (existing.start_r_at && endR) {
-    updates.duration_r_min = minutesBetween(existing.start_r_at, endR);
+    durRMin = minutesBetween(existing.start_r_at, endR);
+    updates.duration_r_min = durRMin;
   }
 
   const { error } = await supabase
@@ -563,7 +578,14 @@ export async function endOngoingDbfAction(formData: FormData) {
 
   revalidatePath("/");
   revalidatePath("/history");
-  redirect(`${returnTo}?logsaved=feeding`);
+
+  // Top-up recommendation: if effective ml < per-feed expected by ≥15ml
+  // and ≥20%, redirect with ?topup=X param so home page can show the
+  // suggestion banner. Conservative — most newborns don't need top-up
+  // routinely, only on poor effectiveness or short sessions.
+  redirect(
+    `${returnTo}?logsaved=feeding&dbf_id=${id}&dbf_dur=${durLMin + durRMin}`,
+  );
 }
 
 export async function endOngoingHiccupAction(formData: FormData) {
