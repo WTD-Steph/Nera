@@ -44,6 +44,8 @@ export type EditLog = {
   sleep_quality: string | null;
   effectiveness: string | null;
   dbf_rate_override: number | null;
+  bath_pijat_ilu: boolean | null;
+  bath_clean_tali_pusat: boolean | null;
   notes: string | null;
 };
 
@@ -740,6 +742,43 @@ function LogModal({
                 </select>
               </Field>
             </>
+          ) : null}
+
+          {subtype === "bath" ? (
+            <Field label="Checklist (opsional)">
+              <div className="space-y-1.5">
+                <label className="flex items-start gap-2 rounded-lg border border-gray-200 bg-white p-2.5 text-[13px] hover:border-rose-300">
+                  <input
+                    type="checkbox"
+                    name="bath_pijat_ilu"
+                    value="1"
+                    defaultChecked={editLog?.bath_pijat_ilu ?? false}
+                    className="mt-0.5 flex-shrink-0 h-4 w-4 accent-rose-500"
+                  />
+                  <span>
+                    <span className="font-semibold">Pijat I-L-U</span>
+                    <span className="ml-1 text-[11px] text-gray-500">
+                      — bantu kentut & cerna
+                    </span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 rounded-lg border border-gray-200 bg-white p-2.5 text-[13px] hover:border-rose-300">
+                  <input
+                    type="checkbox"
+                    name="bath_clean_tali_pusat"
+                    value="1"
+                    defaultChecked={editLog?.bath_clean_tali_pusat ?? false}
+                    className="mt-0.5 flex-shrink-0 h-4 w-4 accent-rose-500"
+                  />
+                  <span>
+                    <span className="font-semibold">Bersihkan tali pusat</span>
+                    <span className="ml-1 text-[11px] text-gray-500">
+                      — sampai puput
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </Field>
           ) : null}
 
           {subtype === "temp" ? (

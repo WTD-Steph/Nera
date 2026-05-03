@@ -289,6 +289,12 @@ function logDetail(l: LogRow, dbfRate: number): string {
   if (l.subtype === "temp") return `${l.temp_celsius}°C`;
   if (l.subtype === "med")
     return [l.med_name, l.med_dose].filter(Boolean).join(" ");
+  if (l.subtype === "bath") {
+    const parts: string[] = [];
+    if (l.bath_pijat_ilu) parts.push("✓ pijat I-L-U");
+    if (l.bath_clean_tali_pusat) parts.push("✓ tali pusat");
+    return parts.join(" · ");
+  }
   return "";
 }
 
@@ -333,7 +339,7 @@ export default async function HomePage({
       supabase
         .from("logs")
         .select(
-          "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, paused_at, started_with_stopwatch, sleep_quality, effectiveness, dbf_rate_override, notes",
+          "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, paused_at, started_with_stopwatch, sleep_quality, effectiveness, dbf_rate_override, bath_pijat_ilu, bath_clean_tali_pusat, notes",
         )
         .eq("baby_id", baby.id)
         .gte("timestamp", since)
@@ -429,7 +435,7 @@ export default async function HomePage({
   }
   if (stats.dbfCount > 0) {
     milkBreakdownParts.push(
-      `≈${dbfEst.ml} ml dari ${fmtDuration(stats.dbfMinTotal)} DBF`,
+      `≈${dbfEst.ml} ml dari ${fmtDuration(stats.dbfMinTotal)} DBF (${stats.dbfCount}×)`,
     );
   }
   const milkBreakdown =
@@ -979,7 +985,9 @@ export default async function HomePage({
             value={`${milkTotalMl} ml`}
             sub={`${milkTarget.min}–${milkTarget.max} ml`}
             progress={milkTotalMl / milkTarget.min}
-            detail={susuSourceBreakdown ?? milkBreakdown}
+            detail={[susuSourceBreakdown, milkBreakdown].filter(
+              (v): v is string => Boolean(v),
+            )}
             href="/?act=bottle#aktivitas"
             active={activeAct === "bottle"}
             trendAnchor="susu"
@@ -1073,6 +1081,16 @@ export default async function HomePage({
                 label="🤱 Total Boobs"
                 value={`L ${fmtDuration(totalBoobsLMin)} | R ${fmtDuration(totalBoobsRMin)}`}
               />
+              {(() => {
+                const counts: string[] = [];
+                if (stats.pumpCount > 0) counts.push(`${stats.pumpCount}× pumping`);
+                if (stats.dbfCount > 0) counts.push(`${stats.dbfCount}× DBF`);
+                return counts.length > 0 ? (
+                  <div className="mt-1 text-[11px] font-medium text-gray-600">
+                    {counts.join(" · ")}
+                  </div>
+                ) : null;
+              })()}
               <div className="mt-1.5 space-y-0.5 text-[11px] text-gray-500">
                 <div>
                   <span className="font-semibold">Kiri:</span>{" "}
@@ -1470,8 +1488,8 @@ function StatRow({
   sub?: string;
   /** 0..1+ progress against target min. Renders progress bar when set. */
   progress?: number;
-  /** Optional small line below the row (breakdown, per-side detail). */
-  detail?: string;
+  /** Optional small line(s) below the row (breakdown, per-side detail). */
+  detail?: string | string[];
   href?: string;
   active?: boolean;
   /** When set, renders a small icon button → /trend#<anchor>. */
@@ -1506,7 +1524,15 @@ function StatRow({
         </div>
       ) : null}
       {detail ? (
-        <div className="mt-0.5 text-[11px] text-gray-500">{detail}</div>
+        Array.isArray(detail) ? (
+          <div className="mt-0.5 space-y-0.5 text-[11px] text-gray-500">
+            {detail.map((line, i) => (
+              <div key={i}>{line}</div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-0.5 text-[11px] text-gray-500">{detail}</div>
+        )
       ) : null}
     </div>
   );

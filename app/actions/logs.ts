@@ -221,8 +221,11 @@ export async function createLogAction(formData: FormData) {
     }
     payload.med_name = name;
     payload.med_dose = str(formData, "med_dose");
+  } else if (subtype === "bath") {
+    payload.bath_pijat_ilu = formData.get("bath_pijat_ilu") === "1";
+    payload.bath_clean_tali_pusat =
+      formData.get("bath_clean_tali_pusat") === "1";
   }
-  // bath: no extra fields
 
   const { error } = await supabase.from("logs").insert(payload as never);
 
@@ -1160,6 +1163,10 @@ export async function updateLogAction(formData: FormData) {
     }
     payload.med_name = name;
     payload.med_dose = str(formData, "med_dose");
+  } else if (subtype === "bath") {
+    payload.bath_pijat_ilu = formData.get("bath_pijat_ilu") === "1";
+    payload.bath_clean_tali_pusat =
+      formData.get("bath_clean_tali_pusat") === "1";
   }
 
   // ASI re-allocation: if old row was an ASI feed, refund first; if new
