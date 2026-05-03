@@ -24,6 +24,11 @@ import {
   startOngoingLogAction,
 } from "@/app/actions/logs";
 import {
+  startHandoverAction,
+  endHandoverAction,
+} from "@/app/actions/handover";
+import { summarizeHandoverActivity } from "@/lib/compute/handover";
+import {
   computeTodayStats,
   computeLastByType,
   jakartaDayStartMs,
@@ -63,6 +68,8 @@ type SearchParams = {
   dbf_dur?: string;
   /** ID of just-completed pumping row → show rate comparison banner. */
   pump_id?: string;
+  /** Handover toast: "started" | "ended" → show post-action confirmation. */
+  handover?: string;
 };
 
 function parseJakartaDate(s: string | undefined): number | null {
@@ -337,6 +344,7 @@ export default async function HomePage({
     { data: medsData },
     { data: stockData },
     { data: latestWeightData },
+    { data: activeHandoverData },
   ] = await Promise.all([
       supabase
         .from("logs")
@@ -365,6 +373,14 @@ export default async function HomePage({
         .select("weight_kg")
         .eq("baby_id", baby.id)
         .order("measured_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("handovers")
+        .select("id, started_by, started_by_email, started_at")
+        .eq("household_id", household.household_id)
+        .is("ended_at", null)
+        .order("started_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
     ]);
@@ -587,6 +603,27 @@ export default async function HomePage({
   const showLanjutTidur =
     !!searchParams.dbf_id && !ongoingSubtypes.has("sleep");
 
+  const activeHandover = activeHandoverData as
+    | {
+        id: string;
+        started_by: string;
+        started_by_email: string;
+        started_at: string;
+      }
+    | null;
+  const handoverByMe = !!activeHandover && activeHandover.started_by === user.id;
+  const handoverSummary = activeHandover
+    ? summarizeHandoverActivity(logsArray, activeHandover.started_at)
+    : null;
+  const handoverDurationMins = activeHandover
+    ? Math.round(
+        (Date.now() - new Date(activeHandover.started_at).getTime()) / 60000,
+      )
+    : 0;
+  const handoverPartnerName = activeHandover
+    ? activeHandover.started_by_email.split("@")[0] ?? "partner"
+    : null;
+
   const feedingReminder = (() => {
     if (!last.feeding) return null;
     const minsSince =
@@ -629,7 +666,7 @@ export default async function HomePage({
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl lg:max-w-3xl">
-      <LogsRealtime babyId={baby.id} />
+      <LogsRealtime babyId={baby.id} householdId={household.household_id} />
       <header className="flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-rose-300 to-pink-400 text-2xl shadow-sm">
           <span aria-hidden>👶</span>
@@ -672,9 +709,95 @@ export default async function HomePage({
         </Link>
       </header>
 
+      {activeHandover ? (
+        handoverByMe ? (
+          <form
+            action={endHandoverAction}
+            className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 shadow-sm"
+          >
+            <input type="hidden" name="id" value={activeHandover.id} />
+            <input type="hidden" name="return_to" value="/" />
+            <div className="text-[11px] text-indigo-800">
+              <div className="font-semibold">
+                🌙 Kamu shift istirahat sejak {fmtTime(activeHandover.started_at)}
+              </div>
+              <div className="text-indigo-600/70">
+                {fmtDuration(handoverDurationMins)} lalu
+              </div>
+            </div>
+            <SubmitButton
+              pendingText="…"
+              className="rounded-full bg-indigo-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-600"
+            >
+              ✓ Saya bangun
+            </SubmitButton>
+          </form>
+        ) : (
+          <section className="flash-in mt-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
+            <div className="flex items-start gap-2">
+              <span className="text-xl" aria-hidden>
+                📋
+              </span>
+              <div className="flex-1">
+                <div className="text-sm font-bold text-indigo-900">
+                  {handoverPartnerName} shift istirahat
+                </div>
+                <div className="text-[11px] text-indigo-700/80">
+                  Sejak {fmtTime(activeHandover.started_at)} ·{" "}
+                  {fmtDuration(handoverDurationMins)} lalu
+                </div>
+                {handoverSummary && handoverSummary.bullets.length > 0 ? (
+                  <div className="mt-2 space-y-0.5 text-[12px] text-indigo-900">
+                    <div className="font-semibold">Selama itu:</div>
+                    {handoverSummary.bullets.map((b, i) => (
+                      <div key={i}>· {b}</div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-2 text-[12px] italic text-indigo-700/80">
+                    Belum ada aktivitas tercatat.
+                  </div>
+                )}
+                {handoverSummary && handoverSummary.recent.length > 0 ? (
+                  <details className="mt-2 text-[11px]">
+                    <summary className="cursor-pointer text-indigo-700/80 hover:text-indigo-900">
+                      Lihat riwayat ({handoverSummary.total})
+                    </summary>
+                    <div className="mt-1 space-y-0.5 text-indigo-800/90">
+                      {handoverSummary.recent.map((r, i) => (
+                        <div key={i}>
+                          <span className="font-medium text-indigo-700">
+                            {r.time}
+                          </span>{" "}
+                          · {r.text}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
+                <form action={endHandoverAction} className="mt-3">
+                  <input type="hidden" name="id" value={activeHandover.id} />
+                  <input type="hidden" name="return_to" value="/" />
+                  <SubmitButton
+                    pendingText="…"
+                    className="w-full rounded-xl bg-indigo-500 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-600"
+                  >
+                    ✓ {handoverPartnerName} sudah bangun, akhiri handover
+                  </SubmitButton>
+                </form>
+              </div>
+            </div>
+          </section>
+        )
+      ) : null}
       {welcomeMsg ? (
         <div className="mt-3 rounded-2xl border border-rose-100 bg-rose-50 p-3 text-sm text-rose-800">
           {welcomeMsg}
+        </div>
+      ) : null}
+      {searchParams.handover === "ended" ? (
+        <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-800">
+          ✓ Handover ditutup. Selamat lanjut beraktivitas!
         </div>
       ) : null}
       {logerror ? (
@@ -961,6 +1084,18 @@ export default async function HomePage({
             </div>
           )}
         </div>
+        {!activeHandover ? (
+          <form action={startHandoverAction} className="mt-2">
+            <input type="hidden" name="return_to" value="/" />
+            <SubmitButton
+              pendingText="…"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white py-2 text-xs font-semibold text-indigo-600 shadow-sm hover:bg-indigo-50"
+            >
+              <span aria-hidden>🌙</span>
+              Saya tidur dulu (mulai handover)
+            </SubmitButton>
+          </form>
+        ) : null}
       </section>
 
       <section className="mt-5">

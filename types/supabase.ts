@@ -222,6 +222,53 @@ export type Database = {
           },
         ]
       }
+      handovers: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          ended_by: string | null
+          ended_by_email: string | null
+          household_id: string
+          id: string
+          notes: string | null
+          started_at: string
+          started_by: string
+          started_by_email: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          ended_by?: string | null
+          ended_by_email?: string | null
+          household_id: string
+          id?: string
+          notes?: string | null
+          started_at?: string
+          started_by: string
+          started_by_email: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          ended_by?: string | null
+          ended_by_email?: string | null
+          household_id?: string
+          id?: string
+          notes?: string | null
+          started_at?: string
+          started_by?: string
+          started_by_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handovers_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       households: {
         Row: {
           created_at: string
