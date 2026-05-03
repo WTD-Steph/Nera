@@ -714,15 +714,19 @@ function EndPumpingModal({
               <span className="mb-1.5 block text-xs font-semibold text-gray-600">
                 Kiri (ml)
               </span>
-              <PumpMlStepper name="amount_l_ml" autoFocus />
+              <PumpMlSelect name="amount_l_ml" autoFocus />
             </div>
             <div>
               <span className="mb-1.5 block text-xs font-semibold text-gray-600">
                 Kanan (ml)
               </span>
-              <PumpMlStepper name="amount_r_ml" />
+              <PumpMlSelect name="amount_r_ml" />
             </div>
           </div>
+          <p className="text-center text-[10px] text-gray-400">
+            Tap angka → muncul wheel picker (iOS) / dropdown (web). Tidak
+            buka keyboard.
+          </p>
 
           <div className="sticky bottom-0 -mx-5 -mb-5 mt-2 border-t border-gray-100 bg-white/95 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80">
             <SubmitButton
@@ -1077,72 +1081,33 @@ function ComboPumpButton({ side }: { side: "kiri" | "kanan" }) {
   );
 }
 
-const PUMP_PRESETS = [5, 10, 15, 20, 30, 50, 80];
-const PUMP_STEP = 5;
+/**
+ * Native <select> with all integer ml values 0-200. On iOS/iPad triggers
+ * the system wheel picker (drum-style, same as time picker) — keyboard
+ * never opens. On desktop renders as a regular dropdown. On Android
+ * renders as a scrollable list. Universal keyboardless input.
+ */
+const PUMP_MAX_ML = 200;
 
-function PumpMlStepper({
+function PumpMlSelect({
   name,
   autoFocus,
 }: {
   name: string;
   autoFocus?: boolean;
 }) {
-  const [value, setValue] = useState<string>("");
-  const numeric = Number(value) || 0;
   return (
-    <div>
-      <div className="flex items-stretch gap-1.5">
-        <button
-          type="button"
-          onClick={() =>
-            setValue(String(Math.max(0, numeric - PUMP_STEP)))
-          }
-          className="rounded-xl border border-gray-200 bg-white px-3 text-sm font-bold text-gray-600 hover:bg-rose-50 hover:text-rose-700 active:scale-95"
-          aria-label={`-${PUMP_STEP} ml`}
-        >
-          −
-        </button>
-        <input
-          type="number"
-          name={name}
-          step="1"
-          min="0"
-          max="500"
-          inputMode="numeric"
-          placeholder="0"
-          autoFocus={autoFocus}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onFocus={(e) => e.target.select()}
-          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-center text-base font-semibold tabular-nums outline-none focus:border-rose-400"
-        />
-        <button
-          type="button"
-          onClick={() =>
-            setValue(String(Math.min(500, numeric + PUMP_STEP)))
-          }
-          className="rounded-xl border border-gray-200 bg-white px-3 text-sm font-bold text-gray-600 hover:bg-rose-50 hover:text-rose-700 active:scale-95"
-          aria-label={`+${PUMP_STEP} ml`}
-        >
-          +
-        </button>
-      </div>
-      <div className="mt-1.5 flex flex-wrap gap-1">
-        {PUMP_PRESETS.map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => setValue(String(p))}
-            className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
-              numeric === p
-                ? "bg-rose-500 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-rose-100 hover:text-rose-700"
-            }`}
-          >
-            {p}
-          </button>
-        ))}
-      </div>
-    </div>
+    <select
+      name={name}
+      defaultValue={0}
+      autoFocus={autoFocus}
+      className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-3 py-3 text-center text-xl font-bold tabular-nums text-rose-700 outline-none focus:border-rose-400"
+    >
+      {Array.from({ length: PUMP_MAX_ML + 1 }, (_, i) => (
+        <option key={i} value={i}>
+          {i} ml
+        </option>
+      ))}
+    </select>
   );
 }

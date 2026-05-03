@@ -122,24 +122,27 @@ export function StartOngoingButton({
           ) : null}
         </>
       ) : (
+        // Pumping: 3 sides (Kiri / Kanan / Dua sisi). Use 💧 (pumping
+        // context) instead of 🤱 (DBF). Equal-width grid; "Dua sisi"
+        // text — clearer than "Dua" alone.
         <div className="grid grid-cols-3 gap-1.5">
           <SideChoice
             subtype={subtype}
             side="kiri"
             offsetMin={offsetMin}
-            label="🤱 Kiri"
+            label="💧 Kiri"
           />
           <SideChoice
             subtype={subtype}
             side="kanan"
             offsetMin={offsetMin}
-            label="🤱 Kanan"
+            label="💧 Kanan"
           />
           <SideChoice
             subtype={subtype}
             side="both"
             offsetMin={offsetMin}
-            label="🤱🤱 Dua"
+            label="💧 Dua sisi"
           />
         </div>
       )}
