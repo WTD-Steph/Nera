@@ -21,26 +21,44 @@ import { createClient } from "@/lib/supabase/client";
  *
  * RLS-aware: realtime + Supabase queries both respect row policies.
  */
-export function LogsRealtime({ babyId }: { babyId: string }) {
+export function LogsRealtime({
+  babyId,
+  householdId,
+}: {
+  babyId: string;
+  householdId?: string;
+}) {
   const router = useRouter();
 
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase
-      .channel(`logs:${babyId}`)
-      .on(
+    let channel = supabase.channel(`logs:${babyId}`).on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "logs",
+        filter: `baby_id=eq.${babyId}`,
+      },
+      () => {
+        router.refresh();
+      },
+    );
+    if (householdId) {
+      channel = channel.on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "logs",
-          filter: `baby_id=eq.${babyId}`,
+          table: "handovers",
+          filter: `household_id=eq.${householdId}`,
         },
         () => {
           router.refresh();
         },
-      )
-      .subscribe();
+      );
+    }
+    channel.subscribe();
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -65,7 +83,7 @@ export function LogsRealtime({ babyId }: { babyId: string }) {
       window.removeEventListener("online", onOnline);
       clearInterval(pollId);
     };
-  }, [babyId, router]);
+  }, [babyId, householdId, router]);
 
   return null;
 }
