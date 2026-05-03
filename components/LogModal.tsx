@@ -18,7 +18,9 @@ export type LogSubtype =
   | "sleep"
   | "bath"
   | "temp"
-  | "med";
+  | "med"
+  | "hiccup"
+  | "tummy";
 
 export type EditLog = {
   id: string;
@@ -58,6 +60,8 @@ const SUBTYPE_LABEL: Record<LogSubtype, string> = {
   bath: "Mandi",
   temp: "Suhu",
   med: "Obat / Suplemen",
+  hiccup: "Cegukan",
+  tummy: "Tummy time",
 };
 
 const POOP_COLORS = ["kuning", "hijau", "coklat", "hitam", "merah"];
@@ -193,7 +197,9 @@ function isEditableSubtype(s: string): s is LogSubtype {
     s === "sleep" ||
     s === "bath" ||
     s === "temp" ||
-    s === "med"
+    s === "med" ||
+    s === "hiccup" ||
+    s === "tummy"
   );
 }
 
@@ -377,7 +383,13 @@ function LogModal({
             </Field>
           ) : (
             <Field
-              label={subtype === "sleep" ? "Waktu Mulai" : "Waktu"}
+              label={
+                subtype === "sleep" ||
+                subtype === "hiccup" ||
+                subtype === "tummy"
+                  ? "Waktu Mulai"
+                  : "Waktu"
+              }
             >
               <input
                 type="datetime-local"
@@ -743,6 +755,19 @@ function LogModal({
                 </select>
               </Field>
             </>
+          ) : null}
+
+          {subtype === "hiccup" || subtype === "tummy" ? (
+            <Field label="Waktu Selesai (kosongkan jika masih berlangsung)">
+              <input
+                type="datetime-local"
+                name="end_timestamp"
+                defaultValue={isoToDatetimeLocal(
+                  editLog?.end_timestamp ?? null,
+                )}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+              />
+            </Field>
           ) : null}
 
           {subtype === "bath" ? (
