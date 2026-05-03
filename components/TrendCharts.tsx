@@ -164,7 +164,7 @@ export function TrendCharts({
       </ChartCard>
 
       <ChartCard
-        title="🌙 Tidur / hari"
+        title="😴 Tidur / hari"
         subtitle="Target naik seiring usia · cross-day di-split"
         unit="jam"
         anchorId="tidur"
@@ -302,7 +302,7 @@ export function TrendCharts({
       </ChartCard>
 
       <ChartCard
-        title="🌙 Pola Tidur · 14 hari"
+        title="😴 Pola Tidur · 14 hari"
         subtitle="Heatmap menit tidur per jam (lebih gelap = lebih lama)"
         unit="jam"
       >

@@ -179,7 +179,7 @@ export function IdleClockMode({
             barTrack={barTrack}
           />
           <CompactStatRow
-            label="🌙 Tidur"
+            label="😴 Tidur"
             valueText={`${fmtH(stats.sleepMin)} / ${stats.sleepTargetHoursMin}–${stats.sleepTargetHoursMax} jam`}
             progress={pct(
               stats.sleepMin,
@@ -213,7 +213,7 @@ export function IdleClockMode({
           <ShortcutForm
             subtype="sleep"
             label="Tidur"
-            emoji="🌙"
+            emoji="😴"
             cardColor={cardColor}
             accent={accentColor}
             subtle={subtleColor}
@@ -242,7 +242,7 @@ export function IdleClockMode({
           <ShortcutForm
             subtype="hiccup"
             label="Cegukan"
-            emoji="🤧"
+            emoji="🫨"
             cardColor={cardColor}
             accent={accentColor}
             subtle={subtleColor}
@@ -412,10 +412,10 @@ export function IdleClockToggle({
         title="Mode Jam"
       >
         {variant === "icon" ? (
-          <span aria-hidden>🕐</span>
+          <span aria-hidden>⏰</span>
         ) : (
           <>
-            <span aria-hidden>🕐</span>
+            <span aria-hidden>⏰</span>
             <span>Mode Jam</span>
           </>
         )}

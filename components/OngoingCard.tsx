@@ -28,10 +28,10 @@ const TITLES: Record<Subtype, string> = {
 };
 
 const EMOJIS: Record<Subtype, string> = {
-  sleep: "🌙",
+  sleep: "😴",
   pumping: "💧",
   dbf: "🤱",
-  hiccup: "🤧",
+  hiccup: "🫨",
   tummy: "🐢",
 };
 

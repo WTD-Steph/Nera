@@ -80,7 +80,7 @@ function buildBullets(d: HighlightsData): { tone: Tone; text: string }[] {
       pct >= 1 ? "cukup" : pct >= 0.6 ? "kurang sedikit" : "kurang banyak";
     bullets.push({
       tone,
-      text: `🌙 Tidur ${fmtH(d.sleepMin)} dari target ${d.sleepTargetHoursMin}–${d.sleepTargetHoursMax} jam (${d.sleepCount} sesi${longest}) — ${status}`,
+      text: `😴 Tidur ${fmtH(d.sleepMin)} dari target ${d.sleepTargetHoursMin}–${d.sleepTargetHoursMax} jam (${d.sleepCount} sesi${longest}) — ${status}`,
     });
   }
 
