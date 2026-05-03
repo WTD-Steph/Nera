@@ -102,6 +102,14 @@ export async function createLogAction(formData: FormData) {
       }
       payload.duration_l_min = l;
       payload.duration_r_min = r;
+      // Per-row rate override (ml/menit) — applies to this session only.
+      const rateRaw = String(formData.get("dbf_rate_override") ?? "").trim();
+      if (rateRaw !== "") {
+        const rate = Number(rateRaw);
+        if (Number.isFinite(rate) && rate > 0 && rate <= 30) {
+          payload.dbf_rate_override = rate;
+        }
+      }
     }
   } else if (subtype === "pumping") {
     const l = num(formData, "amount_l_ml");
@@ -961,6 +969,17 @@ export async function updateLogAction(formData: FormData) {
         redirect(
           `${returnTo}?logerror=${encodeURIComponent("Isi durasi DBF kiri atau kanan.")}`,
         );
+      }
+      // Per-row rate override (ml/menit) — applies to this DBF row only.
+      // Empty/null = clear override (revert to baby-level setting).
+      const rateRaw = String(formData.get("dbf_rate_override") ?? "").trim();
+      if (rateRaw === "") {
+        payload.dbf_rate_override = null;
+      } else {
+        const rate = Number(rateRaw);
+        if (Number.isFinite(rate) && rate > 0 && rate <= 30) {
+          payload.dbf_rate_override = rate;
+        }
       }
     }
   } else if (subtype === "pumping") {

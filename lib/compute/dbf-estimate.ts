@@ -63,14 +63,18 @@ export type DbfEstimateOverrides = {
   /** Multiplier applied to pumping rate. Highest priority when both
    *  multiplier and a usable pumping rate exist. */
   pumpingMultiplier?: number | null;
+  /** Per-row override (highest priority of all). When set on a specific
+   *  DBF row, takes precedence over baby-level setting. */
+  rowOverride?: number | null;
 };
 
 /**
  * Resolve DBF rate using priority chain:
- *   1. multiplier × pumping rate (when both set)
- *   2. fixed ml/min override
- *   3. auto pumping rate
- *   4. literature default 4 ml/min
+ *   1. row-level override (per-aktivitas)
+ *   2. baby multiplier × pumping rate
+ *   3. baby fixed ml/min
+ *   4. auto pumping rate
+ *   5. literature default 4 ml/min
  */
 export function dbfEstimateMl(
   dbfMinutes: number,
@@ -79,11 +83,20 @@ export function dbfEstimateMl(
 ): {
   ml: number;
   mlPerMin: number;
-  source: "multiplier" | "fixed" | "pumping" | "default";
+  source: "row" | "multiplier" | "fixed" | "pumping" | "default";
   pumpingRate: number | null;
 } {
   const fromPump = pumpingMlPerMin(logs);
-  const { fixedMlPerMin, pumpingMultiplier } = overrides;
+  const { fixedMlPerMin, pumpingMultiplier, rowOverride } = overrides;
+
+  if (typeof rowOverride === "number" && rowOverride > 0) {
+    return {
+      ml: Math.round(dbfMinutes * rowOverride),
+      mlPerMin: rowOverride,
+      source: "row",
+      pumpingRate: fromPump,
+    };
+  }
 
   if (
     typeof pumpingMultiplier === "number" &&

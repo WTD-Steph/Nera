@@ -328,7 +328,7 @@ export default async function HomePage({
       supabase
         .from("logs")
         .select(
-          "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, paused_at, started_with_stopwatch, sleep_quality, effectiveness, notes",
+          "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, paused_at, started_with_stopwatch, sleep_quality, effectiveness, dbf_rate_override, notes",
         )
         .eq("baby_id", baby.id)
         .gte("timestamp", since)
@@ -510,6 +510,28 @@ export default async function HomePage({
             {household.household_name}
           </div>
         </div>
+        <IdleClockToggle
+          variant="icon"
+          sinceFeeding={
+            last.feeding ? timeSince(last.feeding.timestamp) : null
+          }
+          sinceSleep={last.sleep ? timeSince(last.sleep.timestamp) : null}
+          sinceDiaper={last.diaper ? timeSince(last.diaper.timestamp) : null}
+          reminder={feedingReminder}
+          stats={{
+            milkTotalMl,
+            milkTargetMin: milkTarget.min,
+            milkTargetMax: milkTarget.max,
+            sleepMin: stats.sleepMin,
+            sleepTargetHoursMin: target.sleepHoursMin,
+            sleepTargetHoursMax: target.sleepHoursMax,
+            peeCount: stats.diaperPeeCount,
+            peeTargetMin: target.peeMin,
+            poopCount: stats.diaperPoopCount,
+            poopTargetMin: target.poopMin,
+          }}
+          ongoingSubtypes={Array.from(ongoingSubtypes)}
+        />
         <Link
           href="/more/profile"
           className="text-xs text-rose-600 hover:underline"

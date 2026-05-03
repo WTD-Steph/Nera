@@ -43,6 +43,7 @@ export type EditLog = {
   end_r_at: string | null;
   sleep_quality: string | null;
   effectiveness: string | null;
+  dbf_rate_override: number | null;
   notes: string | null;
 };
 
@@ -500,6 +501,27 @@ function LogModal({
                   </Field>
                 </div>
               )}
+              {feedingMode === "dbf" ? (
+                <Field label="Estimasi flow override (opsional, ml/menit)">
+                  <input
+                    type="number"
+                    name="dbf_rate_override"
+                    step="0.1"
+                    min="0.1"
+                    max="30"
+                    inputMode="decimal"
+                    placeholder="Pakai default Profile (auto/multiplier/fixed)"
+                    defaultValue={editLog?.dbf_rate_override ?? ""}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                  />
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    Override rate ml/menit untuk SESI INI saja. Kosong = pakai
+                    setting Profile (multiplier × pumping / fixed / default
+                    4). Berguna kalau session tertentu sangat efektif (e.g.
+                    5 ml/m) atau tidak (e.g. 1 ml/m).
+                  </p>
+                </Field>
+              ) : null}
             </>
           ) : null}
 

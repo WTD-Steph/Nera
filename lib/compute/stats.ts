@@ -27,6 +27,7 @@ export type LogRow = {
   started_with_stopwatch: boolean;
   sleep_quality: "nyenyak" | "gelisah" | "sering_bangun" | null;
   effectiveness: "efektif" | "sedang" | "kurang_efektif" | null;
+  dbf_rate_override: number | null;
   notes: string | null;
 };
 
