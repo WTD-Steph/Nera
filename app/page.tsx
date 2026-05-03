@@ -431,6 +431,15 @@ export default async function HomePage({
     milkBreakdownParts.length > 0 ? milkBreakdownParts.join(" · ") : undefined;
   const totalBoobsLMin = stats.dbfMinL + stats.pumpMinL;
   const totalBoobsRMin = stats.dbfMinR + stats.pumpMinR;
+  // For Mode Jam + Sejak Terakhir cards: sleep "since" anchor = end
+  // time (waktu bangun), not start. For currently-ongoing sleep,
+  // surface "sedang berjalan". Aligns Mode Jam with regular SinceCard.
+  const sleepSinceText = (() => {
+    if (!last.sleep) return null;
+    if (last.sleep.end_timestamp == null) return "sedang berjalan";
+    return timeSince(last.sleep.end_timestamp);
+  })();
+
   // Top-up suggestion after DBF Selesai. dbf_id + dbf_dur passed via
   // redirect from endOngoingDbfAction. Looks up effectiveness from the
   // row, computes suggestion using dbf-effectiveness research model.
@@ -516,7 +525,7 @@ export default async function HomePage({
           sinceFeeding={
             last.feeding ? timeSince(last.feeding.timestamp) : null
           }
-          sinceSleep={last.sleep ? timeSince(last.sleep.timestamp) : null}
+          sinceSleep={sleepSinceText}
           sinceDiaper={last.diaper ? timeSince(last.diaper.timestamp) : null}
           reminder={feedingReminder}
           stats={{
@@ -1154,7 +1163,7 @@ export default async function HomePage({
             sinceFeeding={
               last.feeding ? timeSince(last.feeding.timestamp) : null
             }
-            sinceSleep={last.sleep ? timeSince(last.sleep.timestamp) : null}
+            sinceSleep={sleepSinceText}
             sinceDiaper={
               last.diaper ? timeSince(last.diaper.timestamp) : null
             }
