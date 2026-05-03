@@ -59,6 +59,8 @@ type SearchParams = {
   dbf_id?: string;
   /** Total minutes of that DBF (kiri+kanan). */
   dbf_dur?: string;
+  /** ID of just-completed pumping row → show rate comparison banner. */
+  pump_id?: string;
 };
 
 function parseJakartaDate(s: string | undefined): number | null {
@@ -429,8 +431,99 @@ export default async function HomePage({
   }
   const milkBreakdown =
     milkBreakdownParts.length > 0 ? milkBreakdownParts.join(" · ") : undefined;
+  // Susu breakdown: ASI vs Sufor (by source, not delivery method).
+  // ASI = bottle ASI + DBF estimate. Sufor = bottle sufor only.
+  // Iterate logs filtered to selected day's window.
+  const susuBreakdown = (() => {
+    let asiBottle = 0;
+    let suforBottle = 0;
+    const startMs = selectedDayMs;
+    const endMs = startMs + 86400000;
+    for (const l of logsArray) {
+      if (l.subtype !== "feeding") continue;
+      if (l.amount_ml == null || l.amount_ml <= 0) continue;
+      const t = new Date(l.timestamp).getTime();
+      if (t < startMs || t >= endMs) continue;
+      if (l.bottle_content === "asi") asiBottle += l.amount_ml;
+      else suforBottle += l.amount_ml;
+    }
+    const dbfMl = dbfEst.ml; // DBF is breastmilk → ASI
+    return {
+      asi: asiBottle + dbfMl,
+      sufor: suforBottle,
+      asiBottle,
+      suforBottle,
+      dbfMl,
+    };
+  })();
+  const susuSourceBreakdown = (() => {
+    const parts: string[] = [];
+    if (susuBreakdown.asi > 0) {
+      parts.push(`🤱 ASI ≈${Math.round(susuBreakdown.asi)} ml`);
+    }
+    if (susuBreakdown.sufor > 0) {
+      parts.push(`🥛 Sufor ${Math.round(susuBreakdown.sufor)} ml`);
+    }
+    return parts.length > 0 ? parts.join(" · ") : null;
+  })();
   const totalBoobsLMin = stats.dbfMinL + stats.pumpMinL;
   const totalBoobsRMin = stats.dbfMinR + stats.pumpMinR;
+  // Pumping rate banner — after Selesai, compare current rate to avg
+  // of last 5 prior pumpings. Visible saat redirect with ?pump_id=X.
+  const pumpRateBanner = (() => {
+    if (!searchParams.pump_id) return null;
+    const cur = logsArray.find(
+      (l) => l.id === searchParams.pump_id && l.subtype === "pumping",
+    );
+    if (!cur) return null;
+    const sideMins = (start: string | null, end: string | null) => {
+      if (!start || !end) return 0;
+      return Math.max(
+        0,
+        (new Date(end).getTime() - new Date(start).getTime()) / 60000,
+      );
+    };
+    const totalMl =
+      (cur.amount_l_ml ?? 0) + (cur.amount_r_ml ?? 0);
+    const totalMin =
+      sideMins(cur.start_l_at, cur.end_l_at) +
+      sideMins(cur.start_r_at, cur.end_r_at);
+    if (totalMl <= 0 || totalMin <= 0) return null;
+    const curRate = totalMl / totalMin;
+    // Last 5 prior pumpings (excluding current)
+    const prior = logsArray
+      .filter(
+        (l) =>
+          l.subtype === "pumping" &&
+          l.id !== searchParams.pump_id &&
+          l.end_timestamp != null,
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+      )
+      .slice(0, 5);
+    const priorRates: number[] = [];
+    for (const p of prior) {
+      const ml = (p.amount_l_ml ?? 0) + (p.amount_r_ml ?? 0);
+      const min =
+        sideMins(p.start_l_at, p.end_l_at) +
+        sideMins(p.start_r_at, p.end_r_at);
+      if (ml > 0 && min > 0) priorRates.push(ml / min);
+    }
+    const avgPrior =
+      priorRates.length > 0
+        ? priorRates.reduce((s, r) => s + r, 0) / priorRates.length
+        : null;
+    return {
+      curRate,
+      curMl: totalMl,
+      curMin: Math.round(totalMin),
+      avgPrior,
+      priorCount: priorRates.length,
+    };
+  })();
+
   // For Mode Jam + Sejak Terakhir cards: sleep "since" anchor = end
   // time (waktu bangun), not start. For currently-ongoing sleep,
   // surface "sedang berjalan". Aligns Mode Jam with regular SinceCard.
@@ -560,6 +653,50 @@ export default async function HomePage({
           {logerror}
         </div>
       ) : null}
+      {pumpRateBanner ? (
+        (() => {
+          const r = pumpRateBanner;
+          let trend: { text: string; cls: string } | null = null;
+          if (r.avgPrior != null && r.avgPrior > 0) {
+            const delta = (r.curRate - r.avgPrior) / r.avgPrior;
+            const pct = Math.round(Math.abs(delta) * 100);
+            if (delta > 0.05) {
+              trend = {
+                text: `↑ ${pct}% lebih tinggi dari avg ${r.priorCount} pump terakhir (${r.avgPrior.toFixed(1)} ml/m)`,
+                cls: "text-emerald-700",
+              };
+            } else if (delta < -0.05) {
+              trend = {
+                text: `↓ ${pct}% lebih rendah dari avg ${r.priorCount} pump terakhir (${r.avgPrior.toFixed(1)} ml/m)`,
+                cls: "text-amber-700",
+              };
+            } else {
+              trend = {
+                text: `≈ Sama dgn avg ${r.priorCount} pump terakhir (${r.avgPrior.toFixed(1)} ml/m)`,
+                cls: "text-gray-600",
+              };
+            }
+          }
+          return (
+            <div className="flash-in mt-3 rounded-2xl border border-sky-200 bg-sky-50 p-3 shadow-sm">
+              <div className="text-sm font-semibold text-sky-900">
+                💧 Pumping selesai · {r.curMl} ml / {r.curMin}m ={" "}
+                {r.curRate.toFixed(1)} ml/m
+              </div>
+              {trend ? (
+                <div className={`mt-0.5 text-[12px] ${trend.cls}`}>
+                  {trend.text}
+                </div>
+              ) : (
+                <div className="mt-0.5 text-[11px] text-sky-700/70">
+                  (Belum cukup data untuk perbandingan — butuh ≥1 pump
+                  sebelumnya yang punya ml + duration)
+                </div>
+              )}
+            </div>
+          );
+        })()
+      ) : null}
       {topUpSuggestion ? (
         <div className="flash-in mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
           <div className="flex items-start gap-2">
@@ -575,8 +712,8 @@ export default async function HomePage({
                 {dbfRowEffectiveness
                   ? `${EFFECTIVENESS_EMOJIS[dbfRowEffectiveness]} ${EFFECTIVENESS_LABELS[dbfRowEffectiveness]}`
                   : "estimasi"}{" "}
-                ≈{topUpSuggestion.effectiveMl} ml dari target per feed{" "}
-                {topUpSuggestion.expectedPerFeed} ml.
+                ≈{topUpSuggestion.effectiveMl} ml @ {dbfEst.mlPerMin.toFixed(1)} ml/m
+                {" "}dari target per feed {topUpSuggestion.expectedPerFeed} ml.
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
                 <LogModalTrigger
@@ -818,11 +955,32 @@ export default async function HomePage({
             value={`${milkTotalMl} ml`}
             sub={`${milkTarget.min}–${milkTarget.max} ml`}
             progress={milkTotalMl / milkTarget.min}
-            detail={milkBreakdown}
+            detail={susuSourceBreakdown ?? milkBreakdown}
             href="/?act=bottle#aktivitas"
             active={activeAct === "bottle"}
             trendAnchor="susu"
           />
+          {stats.dbfCount > 0 || activeAct === "dbf" ? (
+            <StatRow
+              label="🤱 DBF"
+              value={fmtDuration(stats.dbfMinTotal)}
+              sub={`≈${dbfEst.ml} ml`}
+              detail={`${stats.dbfCount} sesi · rate ${dbfEst.mlPerMin.toFixed(1)} ml/m (${
+                dbfEst.source === "row"
+                  ? "snapshot/override"
+                  : dbfEst.source === "multiplier"
+                    ? `${baby.dbf_pumping_multiplier}× pumping`
+                    : dbfEst.source === "fixed"
+                      ? "fixed Profile"
+                      : dbfEst.source === "pumping"
+                        ? "auto pumping"
+                        : "default"
+              })`}
+              href="/?act=dbf#aktivitas"
+              active={activeAct === "dbf"}
+              trendAnchor="susu"
+            />
+          ) : null}
           <StatRow
             label="🌙 Tidur"
             value={fmtDuration(stats.sleepMin)}
@@ -1156,34 +1314,6 @@ export default async function HomePage({
           Lihat semua riwayat →
         </Link>
       </section>
-
-      {ongoing.length === 0 ? (
-        <div className="mt-5">
-          <IdleClockToggle
-            sinceFeeding={
-              last.feeding ? timeSince(last.feeding.timestamp) : null
-            }
-            sinceSleep={sleepSinceText}
-            sinceDiaper={
-              last.diaper ? timeSince(last.diaper.timestamp) : null
-            }
-            reminder={feedingReminder}
-            stats={{
-              milkTotalMl,
-              milkTargetMin: milkTarget.min,
-              milkTargetMax: milkTarget.max,
-              sleepMin: stats.sleepMin,
-              sleepTargetHoursMin: target.sleepHoursMin,
-              sleepTargetHoursMax: target.sleepHoursMax,
-              peeCount: stats.diaperPeeCount,
-              peeTargetMin: target.peeMin,
-              poopCount: stats.diaperPoopCount,
-              poopTargetMin: target.poopMin,
-            }}
-            ongoingSubtypes={Array.from(ongoingSubtypes)}
-          />
-        </div>
-      ) : null}
 
       <div className="mt-6 grid grid-cols-2 gap-2">
         <Link
