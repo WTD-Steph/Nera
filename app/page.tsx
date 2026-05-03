@@ -20,6 +20,8 @@ import {
   resumeOngoingLogAction,
   expireStalePausedLogs,
   bulkUpdateDbfRateAction,
+  logDbfTampunganAction,
+  startOngoingLogAction,
 } from "@/app/actions/logs";
 import {
   computeTodayStats,
@@ -566,6 +568,24 @@ export default async function HomePage({
     const row = logsArray.find((l) => l.id === searchParams.dbf_id);
     return (row?.effectiveness ?? null) as EffectivenessLevel | null;
   })();
+  // Tampungan (Haakaa) prompt: only show when DBF was single-side (the
+  // OTHER side is the one that may have dripped into a collector cup).
+  // Both-sides DBF can't have a tampungan (no free side), nor can sessions
+  // already paired with an ongoing pumping.
+  const tampunganSide: "kiri" | "kanan" | null = (() => {
+    if (!searchParams.dbf_id) return null;
+    if (ongoingSubtypes.has("pumping")) return null;
+    const row = logsArray.find((l) => l.id === searchParams.dbf_id);
+    if (!row || row.subtype !== "feeding") return null;
+    const usedL = !!row.start_l_at;
+    const usedR = !!row.start_r_at;
+    if (usedL && !usedR) return "kanan";
+    if (usedR && !usedL) return "kiri";
+    return null;
+  })();
+  // Lanjut tidur button: show after DBF Selesai if there's no ongoing sleep.
+  const showLanjutTidur =
+    !!searchParams.dbf_id && !ongoingSubtypes.has("sleep");
 
   const feedingReminder = (() => {
     if (!last.feeding) return null;
@@ -746,6 +766,74 @@ export default async function HomePage({
             </div>
           </div>
         </div>
+      ) : null}
+
+      {tampunganSide ? (
+        <form
+          action={logDbfTampunganAction}
+          className="flash-in mt-3 rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm"
+        >
+          <input type="hidden" name="dbf_id" value={searchParams.dbf_id} />
+          <input type="hidden" name="side" value={tampunganSide} />
+          <input type="hidden" name="return_to" value="/" />
+          <div className="flex items-start gap-2">
+            <span aria-hidden className="text-xl">
+              💧
+            </span>
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-blue-900">
+                Tampungan sisi {tampunganSide} (Haakaa)?
+              </div>
+              <div className="mt-0.5 text-[11px] leading-snug text-blue-800/80">
+                Letdown reflex sering bikin sisi yang tidak diisap juga
+                menetes. Kalau ada tampungan, langsung masuk ke stock ASI.
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input
+                  type="number"
+                  name="ml"
+                  required
+                  min="1"
+                  max="500"
+                  step="1"
+                  inputMode="decimal"
+                  placeholder="ml"
+                  className="w-24 rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+                />
+                <SubmitButton
+                  pendingText="…"
+                  className="rounded-full bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600"
+                >
+                  Simpan ke stock
+                </SubmitButton>
+                <Link
+                  href="/"
+                  className="text-xs text-blue-700/70 hover:text-blue-900"
+                >
+                  Skip
+                </Link>
+              </div>
+            </div>
+          </div>
+        </form>
+      ) : null}
+
+      {showLanjutTidur ? (
+        <form
+          action={startOngoingLogAction}
+          className="mt-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-3 shadow-sm"
+        >
+          <input type="hidden" name="subtype" value="sleep" />
+          <input type="hidden" name="start_offset_min" value="0" />
+          <input type="hidden" name="return_to" value="/?darklamp=sleep" />
+          <SubmitButton
+            pendingText="…"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-600"
+          >
+            <span aria-hidden>😴</span>
+            Lanjut tidur sekarang
+          </SubmitButton>
+        </form>
       ) : null}
 
       {ongoing.length > 0 ? (
