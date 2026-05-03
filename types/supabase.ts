@@ -262,6 +262,7 @@ export type Database = {
           created_by: string | null
           duration_l_min: number | null
           duration_r_min: number | null
+          effectiveness: string | null
           end_l_at: string | null
           end_r_at: string | null
           end_timestamp: string | null
@@ -294,6 +295,7 @@ export type Database = {
           created_by?: string | null
           duration_l_min?: number | null
           duration_r_min?: number | null
+          effectiveness?: string | null
           end_l_at?: string | null
           end_r_at?: string | null
           end_timestamp?: string | null
@@ -326,6 +328,7 @@ export type Database = {
           created_by?: string | null
           duration_l_min?: number | null
           duration_r_min?: number | null
+          effectiveness?: string | null
           end_l_at?: string | null
           end_r_at?: string | null
           end_timestamp?: string | null

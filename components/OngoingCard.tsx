@@ -232,6 +232,7 @@ function NightLamp({
   onPumpStop: () => void;
 }) {
   const [askingQuality, setAskingQuality] = useState(false);
+  const [askingDbfEff, setAskingDbfEff] = useState(false);
   const isPaused = !!pausedAtIso;
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
@@ -371,30 +372,32 @@ function NightLamp({
             </button>
           )
         ) : subtype === "dbf" ? (
-          <>
-            <DarkPindahButton
+          askingDbfEff ? (
+            <DbfDarkEffectivenessStep
               id={id}
-              startLAt={pumpStartLAt}
-              endLAt={pumpEndLAt}
-              startRAt={pumpStartRAt}
-              endRAt={pumpEndRAt}
+              onClose={onClose}
+              onCancel={() => setAskingDbfEff(false)}
               darkBtn={darkBtn}
             />
-            <form
-              action={endOngoingDbfAction}
-              onSubmit={() => setTimeout(onClose, 0)}
-            >
-              <input type="hidden" name="id" value={id} />
-              <input type="hidden" name="return_to" value="/" />
-              <FormCloser onClose={onClose} />
-              <SubmitButton
-                pendingText="Menyimpan…"
+          ) : (
+            <>
+              <DarkPindahButton
+                id={id}
+                startLAt={pumpStartLAt}
+                endLAt={pumpEndLAt}
+                startRAt={pumpStartRAt}
+                endRAt={pumpEndRAt}
+                darkBtn={darkBtn}
+              />
+              <button
+                type="button"
+                onClick={() => setAskingDbfEff(true)}
                 className={`w-full ${darkBtn}`}
               >
                 Selesai · Simpan
-              </SubmitButton>
-            </form>
-          </>
+              </button>
+            </>
+          )
         ) : subtype === "pumping" ? (
           <button
             type="button"
@@ -409,6 +412,58 @@ function NightLamp({
       <p className="absolute bottom-6 px-6 text-center text-[10px] tracking-widest text-red-950/40">
         Layar redup · Esc atau Tutup ✕ untuk keluar
       </p>
+    </div>
+  );
+}
+
+function DbfDarkEffectivenessStep({
+  id,
+  onClose,
+  onCancel,
+  darkBtn,
+}: {
+  id: string;
+  onClose: () => void;
+  onCancel: () => void;
+  darkBtn: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="mb-2 text-center text-xs uppercase tracking-widest text-red-700/70">
+        Efektivitas DBF?
+      </p>
+      {(
+        [
+          { value: "efektif", label: "😊 Efektif (100%)" },
+          { value: "sedang", label: "😐 Sedang (80%)" },
+          { value: "kurang_efektif", label: "😟 Kurang efektif (60%)" },
+          { value: "", label: "Skip" },
+        ] as const
+      ).map((opt) => (
+        <form
+          key={opt.value || "skip"}
+          action={endOngoingDbfAction}
+          onSubmit={() => setTimeout(onClose, 0)}
+        >
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="return_to" value="/" />
+          <input type="hidden" name="effectiveness" value={opt.value} />
+          <FormCloser onClose={onClose} />
+          <SubmitButton
+            pendingText="Menyimpan…"
+            className={`w-full ${darkBtn}`}
+          >
+            {opt.label}
+          </SubmitButton>
+        </form>
+      ))}
+      <button
+        type="button"
+        onClick={onCancel}
+        className="mt-2 w-full text-center text-xs uppercase tracking-widest text-red-900/60 hover:text-red-700"
+      >
+        ← Batal stop
+      </button>
     </div>
   );
 }
@@ -877,6 +932,7 @@ function DbfControls({
   endRAt: string | null;
   otherPumpingOngoing: boolean;
 }) {
+  const [askingEffectiveness, setAskingEffectiveness] = useState(false);
   const lActive = !!startLAt && !endLAt;
   const rActive = !!startRAt && !endRAt;
   const canPindah = (lActive && !startRAt) || (rActive && !startLAt);
@@ -886,9 +942,6 @@ function DbfControls({
       : "kanan"
     : null;
   const otherSide = fromSide === "kiri" ? "Kanan" : "Kiri";
-  // Combo shortcut: kalau DBF aktif di satu sisi dan tidak ada pumping
-  // ongoing → tawarkan quick-start pumping di sisi sebaliknya. Common
-  // pattern: nursing kiri sambil pump kanan untuk capture letdown.
   const comboPumpSide: "kiri" | "kanan" | null =
     !otherPumpingOngoing && (lActive || rActive)
       ? lActive
@@ -913,22 +966,91 @@ function DbfControls({
           <span>Tidak ada sisi aktif — selesai untuk menyimpan</span>
         ) : null}
       </div>
-      {canPindah && fromSide ? (
+      {!askingEffectiveness && canPindah && fromSide ? (
         <PindahForm id={id} fromSide={fromSide} otherSide={otherSide} />
       ) : null}
-      {comboPumpSide ? (
+      {!askingEffectiveness && comboPumpSide ? (
         <ComboPumpButton side={comboPumpSide} />
       ) : null}
-      <form action={endOngoingDbfAction}>
-        <input type="hidden" name="id" value={id} />
-        <input type="hidden" name="return_to" value="/" />
-        <SubmitButton
-          pendingText="Menyimpan…"
+      {askingEffectiveness ? (
+        <DbfEffectivenessStep
+          id={id}
+          onCancel={() => setAskingEffectiveness(false)}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAskingEffectiveness(true)}
           className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
         >
           Selesai · Simpan
-        </SubmitButton>
-      </form>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function DbfEffectivenessStep({
+  id,
+  onCancel,
+}: {
+  id: string;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-xl border border-rose-100 bg-rose-50/40 p-3">
+      <p className="text-center text-[11px] font-semibold text-rose-700">
+        Bagaimana efektivitas DBF?
+      </p>
+      <p className="text-center text-[10px] leading-snug text-gray-500">
+        Audible swallow + breast soft post-feed = efektif
+      </p>
+      {(
+        [
+          {
+            value: "efektif",
+            label: "😊 Efektif (100%)",
+            hint: "Audible swallows, breast soft setelah",
+          },
+          {
+            value: "sedang",
+            label: "😐 Sedang (80%)",
+            hint: "Swallow inconsistent, baby drifts",
+          },
+          {
+            value: "kurang_efektif",
+            label: "😟 Kurang efektif (60%)",
+            hint: "Few swallows, baby still hungry",
+          },
+          {
+            value: "",
+            label: "Skip",
+            hint: "Default 100%",
+          },
+        ] as const
+      ).map((opt) => (
+        <form key={opt.value || "skip"} action={endOngoingDbfAction}>
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="return_to" value="/" />
+          <input type="hidden" name="effectiveness" value={opt.value} />
+          <SubmitButton
+            pendingText="…"
+            className="flex w-full flex-col items-center rounded-xl border border-rose-200 bg-white py-2 px-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 active:scale-[0.98]"
+          >
+            <span>{opt.label}</span>
+            <span className="text-[10px] font-normal text-gray-500">
+              {opt.hint}
+            </span>
+          </SubmitButton>
+        </form>
+      ))}
+      <button
+        type="button"
+        onClick={onCancel}
+        className="w-full text-center text-[11px] text-gray-400 hover:text-gray-600"
+      >
+        ← Batal stop
+      </button>
     </div>
   );
 }

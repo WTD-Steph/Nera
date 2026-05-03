@@ -38,6 +38,7 @@ export type LogRow = {
   paused_at: string | null;
   started_with_stopwatch: boolean;
   sleep_quality: string | null;
+  effectiveness: string | null;
   notes: string | null;
 };
 
