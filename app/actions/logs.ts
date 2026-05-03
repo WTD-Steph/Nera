@@ -260,6 +260,24 @@ export async function startOngoingLogAction(formData: FormData) {
   if (!baby) redirect("/setup");
 
   const supabase = createClient();
+
+  // Guard against duplicate ongoing of same subtype. Frontend hides the
+  // start button when ongoingSubtypes has the type, but a stale page or
+  // double-tap can still race. Reject server-side.
+  const { data: existingOngoing } = await supabase
+    .from("logs")
+    .select("id")
+    .eq("baby_id", baby.id)
+    .eq("subtype", subtype)
+    .is("end_timestamp", null)
+    .eq("started_with_stopwatch", true)
+    .limit(1);
+  if (existingOngoing && existingOngoing.length > 0) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent(`Sudah ada sesi ${subtype} berlangsung — selesaikan dulu.`)}`,
+    );
+  }
+
   // Backdate option: form may include start_offset_min (0/5/10/15/30)
   // for "Mulai dari X menit lalu". Default 0 → now.
   const offsetMin = (() => {

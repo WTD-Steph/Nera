@@ -58,17 +58,42 @@ function logDetail(l: LogRow): string {
             : null;
       return src ? `🍼 ${src} ${l.amount_ml} ml` : `🍼 ${l.amount_ml} ml`;
     }
-    const lMin = l.duration_l_min ?? 0;
-    const rMin = l.duration_r_min ?? 0;
-    return `🤱 L ${lMin}m / R ${rMin}m`;
+    const fmtDbfSide = (
+      mins: number | null,
+      startAt: string | null,
+      endAt: string | null,
+    ): string | null => {
+      if (mins == null && !startAt) return null;
+      const m = mins ?? 0;
+      if (m === 0 && startAt && endAt) {
+        const sec = Math.round(
+          (new Date(endAt).getTime() - new Date(startAt).getTime()) / 1000,
+        );
+        if (sec >= 1 && sec < 60) return `${sec}s`;
+      }
+      return `${m}m`;
+    };
+    const lFmt = fmtDbfSide(l.duration_l_min, l.start_l_at, l.end_l_at);
+    const rFmt = fmtDbfSide(l.duration_r_min, l.start_r_at, l.end_r_at);
+    if (!lFmt && !rFmt) return `🤱 (kosong)`;
+    if (!lFmt) return `🤱 R ${rFmt}`;
+    if (!rFmt) return `🤱 L ${lFmt}`;
+    return `🤱 L ${lFmt} | R ${rFmt}`;
   }
   if (l.subtype === "pumping") {
     const lDur = pumpDur(l.start_l_at, l.end_l_at);
     const rDur = pumpDur(l.start_r_at, l.end_r_at);
-    const left =
-      `L ${l.amount_l_ml ?? 0} ml` + (lDur ? ` · ${lDur} mnt` : "");
-    const right =
-      `R ${l.amount_r_ml ?? 0} ml` + (rDur ? ` · ${rDur} mnt` : "");
+    const lUsed = l.amount_l_ml != null || !!l.start_l_at;
+    const rUsed = l.amount_r_ml != null || !!l.start_r_at;
+    const left = lUsed
+      ? `L ${l.amount_l_ml ?? 0} ml` + (lDur ? ` · ${lDur} mnt` : "")
+      : null;
+    const right = rUsed
+      ? `R ${l.amount_r_ml ?? 0} ml` + (rDur ? ` · ${rDur} mnt` : "")
+      : null;
+    if (!left && !right) return "(kosong)";
+    if (!left) return right!;
+    if (!right) return left;
     return `${left} | ${right}`;
   }
   if (l.subtype === "diaper") {
