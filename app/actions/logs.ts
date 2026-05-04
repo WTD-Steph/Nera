@@ -725,16 +725,19 @@ export async function logDbfTampunganAction(formData: FormData) {
   }
 
   const { error } = await supabase.from("logs").insert(payload as never);
+  // returnTo may already carry query string (e.g. ?dbf_id=...&tampungan_skip=1
+  // so other post-DBF banners stay). Pick separator accordingly.
+  const sep = returnTo.includes("?") ? "&" : "?";
   if (error) {
     redirect(
-      `${returnTo}?logerror=${encodeURIComponent(`Gagal simpan tampungan: ${error.message}`)}`,
+      `${returnTo}${sep}logerror=${encodeURIComponent(`Gagal simpan tampungan: ${error.message}`)}`,
     );
   }
 
   revalidatePath("/");
   revalidatePath("/history");
   revalidatePath("/stock");
-  redirect(`${returnTo}?logsaved=tampungan`);
+  redirect(`${returnTo}${sep}logsaved=tampungan`);
 }
 
 export async function endOngoingHiccupAction(formData: FormData) {

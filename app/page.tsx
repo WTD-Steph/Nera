@@ -70,6 +70,10 @@ type SearchParams = {
   pump_id?: string;
   /** Handover toast: "started" | "ended" → show post-action confirmation. */
   handover?: string;
+  /** "1" = user dismissed tampungan banner; keep dbf_id so other banners stay. */
+  tampungan_skip?: string;
+  /** "1" = user dismissed top-up suggestion; keep dbf_id so other banners stay. */
+  topup_skip?: string;
 };
 
 function parseJakartaDate(s: string | undefined): number | null {
@@ -579,6 +583,7 @@ export default async function HomePage({
     const dbfId = searchParams.dbf_id;
     const dbfDur = Number(searchParams.dbf_dur ?? 0);
     if (!dbfId || !Number.isFinite(dbfDur) || dbfDur <= 0) return null;
+    if (searchParams.topup_skip === "1") return null;
     const dbfRow = logsArray.find((l) => l.id === dbfId);
     if (!dbfRow || dbfRow.subtype !== "feeding") return null;
     const effectiveness = (dbfRow.effectiveness ??
@@ -599,9 +604,11 @@ export default async function HomePage({
   // Tampungan (Haakaa) prompt: only show when DBF was single-side (the
   // OTHER side is the one that may have dripped into a collector cup).
   // Both-sides DBF can't have a tampungan (no free side), nor can sessions
-  // already paired with an ongoing pumping.
+  // already paired with an ongoing pumping. User can dismiss via Skip
+  // (?tampungan_skip=1) without affecting top-up/lanjut-tidur banners.
   const tampunganSide: "kiri" | "kanan" | null = (() => {
     if (!searchParams.dbf_id) return null;
+    if (searchParams.tampungan_skip === "1") return null;
     if (ongoingSubtypes.has("pumping")) return null;
     const row = logsArray.find((l) => l.id === searchParams.dbf_id);
     if (!row || row.subtype !== "feeding") return null;
@@ -614,6 +621,16 @@ export default async function HomePage({
   // Lanjut tidur button: show after DBF Selesai if there's no ongoing sleep.
   const showLanjutTidur =
     !!searchParams.dbf_id && !ongoingSubtypes.has("sleep");
+
+  // Build a URL that preserves the post-DBF context (dbf_id + dbf_dur) so
+  // dismissing one banner doesn't tear down the others.
+  const postDbfHref = (extra: Record<string, string>) => {
+    const params = new URLSearchParams();
+    if (searchParams.dbf_id) params.set("dbf_id", searchParams.dbf_id);
+    if (searchParams.dbf_dur) params.set("dbf_dur", searchParams.dbf_dur);
+    for (const [k, v] of Object.entries(extra)) params.set(k, v);
+    return `/?${params.toString()}`;
+  };
 
   const activeHandover = activeHandoverData as
     | {
@@ -931,7 +948,7 @@ export default async function HomePage({
                   🍼 Catat botol top-up
                 </LogModalTrigger>
                 <Link
-                  href="/"
+                  href={postDbfHref({ topup_skip: "1" })}
                   className="inline-flex items-center rounded-full px-3 py-1.5 text-xs text-amber-700/70 hover:text-amber-900"
                 >
                   Skip
@@ -953,7 +970,11 @@ export default async function HomePage({
         >
           <input type="hidden" name="dbf_id" value={searchParams.dbf_id} />
           <input type="hidden" name="side" value={tampunganSide} />
-          <input type="hidden" name="return_to" value="/" />
+          <input
+            type="hidden"
+            name="return_to"
+            value={postDbfHref({ tampungan_skip: "1" })}
+          />
           <div className="flex items-start gap-2">
             <span aria-hidden className="text-xl">
               💧
@@ -985,7 +1006,7 @@ export default async function HomePage({
                   Simpan ke stock
                 </SubmitButton>
                 <Link
-                  href="/"
+                  href={postDbfHref({ tampungan_skip: "1" })}
                   className="text-xs text-blue-700/70 hover:text-blue-900"
                 >
                   Skip
