@@ -275,12 +275,18 @@ function logDetail(l: LogRow, dbfRate: number): string {
     const rDur = pumpDur(l.start_r_at, l.end_r_at);
     const lUsed = l.amount_l_ml != null || !!l.start_l_at;
     const rUsed = l.amount_r_ml != null || !!l.start_r_at;
-    const lFmt = lUsed
-      ? `L ${l.amount_l_ml ?? 0} ml` + (lDur ? ` · ${lDur} mnt` : "")
-      : null;
-    const rFmt = rUsed
-      ? `R ${l.amount_r_ml ?? 0} ml` + (rDur ? ` · ${rDur} mnt` : "")
-      : null;
+    const sideStr = (
+      sideLabel: string,
+      ml: number,
+      dur: number | null,
+    ): string => {
+      const durPart = dur ? ` · ${dur} mnt` : "";
+      const ratePart =
+        dur && dur > 0 && ml > 0 ? ` · ${(ml / dur).toFixed(1)} ml/m` : "";
+      return `${sideLabel} ${ml} ml${durPart}${ratePart}`;
+    };
+    const lFmt = lUsed ? sideStr("L", l.amount_l_ml ?? 0, lDur) : null;
+    const rFmt = rUsed ? sideStr("R", l.amount_r_ml ?? 0, rDur) : null;
     if (!lFmt && !rFmt) return "(kosong)";
     if (!lFmt) return rFmt!;
     if (!rFmt) return lFmt;
