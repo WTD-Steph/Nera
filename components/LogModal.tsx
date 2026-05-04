@@ -241,6 +241,10 @@ function LogModal({
   );
   // ASI batch override: "" = auto FIFO (oldest first); else specific batch id
   const [asiBatchId, setAsiBatchId] = useState<string>("");
+  // Bottle ml — controlled so picking a batch can auto-fill (still user-editable)
+  const [bottleMl, setBottleMl] = useState<string>(
+    String(editLog?.amount_ml ?? 60),
+  );
 
   // Pumping per-side timestamps. In create mode: Kiri now → now+15,
   // Kanan sequentially after. In edit mode: pre-fill from existing row.
@@ -470,7 +474,18 @@ function LogModal({
                       />
                       <select
                         value={asiBatchId}
-                        onChange={(e) => setAsiBatchId(e.target.value)}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          setAsiBatchId(id);
+                          // Auto-fill ml dengan remaining batch terpilih.
+                          // User tetap bisa edit setelahnya. Skip kalau
+                          // pilih "Auto" (id=""), supaya nilai sebelumnya
+                          // tidak ke-reset.
+                          if (id) {
+                            const batch = asiBatches.find((b) => b.id === id);
+                            if (batch) setBottleMl(String(batch.remainingMl));
+                          }
+                        }}
                         className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                       >
                         <option value="">
@@ -484,7 +499,8 @@ function LogModal({
                       </select>
                       <p className="mt-1 text-[11px] text-gray-400">
                         Auto akan deduct dari batch terlama dulu. Pilih batch
-                        spesifik kalau mau ambil dari botol tertentu.
+                        spesifik untuk auto-fill ml dari sisa batch (masih
+                        bisa di-edit).
                       </p>
                     </Field>
                   ) : null}
@@ -492,6 +508,8 @@ function LogModal({
                     <MlInput
                       name="amount_ml"
                       initial={editLog?.amount_ml ?? 60}
+                      controlledValue={bottleMl}
+                      onValueChange={setBottleMl}
                     />
                   </Field>
                 </>
@@ -970,11 +988,21 @@ const ML_STEP = 5;
 function MlInput({
   name,
   initial,
+  controlledValue,
+  onValueChange,
 }: {
   name: string;
   initial: number;
+  /** When provided, MlInput acts controlled — parent state is the source of truth. */
+  controlledValue?: string;
+  onValueChange?: (v: string) => void;
 }) {
-  const [value, setValue] = useState<string>(String(initial));
+  const [internal, setInternal] = useState<string>(String(initial));
+  const value = controlledValue ?? internal;
+  const setValue = (v: string) => {
+    if (onValueChange) onValueChange(v);
+    else setInternal(v);
+  };
   const numeric = Number(value) || 0;
   return (
     <div>
