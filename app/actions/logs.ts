@@ -25,6 +25,24 @@ function isValidSubtype(s: string): s is Subtype {
   return (SUBTYPES as readonly string[]).includes(s);
 }
 
+/**
+ * Resolve end timestamp for ongoing actions. Priority:
+ *   1. paused_at — user already paused; that moment IS the actual end
+ *      (offset would double-shift). Pause wins to preserve durations.
+ *   2. now() − end_offset_min × 60s — user picked "berapa menit lalu"
+ *      because they forgot to tap Selesai right when baby woke / activity
+ *      ended. Default offset 0 → now().
+ */
+function computeEndIso(
+  formData: FormData,
+  pausedAt: string | null | undefined,
+): string {
+  if (pausedAt) return pausedAt;
+  const raw = String(formData.get("end_offset_min") ?? "0").trim();
+  const offset = Math.max(0, Number(raw) || 0);
+  return new Date(Date.now() - offset * 60000).toISOString();
+}
+
 function num(formData: FormData, key: string): number | null {
   const raw = String(formData.get(key) ?? "").trim();
   if (raw === "") return null;
@@ -417,14 +435,12 @@ export async function endOngoingSleepAction(formData: FormData) {
   if (!id) redirect(returnTo);
 
   const supabase = createClient();
-  // If currently paused, end at paused_at so the pause window doesn't
-  // count toward duration. Otherwise end at now().
   const { data: row } = await supabase
     .from("logs")
     .select("paused_at")
     .eq("id", id)
     .single();
-  const endIso = row?.paused_at ?? new Date().toISOString();
+  const endIso = computeEndIso(formData, row?.paused_at ?? null);
 
   const updates: Record<string, unknown> = {
     end_timestamp: endIso,
@@ -470,7 +486,7 @@ export async function endOngoingPumpingAction(formData: FormData) {
     .select("start_l_at, end_l_at, start_r_at, end_r_at, paused_at")
     .eq("id", id)
     .single();
-  const now = existing?.paused_at ?? new Date().toISOString();
+  const now = computeEndIso(formData, existing?.paused_at ?? null);
   const lActive = l !== null && l > 0;
   const rActive = r !== null && r > 0;
   const updates: Record<string, unknown> = {
@@ -579,8 +595,7 @@ export async function endOngoingDbfAction(formData: FormData) {
     .single();
   if (!existing) redirect(returnTo);
 
-  // If paused, freeze end at paused_at so durations exclude pause time.
-  const now = existing.paused_at ?? new Date().toISOString();
+  const now = computeEndIso(formData, existing.paused_at ?? null);
   const endL = existing.end_l_at ?? (existing.start_l_at ? now : null);
   const endR = existing.end_r_at ?? (existing.start_r_at ? now : null);
   // Effectiveness assessment (efektif / sedang / kurang_efektif).
@@ -751,8 +766,7 @@ export async function endOngoingHiccupAction(formData: FormData) {
     .select("paused_at")
     .eq("id", id)
     .single();
-  // Freeze at paused_at if paused, else now. Same convention as sleep/dbf.
-  const endIso = row?.paused_at ?? new Date().toISOString();
+  const endIso = computeEndIso(formData, row?.paused_at ?? null);
 
   const { error } = await supabase
     .from("logs")
@@ -783,7 +797,7 @@ export async function endOngoingTummyAction(formData: FormData) {
     .select("paused_at")
     .eq("id", id)
     .single();
-  const endIso = row?.paused_at ?? new Date().toISOString();
+  const endIso = computeEndIso(formData, row?.paused_at ?? null);
 
   const { error } = await supabase
     .from("logs")
