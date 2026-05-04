@@ -670,6 +670,7 @@ function EndPumpingModal({
   id: string;
   onClose: () => void;
 }) {
+  const [endOffset, setEndOffset] = useState(0);
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -708,6 +709,14 @@ function EndPumpingModal({
           <FormCloser onClose={onClose} />
           <input type="hidden" name="id" value={id} />
           <input type="hidden" name="return_to" value="/" />
+          <input type="hidden" name="end_offset_min" value={endOffset} />
+
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold text-gray-600">
+              Waktu selesai
+            </span>
+            <EndOffsetSelect value={endOffset} onChange={setEndOffset} />
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -847,8 +856,37 @@ function PindahForm({
   );
 }
 
+const END_OFFSETS: { value: number; label: string }[] = [
+  { value: 0, label: "Sekarang" },
+  { value: 1, label: "1 menit lalu" },
+  { value: 3, label: "3 menit lalu" },
+  { value: 5, label: "5 menit lalu" },
+  { value: 7, label: "7 menit lalu" },
+  { value: 10, label: "10 menit lalu" },
+];
+
+function EndOffsetSelect({ value, onChange }: {
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[11px] outline-none focus:border-rose-400"
+    >
+      {END_OFFSETS.map((o) => (
+        <option key={o.value} value={o.value}>
+          Selesai · {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function SleepLightControls({ id }: { id: string }) {
   const [asking, setAsking] = useState(false);
+  const [endOffset, setEndOffset] = useState(0);
   if (!asking) {
     return (
       <button
@@ -862,6 +900,7 @@ function SleepLightControls({ id }: { id: string }) {
   }
   return (
     <div className="mt-3 space-y-2 rounded-xl border border-rose-100 bg-rose-50/40 p-3">
+      <EndOffsetSelect value={endOffset} onChange={setEndOffset} />
       <p className="text-center text-[11px] font-semibold text-rose-700">
         Bagaimana kualitas tidurnya?
       </p>
@@ -877,6 +916,7 @@ function SleepLightControls({ id }: { id: string }) {
           <input type="hidden" name="id" value={id} />
           <input type="hidden" name="return_to" value="/" />
           <input type="hidden" name="sleep_quality" value={opt.value} />
+          <input type="hidden" name="end_offset_min" value={endOffset} />
           <SubmitButton
             pendingText="…"
             className="w-full rounded-xl border border-rose-200 bg-white py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 active:scale-[0.98]"
@@ -897,10 +937,13 @@ function SleepLightControls({ id }: { id: string }) {
 }
 
 function HiccupControls({ id }: { id: string }) {
+  const [endOffset, setEndOffset] = useState(0);
   return (
-    <form action={endOngoingHiccupAction} className="mt-3">
+    <form action={endOngoingHiccupAction} className="mt-3 space-y-2">
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="return_to" value="/" />
+      <input type="hidden" name="end_offset_min" value={endOffset} />
+      <EndOffsetSelect value={endOffset} onChange={setEndOffset} />
       <SubmitButton
         pendingText="Menyimpan…"
         className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
@@ -912,10 +955,13 @@ function HiccupControls({ id }: { id: string }) {
 }
 
 function TummyControls({ id }: { id: string }) {
+  const [endOffset, setEndOffset] = useState(0);
   return (
-    <form action={endOngoingTummyAction} className="mt-3">
+    <form action={endOngoingTummyAction} className="mt-3 space-y-2">
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="return_to" value="/" />
+      <input type="hidden" name="end_offset_min" value={endOffset} />
+      <EndOffsetSelect value={endOffset} onChange={setEndOffset} />
       <SubmitButton
         pendingText="Menyimpan…"
         className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600 active:bg-rose-700"
@@ -1006,8 +1052,10 @@ function DbfEffectivenessStep({
   id: string;
   onCancel: () => void;
 }) {
+  const [endOffset, setEndOffset] = useState(0);
   return (
     <div className="space-y-2 rounded-xl border border-rose-100 bg-rose-50/40 p-3">
+      <EndOffsetSelect value={endOffset} onChange={setEndOffset} />
       <p className="text-center text-[11px] font-semibold text-rose-700">
         Bagaimana efektivitas DBF?
       </p>
@@ -1042,6 +1090,7 @@ function DbfEffectivenessStep({
           <input type="hidden" name="id" value={id} />
           <input type="hidden" name="return_to" value="/" />
           <input type="hidden" name="effectiveness" value={opt.value} />
+          <input type="hidden" name="end_offset_min" value={endOffset} />
           <SubmitButton
             pendingText="…"
             className="flex w-full flex-col items-center rounded-xl border border-rose-200 bg-white py-2 px-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 active:scale-[0.98]"
