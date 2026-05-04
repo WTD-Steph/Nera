@@ -8,6 +8,7 @@ import {
   endOngoingHiccupAction,
   endOngoingTummyAction,
   pumpingPindahAction,
+  pumpingTambahAction,
   pauseOngoingLogAction,
   resumeFromPauseAction,
   startOngoingLogAction as startOngoingLogActionImported,
@@ -207,7 +208,14 @@ export function OngoingCard({
       ) : null}
 
       {showPumpEnd ? (
-        <EndPumpingModal id={id} onClose={() => setShowPumpEnd(false)} />
+        <EndPumpingModal
+          id={id}
+          startLAt={pumpStartLAt ?? null}
+          endLAt={pumpEndLAt ?? null}
+          startRAt={pumpStartRAt ?? null}
+          endRAt={pumpEndRAt ?? null}
+          onClose={() => setShowPumpEnd(false)}
+        />
       ) : null}
     </>
   );
@@ -665,9 +673,17 @@ function SideTile({
 
 function EndPumpingModal({
   id,
+  startLAt,
+  endLAt,
+  startRAt,
+  endRAt,
   onClose,
 }: {
   id: string;
+  startLAt: string | null;
+  endLAt: string | null;
+  startRAt: string | null;
+  endRAt: string | null;
   onClose: () => void;
 }) {
   const [endOffset, setEndOffset] = useState(0);
@@ -678,6 +694,44 @@ function EndPumpingModal({
     window.addEventListener("keydown", onEsc);
     return () => window.removeEventListener("keydown", onEsc);
   }, [onClose]);
+
+  // Per-side duration (closed sides only). Active sides will close at
+  // submit time, so estimate duration up to (now - endOffset).
+  const nowMs = Date.now();
+  const endMsForActive = nowMs - endOffset * 60_000;
+  const sideMin = (
+    start: string | null,
+    end: string | null,
+  ): number => {
+    if (!start) return 0;
+    const startMs = new Date(start).getTime();
+    const endMs = end ? new Date(end).getTime() : endMsForActive;
+    return Math.max(0, Math.round((endMs - startMs) / 60_000));
+  };
+  const lMin = sideMin(startLAt, endLAt);
+  const rMin = sideMin(startRAt, endRAt);
+  const lUsed = !!startLAt;
+  const rUsed = !!startRAt;
+  const bothUsed = lUsed && rUsed;
+  // Wall-clock total: from earliest start to latest end (or now-offset).
+  const earliestStart = (() => {
+    const candidates = [startLAt, startRAt].filter(Boolean) as string[];
+    if (candidates.length === 0) return null;
+    return candidates.reduce((min, s) =>
+      new Date(s).getTime() < new Date(min).getTime() ? s : min,
+    );
+  })();
+  const latestEnd = (() => {
+    const candidates: number[] = [];
+    if (lUsed) candidates.push(endLAt ? new Date(endLAt).getTime() : endMsForActive);
+    if (rUsed) candidates.push(endRAt ? new Date(endRAt).getTime() : endMsForActive);
+    if (candidates.length === 0) return null;
+    return Math.max(...candidates);
+  })();
+  const totalMin =
+    earliestStart && latestEnd
+      ? Math.max(0, Math.round((latestEnd - new Date(earliestStart).getTime()) / 60_000))
+      : 0;
 
   return (
     <div
@@ -718,23 +772,87 @@ function EndPumpingModal({
             <EndOffsetSelect value={endOffset} onChange={setEndOffset} />
           </div>
 
+          <div className="rounded-lg bg-rose-50/40 px-3 py-2 text-[11px] text-gray-600">
+            Total pump · <span className="font-semibold tabular-nums">{totalMin}m</span>
+            {lUsed ? (
+              <>
+                {" "}· Kiri{" "}
+                <span className="font-semibold tabular-nums">{lMin}m</span>
+              </>
+            ) : null}
+            {rUsed ? (
+              <>
+                {" "}· Kanan{" "}
+                <span className="font-semibold tabular-nums">{rMin}m</span>
+              </>
+            ) : null}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <span className="mb-1.5 block text-xs font-semibold text-gray-600">
-                Kiri (ml)
-              </span>
-              <PumpMlSelect name="amount_l_ml" autoFocus />
+            {/* Kiri */}
+            <div
+              className={`rounded-xl border-2 p-2 ${
+                lUsed
+                  ? "border-rose-300 bg-rose-50/50"
+                  : "border-dashed border-blue-200 bg-blue-50/30"
+              }`}
+            >
+              <div className="mb-1.5 flex items-baseline justify-between">
+                <span className="text-xs font-semibold text-gray-700">
+                  Kiri (ml)
+                </span>
+                {lUsed ? (
+                  <span className="text-[10px] font-medium text-rose-600">
+                    pump · {lMin}m
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-medium text-blue-700">
+                    💧 letdown?
+                  </span>
+                )}
+              </div>
+              <PumpMlSelect name="amount_l_ml" autoFocus={lUsed} />
+              {!lUsed && rUsed ? (
+                <p className="mt-1 text-[9px] leading-snug text-blue-700/80">
+                  Letdown reflex bisa bikin sisi tidak di-pump tetap
+                  netes — kalau ditampung (Haakaa), isi ml-nya.
+                </p>
+              ) : null}
             </div>
-            <div>
-              <span className="mb-1.5 block text-xs font-semibold text-gray-600">
-                Kanan (ml)
-              </span>
-              <PumpMlSelect name="amount_r_ml" />
+
+            {/* Kanan */}
+            <div
+              className={`rounded-xl border-2 p-2 ${
+                rUsed
+                  ? "border-rose-300 bg-rose-50/50"
+                  : "border-dashed border-blue-200 bg-blue-50/30"
+              }`}
+            >
+              <div className="mb-1.5 flex items-baseline justify-between">
+                <span className="text-xs font-semibold text-gray-700">
+                  Kanan (ml)
+                </span>
+                {rUsed ? (
+                  <span className="text-[10px] font-medium text-rose-600">
+                    pump · {rMin}m
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-medium text-blue-700">
+                    💧 letdown?
+                  </span>
+                )}
+              </div>
+              <PumpMlSelect name="amount_r_ml" autoFocus={!lUsed && rUsed} />
+              {!rUsed && lUsed ? (
+                <p className="mt-1 text-[9px] leading-snug text-blue-700/80">
+                  Letdown reflex bisa bikin sisi tidak di-pump tetap
+                  netes — kalau ditampung (Haakaa), isi ml-nya.
+                </p>
+              ) : null}
             </div>
           </div>
           <p className="text-center text-[10px] text-gray-400">
-            Tap angka → muncul wheel picker (iOS) / dropdown (web). Tidak
-            buka keyboard.
+            Tap angka → wheel picker (iOS) / dropdown (web). Tanpa keyboard.
           </p>
 
           <div className="sticky bottom-0 -mx-5 -mb-5 mt-2 border-t border-gray-100 bg-white/95 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80">
@@ -800,7 +918,10 @@ function PumpingControls({
         ) : null}
       </div>
       {canPindah && fromSide ? (
-        <PindahForm id={id} fromSide={fromSide} otherSide={otherSide} />
+        <>
+          <PindahForm id={id} fromSide={fromSide} otherSide={otherSide} />
+          <TambahForm id={id} addSide={fromSide === "kiri" ? "kanan" : "kiri"} />
+        </>
       ) : null}
       <button
         type="button"
@@ -851,6 +972,45 @@ function PindahForm({
         className="w-full rounded-xl border border-rose-200 bg-white py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50"
       >
         ⇄ Pindah ke {otherSide}
+      </SubmitButton>
+    </form>
+  );
+}
+
+/**
+ * Pumping-only: start the OTHER side simultaneously without ending the
+ * current one. Both sides pump together. Useful when user mulai dari
+ * satu sisi lalu mau pasang dual-pump.
+ */
+function TambahForm({
+  id,
+  addSide,
+}: {
+  id: string;
+  addSide: "kiri" | "kanan";
+}) {
+  const otherLabel = addSide === "kiri" ? "Kiri" : "Kanan";
+  return (
+    <form action={pumpingTambahAction} className="space-y-1.5">
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="add_side" value={addSide} />
+      <input type="hidden" name="return_to" value="/" />
+      <select
+        name="tambah_offset_min"
+        defaultValue={0}
+        className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[11px] outline-none focus:border-rose-400"
+      >
+        {PINDAH_OFFSETS.map((o) => (
+          <option key={o.value} value={o.value}>
+            Tambah · {o.label}
+          </option>
+        ))}
+      </select>
+      <SubmitButton
+        pendingText="Menambah…"
+        className="w-full rounded-xl border border-rose-200 bg-white py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50"
+      >
+        ＋ Tambah {otherLabel} (dual)
       </SubmitButton>
     </form>
   );

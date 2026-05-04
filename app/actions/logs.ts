@@ -582,6 +582,48 @@ export async function pumpingPindahAction(formData: FormData) {
   redirect(returnTo);
 }
 
+/**
+ * Pumping-specific: start the OTHER side without ending the active one.
+ * Both sides pump simultaneously after this. Mirror of pindah but
+ * kiri-end-kanan-start semantics replaced with kanan-start only.
+ */
+export async function pumpingTambahAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const addSide = String(formData.get("add_side") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/");
+  if (!id || (addSide !== "kiri" && addSide !== "kanan")) {
+    redirect(returnTo);
+  }
+  const offsetMin = (() => {
+    const raw = String(formData.get("tambah_offset_min") ?? "0");
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0 || n > 60) return 0;
+    return Math.round(n);
+  })();
+
+  const supabase = createClient();
+  const startIso = new Date(Date.now() - offsetMin * 60_000).toISOString();
+
+  const updates: Record<string, unknown> =
+    addSide === "kiri" ? { start_l_at: startIso } : { start_r_at: startIso };
+
+  const { error } = await supabase
+    .from("logs")
+    .update(updates as never)
+    .eq("id", id)
+    .eq("subtype", "pumping")
+    .is("end_timestamp", null);
+
+  if (error) {
+    redirect(
+      `${returnTo}?logerror=${encodeURIComponent(`Gagal tambah sisi: ${error.message}`)}`,
+    );
+  }
+
+  revalidatePath("/");
+  redirect(returnTo);
+}
+
 export async function endOngoingDbfAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/");
