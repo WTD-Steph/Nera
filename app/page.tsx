@@ -596,6 +596,37 @@ export default async function HomePage({
       target,
     });
   })();
+  // When DBF was sufficient (no top-up suggested) but user just ended
+  // a session, surface an "OK, no top-up needed" info banner so they
+  // don't wonder "kok ngga ada saran ya?".
+  const topUpInfo = (() => {
+    if (topUpSuggestion) return null;
+    const dbfId = searchParams.dbf_id;
+    const dbfDur = Number(searchParams.dbf_dur ?? 0);
+    if (!dbfId || !Number.isFinite(dbfDur) || dbfDur <= 0) return null;
+    if (searchParams.topup_skip === "1") return null;
+    const dbfRow = logsArray.find((l) => l.id === dbfId);
+    if (!dbfRow || dbfRow.subtype !== "feeding") return null;
+    const eff = (dbfRow.effectiveness ?? null) as EffectivenessLevel | null;
+    const factor = eff
+      ? eff === "efektif"
+        ? 1.0
+        : eff === "sedang"
+          ? 0.8
+          : 0.6
+      : 1.0;
+    const effectiveMl = Math.round(dbfDur * dbfEst.mlPerMin * factor);
+    const feedsPerDay =
+      target.ageDaysMax <= 30
+        ? 10
+        : target.ageDaysMax <= 90
+          ? 7
+          : target.ageDaysMax <= 180
+            ? 6
+            : 5;
+    const expectedPerFeed = Math.round(milkTarget.min / feedsPerDay);
+    return { effectiveMl, expectedPerFeed };
+  })();
   const dbfRowEffectiveness = (() => {
     if (!searchParams.dbf_id) return null;
     const row = logsArray.find((l) => l.id === searchParams.dbf_id);
@@ -958,6 +989,33 @@ export default async function HomePage({
                 Saran berbasis WHO/AAP/IDAI per-kg/hari × usia ÷ feeds/hari.
                 Bukan instruksi medis — ikuti panduan DSA.
               </p>
+            </div>
+          </div>
+        </div>
+      ) : topUpInfo ? (
+        <div className="flash-in mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 shadow-sm">
+          <div className="flex items-start gap-2">
+            <span aria-hidden className="text-lg">
+              ✓
+            </span>
+            <div className="flex-1 text-sm text-emerald-900">
+              <div className="font-semibold">Tidak perlu top-up</div>
+              <div className="mt-0.5 text-[11px] leading-snug text-emerald-800/90">
+                DBF{" "}
+                {dbfRowEffectiveness
+                  ? `${EFFECTIVENESS_EMOJIS[dbfRowEffectiveness]} ${EFFECTIVENESS_LABELS[dbfRowEffectiveness]}`
+                  : "estimasi"}{" "}
+                ≈{topUpInfo.effectiveMl} ml — sudah dekat target per feed
+                ≈{topUpInfo.expectedPerFeed} ml.
+              </div>
+              <div className="mt-1.5">
+                <Link
+                  href={postDbfHref({ topup_skip: "1" })}
+                  className="text-[11px] text-emerald-700/70 hover:text-emerald-900"
+                >
+                  Tutup
+                </Link>
+              </div>
             </div>
           </div>
         </div>
