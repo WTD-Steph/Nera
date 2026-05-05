@@ -1025,22 +1025,37 @@ const END_OFFSETS: { value: number; label: string }[] = [
   { value: 10, label: "10 menit lalu" },
 ];
 
+/**
+ * Chip-style end-offset picker. One-tap select. Default 'Sekarang'
+ * highlighted. Used konsisten di semua end flows (sleep, dbf, pumping,
+ * hiccup, tummy) supaya UX-nya familiar.
+ */
 function EndOffsetSelect({ value, onChange }: {
   value: number;
   onChange: (v: number) => void;
 }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[11px] outline-none focus:border-rose-400"
-    >
-      {END_OFFSETS.map((o) => (
-        <option key={o.value} value={o.value}>
-          Selesai · {o.label}
-        </option>
-      ))}
-    </select>
+    <div>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+        Berhenti
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {END_OFFSETS.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              value === o.value
+                ? "bg-rose-500 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-rose-100 hover:text-rose-700"
+            }`}
+          >
+            {o.value === 0 ? "Sekarang" : `${o.value}m lalu`}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

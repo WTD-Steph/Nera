@@ -163,6 +163,20 @@ export default async function ProfilePage({
           Simpan perubahan
         </SubmitButton>
       </form>
+
+      <div className="mt-8 border-t border-gray-100 pt-4">
+        <p className="mb-2 text-[11px] text-gray-400">
+          {user.email}
+        </p>
+        <form action="/auth/signout" method="post">
+          <SubmitButton
+            pendingText="Keluar…"
+            className="w-full rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            🚪 Keluar dari akun
+          </SubmitButton>
+        </form>
+      </div>
     </main>
   );
 }

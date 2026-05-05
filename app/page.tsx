@@ -1369,48 +1369,117 @@ export default async function HomePage({
               👶 {baby.name}
             </span>
           </div>
-          <StatRow
-            label="🍼 Susu"
-            value={`${milkTotalMl} ml`}
-            sub={`${milkTarget.min}–${milkTarget.max} ml`}
-            progress={milkTotalMl / milkTarget.min}
-            detail={[susuSourceBreakdown, milkBreakdown].filter(
-              (v): v is string => Boolean(v),
-            )}
-            href="/?act=bottle#aktivitas"
-            active={activeAct === "bottle"}
-            trendAnchor="susu"
-          />
-          <StatRow
-            label="😴 Tidur"
-            value={fmtDuration(stats.sleepMin)}
-            sub={`${target.sleepHoursMin}–${target.sleepHoursMax} jam`}
-            progress={stats.sleepMin / 60 / target.sleepHoursMin}
-            detail={
-              stats.sleepCount > 0 ? `${stats.sleepCount} sesi` : undefined
-            }
-            href="/?act=sleep#aktivitas"
-            active={activeAct === "sleep"}
-            trendAnchor="tidur"
-          />
-          <StatRow
-            label="💛 Pipis"
-            value={`${stats.diaperPeeCount}×`}
-            sub={`${target.peeMin}–${target.peeMax}×`}
-            progress={stats.diaperPeeCount / target.peeMin}
-            href="/?act=diaper#aktivitas"
-            active={activeAct === "diaper"}
-            trendAnchor="diaper"
-          />
-          <StatRow
-            label="💩 BAB"
-            value={`${stats.diaperPoopCount}×`}
-            sub={`${target.poopMin}–${target.poopMax}×`}
-            progress={stats.diaperPoopCount / target.poopMin}
-            href="/?act=diaper#aktivitas"
-            active={activeAct === "diaper"}
-            trendAnchor="diaper"
-          />
+          {(() => {
+            // Avg interval helper. Compute mean gap between consecutive
+            // events of given subtype in selected day. Returns null if
+            // <2 events (no gap to measure).
+            const avgIntervalMin = (
+              filter: (l: LogRow) => boolean,
+            ): number | null => {
+              const startMs = selectedDayMs;
+              const endMs = startMs + 86400000;
+              const ts = logsArray
+                .filter(filter)
+                .map((l) => new Date(l.timestamp).getTime())
+                .filter((t) => t >= startMs && t < endMs)
+                .sort((a, b) => a - b);
+              if (ts.length < 2) return null;
+              const gaps: number[] = [];
+              for (let i = 1; i < ts.length; i++) {
+                const a = ts[i - 1];
+                const b = ts[i];
+                if (a !== undefined && b !== undefined)
+                  gaps.push((b - a) / 60000);
+              }
+              if (gaps.length === 0) return null;
+              return gaps.reduce((s, g) => s + g, 0) / gaps.length;
+            };
+            const avgIntervalText = (mins: number | null): string => {
+              if (mins == null) return "";
+              const h = Math.floor(mins / 60);
+              const m = Math.round(mins % 60);
+              if (h === 0) return `${m}m`;
+              if (m === 0) return `${h}j`;
+              return `${h}j ${m}m`;
+            };
+            const peeAvg = avgIntervalMin(
+              (l) => l.subtype === "diaper" && !!l.has_pee,
+            );
+            const poopAvg = avgIntervalMin(
+              (l) => l.subtype === "diaper" && !!l.has_poop,
+            );
+            const sleepAvgPerSession =
+              stats.sleepCount > 0 ? stats.sleepMin / stats.sleepCount : 0;
+            return (
+              <>
+                <StatRow
+                  label="🍼 Susu"
+                  value={`${milkTotalMl} ml`}
+                  sub={`${milkTarget.min}–${milkTarget.max} ml`}
+                  progressSegments={[
+                    {
+                      value: susuBreakdown.asi,
+                      color: "bg-rose-400",
+                      divisor: milkTarget.min,
+                    },
+                    {
+                      value: susuBreakdown.sufor,
+                      color: "bg-amber-400",
+                      divisor: milkTarget.min,
+                    },
+                  ]}
+                  detail={[susuSourceBreakdown, milkBreakdown].filter(
+                    (v): v is string => Boolean(v),
+                  )}
+                  href="/?act=bottle#aktivitas"
+                  active={activeAct === "bottle"}
+                  trendAnchor="susu"
+                />
+                <StatRow
+                  label="😴 Tidur"
+                  value={fmtDuration(stats.sleepMin)}
+                  sub={`${target.sleepHoursMin}–${target.sleepHoursMax} jam`}
+                  progress={stats.sleepMin / 60 / target.sleepHoursMin}
+                  detail={
+                    stats.sleepCount > 0
+                      ? `${stats.sleepCount} sesi · avg ${fmtDuration(Math.round(sleepAvgPerSession))}/sesi`
+                      : undefined
+                  }
+                  href="/?act=sleep#aktivitas"
+                  active={activeAct === "sleep"}
+                  trendAnchor="tidur"
+                />
+                <StatRow
+                  label="💛 Pipis"
+                  value={`${stats.diaperPeeCount}×`}
+                  sub={`${target.peeMin}–${target.peeMax}×`}
+                  progress={stats.diaperPeeCount / target.peeMin}
+                  detail={
+                    peeAvg != null
+                      ? `avg ${avgIntervalText(peeAvg)} antar pipis`
+                      : undefined
+                  }
+                  href="/?act=diaper#aktivitas"
+                  active={activeAct === "diaper"}
+                  trendAnchor="diaper"
+                />
+                <StatRow
+                  label="💩 BAB"
+                  value={`${stats.diaperPoopCount}×`}
+                  sub={`${target.poopMin}–${target.poopMax}×`}
+                  progress={stats.diaperPoopCount / target.poopMin}
+                  detail={
+                    poopAvg != null
+                      ? `avg ${avgIntervalText(poopAvg)} antar BAB`
+                      : undefined
+                  }
+                  href="/?act=diaper#aktivitas"
+                  active={activeAct === "diaper"}
+                  trendAnchor="diaper"
+                />
+              </>
+            );
+          })()}
           {stats.pumpCount > 0 ||
           totalBoobsLMin > 0 ||
           totalBoobsRMin > 0 ? (
@@ -1763,52 +1832,62 @@ export default async function HomePage({
         </Link>
       </section>
 
-      <div className="mt-6 grid grid-cols-2 gap-2">
+      <div className="mt-6 grid grid-cols-3 gap-2">
         <Link
           href="/trend"
-          className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          className="flex flex-col items-center gap-1 rounded-xl border border-gray-200 bg-white px-2 py-3 text-center text-xs font-semibold text-gray-700 hover:bg-gray-50"
         >
-          📊 Trend
+          <span className="text-lg" aria-hidden>
+            📊
+          </span>
+          Trend
         </Link>
         <Link
           href="/growth"
-          className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          className="flex flex-col items-center gap-1 rounded-xl border border-gray-200 bg-white px-2 py-3 text-center text-xs font-semibold text-gray-700 hover:bg-gray-50"
         >
-          📈 Tumbuh
+          <span className="text-lg" aria-hidden>
+            📈
+          </span>
+          Tumbuh
         </Link>
         <Link
           href="/milestone"
-          className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          className="flex flex-col items-center gap-1 rounded-xl border border-gray-200 bg-white px-2 py-3 text-center text-xs font-semibold text-gray-700 hover:bg-gray-50"
         >
-          🎯 Milestone
+          <span className="text-lg" aria-hidden>
+            🎯
+          </span>
+          Milestone
         </Link>
         <Link
           href="/imunisasi"
-          className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          className="flex flex-col items-center gap-1 rounded-xl border border-gray-200 bg-white px-2 py-3 text-center text-xs font-semibold text-gray-700 hover:bg-gray-50"
         >
-          💉 Imunisasi
+          <span className="text-lg" aria-hidden>
+            💉
+          </span>
+          Imunisasi
         </Link>
         <Link
           href="/report"
-          className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          className="flex flex-col items-center gap-1 rounded-xl border border-gray-200 bg-white px-2 py-3 text-center text-xs font-semibold text-gray-700 hover:bg-gray-50"
         >
-          📥 Laporan
+          <span className="text-lg" aria-hidden>
+            📥
+          </span>
+          Laporan
         </Link>
         <Link
           href="/more/household"
-          className="col-span-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          className="flex flex-col items-center gap-1 rounded-xl border border-gray-200 bg-white px-2 py-3 text-center text-xs font-semibold text-gray-700 hover:bg-gray-50"
         >
-          👨‍👩‍👧 Keluarga
+          <span className="text-lg" aria-hidden>
+            👨‍👩‍👧
+          </span>
+          Keluarga
         </Link>
       </div>
-      <form action="/auth/signout" method="post" className="mt-2">
-        <SubmitButton
-          pendingText="Keluar…"
-          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-        >
-          Keluar
-        </SubmitButton>
-      </form>
 
       <p className="mt-6 text-center text-[11px] text-gray-400">
         {user.email} · {household.role === "owner" ? "Owner" : "Member"}
@@ -1881,6 +1960,7 @@ function StatRow({
   value,
   sub,
   progress,
+  progressSegments,
   detail,
   href,
   active,
@@ -1890,8 +1970,11 @@ function StatRow({
   value: string;
   /** Target text shown right of value (e.g. "600–800 ml"). */
   sub?: string;
-  /** 0..1+ progress against target min. Renders progress bar when set. */
+  /** 0..1+ progress against target min. Renders single-color progress bar when set. */
   progress?: number;
+  /** Stacked multi-color bar (e.g. ASI vs Sufor). Each segment gets a
+   *  share of the bar width = value/divisor (clamped to remaining). */
+  progressSegments?: { value: number; color: string; divisor: number }[];
   /** Optional small line(s) below the row (breakdown, per-side detail). */
   detail?: string | string[];
   href?: string;
@@ -1919,7 +2002,23 @@ function StatRow({
           </span>
         ) : null}
       </div>
-      {pct != null ? (
+      {progressSegments && progressSegments.length > 0 ? (
+        <div className="mt-1 flex h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+          {progressSegments.map((seg, i) => {
+            const pctSeg = Math.min(
+              1,
+              Math.max(0, seg.value / Math.max(1, seg.divisor)),
+            );
+            return (
+              <div
+                key={i}
+                className={`h-full ${seg.color} transition-[width]`}
+                style={{ width: `${pctSeg * 100}%` }}
+              />
+            );
+          })}
+        </div>
+      ) : pct != null ? (
         <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
           <div
             className={`h-full rounded-full ${barColor} transition-[width]`}
