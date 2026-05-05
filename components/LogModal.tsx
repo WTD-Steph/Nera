@@ -985,6 +985,10 @@ function DbfEditPerSide({ editLog }: { editLog: EditLog }) {
 const ML_PRESETS = [30, 50, 80, 100, 120, 150];
 const ML_STEP = 5;
 
+// Native <select> 0-200 → iOS wheel picker, no keyboard. Keep ± stepper
+// and chip presets sebagai shortcut quick-jump.
+const ML_MAX = 200;
+
 function MlInput({
   name,
   initial,
@@ -1017,22 +1021,22 @@ function MlInput({
         >
           −
         </button>
-        <input
-          type="number"
+        <select
           name={name}
-          step="1"
-          min="0"
-          max="500"
-          inputMode="numeric"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          onFocus={(e) => e.target.select()}
-          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-center text-base font-semibold tabular-nums outline-none focus:border-rose-400"
-        />
+          className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-base font-semibold tabular-nums outline-none focus:border-rose-400"
+        >
+          {Array.from({ length: ML_MAX + 1 }, (_, i) => (
+            <option key={i} value={i}>
+              {i} ml
+            </option>
+          ))}
+        </select>
         <button
           type="button"
           onClick={() =>
-            setValue(String(Math.min(500, numeric + ML_STEP)))
+            setValue(String(Math.min(ML_MAX, numeric + ML_STEP)))
           }
           className="rounded-xl border border-gray-200 bg-white px-3 text-sm font-bold text-gray-600 hover:bg-rose-50 hover:text-rose-700 active:scale-95"
           aria-label={`+${ML_STEP} ml`}

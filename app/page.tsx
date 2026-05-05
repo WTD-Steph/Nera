@@ -1098,17 +1098,21 @@ export default async function HomePage({
                 menetes. Kalau ada tampungan, langsung masuk ke stock ASI.
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <input
-                  type="number"
+                <select
                   name="ml"
                   required
-                  min="1"
-                  max="500"
-                  step="1"
-                  inputMode="decimal"
-                  placeholder="ml"
-                  className="w-24 rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400"
-                />
+                  defaultValue=""
+                  className="w-28 appearance-none rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-sm font-semibold tabular-nums text-blue-900 outline-none focus:border-blue-400"
+                >
+                  <option value="" disabled>
+                    pilih ml…
+                  </option>
+                  {Array.from({ length: 200 }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>
+                      {n} ml
+                    </option>
+                  ))}
+                </select>
                 <SubmitButton
                   pendingText="…"
                   className="rounded-full bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600"
