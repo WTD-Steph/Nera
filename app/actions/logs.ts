@@ -951,13 +951,17 @@ export async function resumeFromPauseAction(formData: FormData) {
 export async function expireStalePausedLogs(babyId: string) {
   const supabase = createClient();
   const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  // Skip pumping: end_timestamp tanpa amount_l_ml/amount_r_ml = data
+  // pump hilang. User harus manually Selesai supaya bisa input ml.
+  // Skip feeding (DBF) juga supaya effectiveness picker tetap muncul.
   const { data: stale } = await supabase
     .from("logs")
-    .select("id, paused_at, start_l_at, end_l_at, start_r_at, end_r_at")
+    .select("id, subtype, paused_at, start_l_at, end_l_at, start_r_at, end_r_at")
     .eq("baby_id", babyId)
     .is("end_timestamp", null)
     .not("paused_at", "is", null)
-    .lt("paused_at", cutoff);
+    .lt("paused_at", cutoff)
+    .in("subtype", ["sleep", "hiccup", "tummy"]);
   if (!stale || stale.length === 0) return;
   for (const r of stale) {
     if (!r.paused_at) continue;
