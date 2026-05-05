@@ -491,6 +491,95 @@ export type Database = {
           },
         ]
       }
+      routines: {
+        Row: {
+          baby_id: string
+          created_at: string
+          created_by: string | null
+          display_order: number
+          emoji: string | null
+          id: string
+          name: string
+          needs_duration: boolean
+        }
+        Insert: {
+          baby_id: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          emoji?: string | null
+          id?: string
+          name: string
+          needs_duration?: boolean
+        }
+        Update: {
+          baby_id?: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          emoji?: string | null
+          id?: string
+          name?: string
+          needs_duration?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routines_baby_id_fkey"
+            columns: ["baby_id"]
+            isOneToOne: false
+            referencedRelation: "babies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      routine_logs: {
+        Row: {
+          baby_id: string
+          created_at: string
+          created_by: string | null
+          duration_min: number | null
+          id: string
+          logged_at: string
+          notes: string | null
+          routine_id: string
+        }
+        Insert: {
+          baby_id: string
+          created_at?: string
+          created_by?: string | null
+          duration_min?: number | null
+          id?: string
+          logged_at?: string
+          notes?: string | null
+          routine_id: string
+        }
+        Update: {
+          baby_id?: string
+          created_at?: string
+          created_by?: string | null
+          duration_min?: number | null
+          id?: string
+          logged_at?: string
+          notes?: string | null
+          routine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routine_logs_baby_id_fkey"
+            columns: ["baby_id"]
+            isOneToOne: false
+            referencedRelation: "babies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routine_logs_routine_id_fkey"
+            columns: ["routine_id"]
+            isOneToOne: false
+            referencedRelation: "routines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       milestone_progress: {
         Row: {
           achieved_at: string
