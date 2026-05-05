@@ -487,12 +487,16 @@ export default async function HomePage({
   const selectedDayKey = jakartaDayKey(selectedDayMs);
   const selectedDayLabel = jakartaDayLabel(selectedDayMs, todayMs);
   const isToday = selectedDayKey === jakartaDayKey(todayMs);
-  // Stats window: rolling 24h when viewing today, calendar day for past
-  // dates. Rolling lebih representative untuk newborn ('apa yang terjadi
-  // 24 jam terakhir') vs midnight reset yang bikin counter di pagi hari
-  // selalu kosong walaupun baru ngurus baby semalaman.
-  const statsWindowMs = isToday ? Date.now() - 86400000 : selectedDayMs;
-  const stats = computeTodayStats(logsArray, statsWindowMs);
+  // Total count = calendar day (Jakarta 00:00–23:59). Easy to compare
+  // hari demi hari, match user's mental model of 'hari ini berapa'.
+  const stats = computeTodayStats(logsArray, selectedDayMs);
+  // Avg metrics window — beda dari Total count untuk kasih pandangan
+  // yang lebih representative:
+  //   - Tidur, Pipis: 24 jam terakhir (rolling) — newborn tidak ngikut
+  //     calendar day, pola lebih kelihatan dari last-24h sample
+  //   - BAB: 7 hari terakhir (separate query) — frequency 0-2×/hari,
+  //     butuh window lebih panjang
+  const avgWindowMs = isToday ? Date.now() - 86400000 : selectedDayMs;
   const last = computeLastByType(logsArray);
   const dayPrev = jakartaDayKey(selectedDayMs - 86400000);
   const dayNext = jakartaDayKey(selectedDayMs + 86400000);
@@ -528,7 +532,7 @@ export default async function HomePage({
   const susuBreakdown = (() => {
     let asiBottle = 0;
     let suforBottle = 0;
-    const startMs = statsWindowMs;
+    const startMs = selectedDayMs;
     const endMs = startMs + 86400000;
     for (const l of logsArray) {
       if (l.subtype !== "feeding") continue;
@@ -1379,7 +1383,7 @@ export default async function HomePage({
       <section className="mt-5">
         <div className="mb-2 flex items-center justify-between gap-2 px-1">
           <h2 className="text-sm font-semibold text-gray-700">
-            {isToday ? "Total 24 Jam Terakhir" : `Total ${selectedDayLabel}`}
+            {isToday ? "Total Hari Ini" : `Total ${selectedDayLabel}`}
           </h2>
           <div className="flex items-center gap-1">
             <Link
@@ -1423,7 +1427,7 @@ export default async function HomePage({
             const avgIntervalMin = (
               filter: (l: LogRow) => boolean,
             ): number | null => {
-              const startMs = statsWindowMs;
+              const startMs = avgWindowMs;
               const endMs = startMs + 86400000;
               const ts = logsArray
                 .filter(filter)
@@ -1441,6 +1445,23 @@ export default async function HomePage({
               if (gaps.length === 0) return null;
               return gaps.reduce((s, g) => s + g, 0) / gaps.length;
             };
+            // Sleep avg per sesi pakai 24h window juga (more representative).
+            const sleep24h = logsArray.filter((l) => {
+              if (l.subtype !== "sleep") return false;
+              const t = new Date(l.timestamp).getTime();
+              return t >= avgWindowMs && t < avgWindowMs + 86400000;
+            });
+            const sleep24hMins = sleep24h.reduce((sum, l) => {
+              if (!l.end_timestamp) return sum;
+              return (
+                sum +
+                (new Date(l.end_timestamp).getTime() -
+                  new Date(l.timestamp).getTime()) /
+                  60000
+              );
+            }, 0);
+            const sleep24hAvgPerSession =
+              sleep24h.length > 0 ? sleep24hMins / sleep24h.length : 0;
             const avgIntervalText = (mins: number | null): string => {
               if (mins == null) return "";
               const h = Math.floor(mins / 60);
@@ -1469,8 +1490,7 @@ export default async function HomePage({
               if (gaps.length === 0) return null;
               return gaps.reduce((s, g) => s + g, 0) / gaps.length;
             })();
-            const sleepAvgPerSession =
-              stats.sleepCount > 0 ? stats.sleepMin / stats.sleepCount : 0;
+            // Reused below; kept for clarity. (avg = 24h window above.)
             return (
               <>
                 <StatRow
@@ -1503,7 +1523,7 @@ export default async function HomePage({
                   progress={stats.sleepMin / 60 / target.sleepHoursMin}
                   detail={
                     stats.sleepCount > 0
-                      ? `${stats.sleepCount} sesi · avg ${fmtDuration(Math.round(sleepAvgPerSession))}/sesi`
+                      ? `${stats.sleepCount} sesi · avg ${fmtDuration(Math.round(sleep24hAvgPerSession))}/sesi · 24 jam`
                       : undefined
                   }
                   href="/?act=sleep#aktivitas"
@@ -1517,7 +1537,7 @@ export default async function HomePage({
                   progress={stats.diaperPeeCount / target.peeMin}
                   detail={
                     peeAvg != null
-                      ? `avg ${avgIntervalText(peeAvg)} antar pipis`
+                      ? `avg ${avgIntervalText(peeAvg)} antar pipis · 24 jam`
                       : undefined
                   }
                   href="/?act=diaper#aktivitas"
@@ -1886,10 +1906,25 @@ export default async function HomePage({
           )}
         </div>
         <Link
-          href="/history"
+          href={(() => {
+            // Preserve home filter when jumping to /history. Map activeAct
+            // to /history filter id (overlap on subtype names + bottle/dbf
+            // both → feeding).
+            if (!activeAct) return "/history";
+            const map: Record<string, string> = {
+              bottle: "feeding",
+              dbf: "feeding",
+              sleep: "sleep",
+              pumping: "pumping",
+              diaper: "diaper",
+            };
+            const f = map[activeAct];
+            return f ? `/history?filter=${f}` : "/history";
+          })()}
           className="mt-2 block text-center text-xs font-semibold text-rose-600 hover:underline"
         >
-          Lihat semua riwayat →
+          Lihat semua riwayat
+          {activeAct ? ` ${ACT_LABEL[activeAct]}` : ""} →
         </Link>
       </section>
 
