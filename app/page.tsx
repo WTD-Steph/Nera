@@ -28,6 +28,7 @@ import {
   endHandoverAction,
 } from "@/app/actions/handover";
 import { summarizeHandoverActivity } from "@/lib/compute/handover";
+import { assessWake, getWakeWindow } from "@/lib/constants/wake-window";
 import {
   RoutineChecklist,
   type RoutineItem,
@@ -627,6 +628,19 @@ export default async function HomePage({
     if (last.sleep.end_timestamp == null) return "sedang berjalan";
     return timeSince(last.sleep.end_timestamp);
   })();
+  // Wake window assessment — counts minutes since last sleep ended,
+  // bucketed by baby age. Surfaces 'overtired risk' when awake too long.
+  const wakeAssessment = (() => {
+    if (!last.sleep || !last.sleep.end_timestamp) return null;
+    const awakeMin = Math.max(
+      0,
+      Math.round(
+        (Date.now() - new Date(last.sleep.end_timestamp).getTime()) / 60000,
+      ),
+    );
+    const window = getWakeWindow(baby.dob);
+    return assessWake(awakeMin, window);
+  })();
 
   // Top-up suggestion after DBF Selesai. dbf_id + dbf_dur passed via
   // redirect from endOngoingDbfAction. Looks up effectiveness from the
@@ -932,7 +946,11 @@ export default async function HomePage({
           {logerror}
         </div>
       ) : null}
-      {feedingReminder || diaperReminder ? (
+      {feedingReminder ||
+      diaperReminder ||
+      (wakeAssessment &&
+        (wakeAssessment.tone === "warn" ||
+          wakeAssessment.tone === "alert")) ? (
         <div className="mt-3 space-y-1.5">
           {feedingReminder ? (
             <div
@@ -956,6 +974,24 @@ export default async function HomePage({
             >
               <span aria-hidden>🧷</span>
               <span>{diaperReminder.text}</span>
+            </div>
+          ) : null}
+          {wakeAssessment &&
+          (wakeAssessment.tone === "warn" ||
+            wakeAssessment.tone === "alert") ? (
+            <div
+              className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium ${
+                wakeAssessment.tone === "alert"
+                  ? "border-red-200 bg-red-50 text-red-800"
+                  : "border-amber-200 bg-amber-50 text-amber-800"
+              }`}
+            >
+              <span aria-hidden>🌙</span>
+              <span>
+                Sudah {wakeAssessment.awakeMin}m bangun · window{" "}
+                {wakeAssessment.window.minMin}–{wakeAssessment.window.maxMin}m
+                · {wakeAssessment.statusLabel}
+              </span>
             </div>
           ) : null}
         </div>
@@ -1712,6 +1748,49 @@ export default async function HomePage({
           <SinceCard label="Diaper" log={last.diaper} />
           <SinceCard label="Tidur" log={last.sleep} />
         </div>
+        {wakeAssessment ? (
+          <div
+            className={`mt-2 rounded-xl border px-3 py-2 text-[11px] ${
+              wakeAssessment.tone === "alert"
+                ? "border-red-200 bg-red-50/60 text-red-800"
+                : wakeAssessment.tone === "warn"
+                  ? "border-amber-200 bg-amber-50/60 text-amber-800"
+                  : "border-emerald-100 bg-emerald-50/40 text-emerald-800"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-semibold">
+                Wake window · usia {wakeAssessment.window.label}
+              </span>
+              <span className="tabular-nums">
+                {wakeAssessment.awakeMin}m / {wakeAssessment.window.minMin}–
+                {wakeAssessment.window.maxMin}m
+              </span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/60">
+              <div
+                className={`h-full transition-all ${
+                  wakeAssessment.tone === "alert"
+                    ? "bg-red-400"
+                    : wakeAssessment.tone === "warn"
+                      ? "bg-amber-400"
+                      : "bg-emerald-400"
+                }`}
+                style={{
+                  width: `${Math.min(
+                    100,
+                    Math.round(
+                      (wakeAssessment.awakeMin /
+                        wakeAssessment.window.maxMin) *
+                        100,
+                    ),
+                  )}%`,
+                }}
+              />
+            </div>
+            <div className="mt-1">{wakeAssessment.statusLabel}</div>
+          </div>
+        ) : null}
       </section>
 
       <section id="aktivitas" className="mt-5 scroll-mt-4">
