@@ -108,7 +108,13 @@ export function OngoingCard({
             </div>
             <div className="text-[11px] text-gray-500">
               Sejak {fmtClock(startIso)}
-              {isPaused ? " · auto-end 10 menit kalau tetap dijeda" : ""}
+              {isPaused
+                ? subtype === "sleep" ||
+                  subtype === "hiccup" ||
+                  subtype === "tummy"
+                  ? " · auto-end 10 menit kalau tetap dijeda"
+                  : " · pause manual — Selesai untuk catat"
+                : ""}
             </div>
           </div>
           {subtype !== "hiccup" && subtype !== "tummy" ? (
@@ -1023,6 +1029,10 @@ const END_OFFSETS: { value: number; label: string }[] = [
   { value: 5, label: "5 menit lalu" },
   { value: 7, label: "7 menit lalu" },
   { value: 10, label: "10 menit lalu" },
+  { value: 15, label: "15 menit lalu" },
+  { value: 20, label: "20 menit lalu" },
+  { value: 25, label: "25 menit lalu" },
+  { value: 30, label: "30 menit lalu" },
 ];
 
 /**
