@@ -30,6 +30,8 @@ import {
 import { summarizeHandoverActivity } from "@/lib/compute/handover";
 import { assessWake, getWakeWindow } from "@/lib/constants/wake-window";
 import { getCurrentRegression } from "@/lib/constants/sleep-regressions";
+import { computeCryCauses } from "@/lib/compute/cry-diagnostic";
+import { CryDiagnostic } from "@/components/CryDiagnostic";
 import {
   RoutineChecklist,
   type RoutineItem,
@@ -644,6 +646,27 @@ export default async function HomePage({
   })();
   // Sleep regression — banner saat in-window OR upcoming dalam 14 hari
   const sleepRegression = getCurrentRegression(baby.dob);
+  // Cry diagnostic — rank kemungkinan penyebab nangis dari log terbaru
+  const lastTemp =
+    logsArray.find((l) => l.subtype === "temp") ?? null;
+  const lastBath =
+    logsArray.find((l) => l.subtype === "bath") ?? null;
+  const lastTummy =
+    logsArray.find((l) => l.subtype === "tummy") ?? null;
+  const isSleepOngoing = ongoingSubtypes.has("sleep");
+  const ageDays = Math.floor(
+    (Date.now() - new Date(baby.dob).getTime()) / 86400000,
+  );
+  const cryCauses = computeCryCauses({
+    lastFeeding: last.feeding,
+    lastDiaper: last.diaper,
+    lastTemp,
+    lastBath,
+    lastTummy,
+    wakeAssessment,
+    isSleepOngoing,
+    ageDays,
+  });
 
   // Top-up suggestion after DBF Selesai. dbf_id + dbf_dur passed via
   // redirect from endOngoingDbfAction. Looks up effectiveness from the
@@ -1809,6 +1832,7 @@ export default async function HomePage({
           <SinceCard label="Diaper" log={last.diaper} />
           <SinceCard label="Tidur" log={last.sleep} />
         </div>
+        <CryDiagnostic causes={cryCauses} asiBatches={asiBatchOptions} />
         {wakeAssessment ? (
           <div
             className={`mt-2 rounded-xl border px-3 py-2 text-[11px] ${
