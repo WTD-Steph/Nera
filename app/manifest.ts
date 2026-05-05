@@ -8,7 +8,7 @@ import type { MetadataRoute } from "next";
 // Chromium re-fetch ikon waktu manifest update. Tanpa ini, browser
 // keep icon yang sudah di-cache walaupun /icon endpoint return PNG baru.
 // Bump angka ini setiap kali design icon berubah.
-const ICON_VERSION = 2;
+const ICON_VERSION = 3;
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -27,17 +27,29 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#f43f5e",
     lang: "id",
     icons: [
+      // 512x512 source — Android splash screen + high-DPI installer
+      // pakai size ini supaya tajam (splash di-upscale dari icon
+      // terbesar, sebelumnya 192px → blur).
       {
         src: `/icon?v=${ICON_VERSION}`,
-        sizes: "192x192",
+        sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
         src: `/icon?v=${ICON_VERSION}`,
-        sizes: "192x192",
+        sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
+      },
+      // 192x192 alias — beberapa browser mau size ini explicit untuk
+      // home screen icon (Chrome auto-scale dari 512 sebenarnya OK
+      // tapi list ini bantu compatibility).
+      {
+        src: `/icon?v=${ICON_VERSION}`,
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
       },
       {
         src: `/apple-icon?v=${ICON_VERSION}`,
