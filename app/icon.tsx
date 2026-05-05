@@ -1,8 +1,10 @@
 import { ImageResponse } from "next/og";
 
-// 192x192 icon untuk PWA + favicon (browser auto-scale untuk favicon size).
+// Master PWA icon — 512x512 untuk Android splash screen sharpness +
+// Chrome installer + favicon. Browser auto-scale untuk size kecil.
+// Sebelumnya 192x192 → splash blur di Android karena upscaling.
 export const runtime = "edge";
-export const size = { width: 192, height: 192 };
+export const size = { width: 512, height: 512 };
 export const contentType = "image/png";
 
 export default function Icon() {
@@ -15,34 +17,37 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #fce7f3 0%, #f9a8d4 55%, #ec4899 100%)",
-          borderRadius: 38,
+          background:
+            "linear-gradient(135deg, #fce7f3 0%, #f9a8d4 55%, #ec4899 100%)",
+          borderRadius: 102,
           position: "relative",
         }}
       >
-        {/* Soft white inner halo for contrast */}
+        {/* Soft white inner halo for contrast — sized so kontennya stays
+            di safe zone (80% center) untuk maskable mask. */}
         <div
           style={{
-            width: 138,
-            height: 138,
+            width: 368,
+            height: 368,
             borderRadius: "50%",
             background: "rgba(255, 252, 254, 0.92)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 92,
-            boxShadow: "inset 0 -6px 14px rgba(244,114,182,0.18)",
+            fontSize: 246,
+            boxShadow: "inset 0 -16px 38px rgba(244,114,182,0.18)",
           }}
         >
           🍼
         </div>
-        {/* Sparkle accent top-right */}
+        {/* Sparkle accent top-right (decorative — di luar safe zone,
+            akan ke-clip kalau di-mask, that's fine) */}
         <div
           style={{
             position: "absolute",
-            top: 18,
-            right: 22,
-            fontSize: 30,
+            top: 48,
+            right: 58,
+            fontSize: 80,
             display: "flex",
           }}
         >
@@ -52,9 +57,9 @@ export default function Icon() {
         <div
           style={{
             position: "absolute",
-            bottom: 22,
-            left: 24,
-            fontSize: 24,
+            bottom: 58,
+            left: 64,
+            fontSize: 64,
             display: "flex",
           }}
         >
