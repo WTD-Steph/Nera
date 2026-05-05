@@ -29,6 +29,7 @@ import {
 } from "@/app/actions/handover";
 import { summarizeHandoverActivity } from "@/lib/compute/handover";
 import { assessWake, getWakeWindow } from "@/lib/constants/wake-window";
+import { getCurrentRegression } from "@/lib/constants/sleep-regressions";
 import {
   RoutineChecklist,
   type RoutineItem,
@@ -641,6 +642,8 @@ export default async function HomePage({
     const window = getWakeWindow(baby.dob);
     return assessWake(awakeMin, window);
   })();
+  // Sleep regression — banner saat in-window OR upcoming dalam 14 hari
+  const sleepRegression = getCurrentRegression(baby.dob);
 
   // Top-up suggestion after DBF Selesai. dbf_id + dbf_dur passed via
   // redirect from endOngoingDbfAction. Looks up effectiveness from the
@@ -995,6 +998,64 @@ export default async function HomePage({
             </div>
           ) : null}
         </div>
+      ) : null}
+      {sleepRegression ? (
+        <details
+          className={`mt-3 rounded-2xl border px-4 py-3 shadow-sm ${
+            sleepRegression.status === "in_window"
+              ? "border-purple-200 bg-purple-50"
+              : "border-indigo-100 bg-indigo-50/40"
+          }`}
+        >
+          <summary className="cursor-pointer list-none">
+            <div className="flex items-start gap-2">
+              <span aria-hidden className="text-xl">
+                {sleepRegression.regression.emoji}
+              </span>
+              <div className="flex-1">
+                <div
+                  className={`text-sm font-bold ${
+                    sleepRegression.status === "in_window"
+                      ? "text-purple-900"
+                      : "text-indigo-900"
+                  }`}
+                >
+                  {sleepRegression.status === "in_window"
+                    ? `🚨 Sedang di window: ${sleepRegression.regression.label}`
+                    : `Heads-up: ${sleepRegression.regression.label} dalam ${sleepRegression.daysUntil} hari`}
+                </div>
+                <div
+                  className={`text-[11px] ${
+                    sleepRegression.status === "in_window"
+                      ? "text-purple-700"
+                      : "text-indigo-700/80"
+                  }`}
+                >
+                  Durasi typical {sleepRegression.regression.durationWeeks} ·
+                  tap untuk detail
+                </div>
+              </div>
+            </div>
+          </summary>
+          <div className="mt-3 space-y-2 text-[12px] text-gray-700">
+            <div>
+              <div className="font-semibold text-gray-900">Penyebab</div>
+              <p className="mt-0.5 leading-snug">
+                {sleepRegression.regression.cause}
+              </p>
+            </div>
+            <div>
+              <div className="font-semibold text-gray-900">Tips</div>
+              <ul className="mt-0.5 space-y-0.5">
+                {sleepRegression.regression.tips.map((t, i) => (
+                  <li key={i} className="leading-snug">
+                    · {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </details>
       ) : null}
       {pumpRateBanner ? (
         (() => {
