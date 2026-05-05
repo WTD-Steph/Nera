@@ -465,7 +465,12 @@ export default async function HomePage({
   const selectedDayKey = jakartaDayKey(selectedDayMs);
   const selectedDayLabel = jakartaDayLabel(selectedDayMs, todayMs);
   const isToday = selectedDayKey === jakartaDayKey(todayMs);
-  const stats = computeTodayStats(logsArray, selectedDayMs);
+  // Stats window: rolling 24h when viewing today, calendar day for past
+  // dates. Rolling lebih representative untuk newborn ('apa yang terjadi
+  // 24 jam terakhir') vs midnight reset yang bikin counter di pagi hari
+  // selalu kosong walaupun baru ngurus baby semalaman.
+  const statsWindowMs = isToday ? Date.now() - 86400000 : selectedDayMs;
+  const stats = computeTodayStats(logsArray, statsWindowMs);
   const last = computeLastByType(logsArray);
   const dayPrev = jakartaDayKey(selectedDayMs - 86400000);
   const dayNext = jakartaDayKey(selectedDayMs + 86400000);
@@ -501,7 +506,7 @@ export default async function HomePage({
   const susuBreakdown = (() => {
     let asiBottle = 0;
     let suforBottle = 0;
-    const startMs = selectedDayMs;
+    const startMs = statsWindowMs;
     const endMs = startMs + 86400000;
     for (const l of logsArray) {
       if (l.subtype !== "feeding") continue;
@@ -1347,7 +1352,7 @@ export default async function HomePage({
       <section className="mt-5">
         <div className="mb-2 flex items-center justify-between gap-2 px-1">
           <h2 className="text-sm font-semibold text-gray-700">
-            {isToday ? "Total Hari Ini" : `Total ${selectedDayLabel}`}
+            {isToday ? "Total 24 Jam Terakhir" : `Total ${selectedDayLabel}`}
           </h2>
           <div className="flex items-center gap-1">
             <Link
@@ -1391,7 +1396,7 @@ export default async function HomePage({
             const avgIntervalMin = (
               filter: (l: LogRow) => boolean,
             ): number | null => {
-              const startMs = selectedDayMs;
+              const startMs = statsWindowMs;
               const endMs = startMs + 86400000;
               const ts = logsArray
                 .filter(filter)
