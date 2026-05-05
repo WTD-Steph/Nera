@@ -364,6 +364,7 @@ export default async function HomePage({
     { data: latestWeightData },
     { data: activeHandoverData },
     { data: householdMembersData },
+    { data: poop7dData },
   ] = await Promise.all([
       supabase
         .from("logs")
@@ -405,6 +406,20 @@ export default async function HomePage({
       supabase.rpc("list_household_members", {
         h_id: household.household_id,
       }),
+      // BAB 7-day window — newborn poop sering cuma 0-2× per hari, jadi
+      // today-only avg interval rarely meaningful. Pull 7-day timestamps
+      // (poop entries only) untuk hitung avg interval yang representative.
+      supabase
+        .from("logs")
+        .select("timestamp")
+        .eq("baby_id", baby.id)
+        .eq("subtype", "diaper")
+        .eq("has_poop", true)
+        .gte(
+          "timestamp",
+          new Date(Date.now() - 7 * 86400000).toISOString(),
+        )
+        .order("timestamp", { ascending: true }),
     ]);
   const medications = (medsData ?? []) as Medication[];
   const stockBatches = (stockData ?? []).map((b) => {
@@ -1405,9 +1420,23 @@ export default async function HomePage({
             const peeAvg = avgIntervalMin(
               (l) => l.subtype === "diaper" && !!l.has_pee,
             );
-            const poopAvg = avgIntervalMin(
-              (l) => l.subtype === "diaper" && !!l.has_poop,
-            );
+            // Poop avg pakai 7-day window (separate query) — newborn
+            // BAB sering 0-2× per hari, today-only sample terlalu kecil.
+            const poopAvg = (() => {
+              const ts = (poop7dData ?? [])
+                .map((p) => new Date(p.timestamp).getTime())
+                .sort((a, b) => a - b);
+              if (ts.length < 2) return null;
+              const gaps: number[] = [];
+              for (let i = 1; i < ts.length; i++) {
+                const a = ts[i - 1];
+                const b = ts[i];
+                if (a !== undefined && b !== undefined)
+                  gaps.push((b - a) / 60000);
+              }
+              if (gaps.length === 0) return null;
+              return gaps.reduce((s, g) => s + g, 0) / gaps.length;
+            })();
             const sleepAvgPerSession =
               stats.sleepCount > 0 ? stats.sleepMin / stats.sleepCount : 0;
             return (
@@ -1470,7 +1499,7 @@ export default async function HomePage({
                   progress={stats.diaperPoopCount / target.poopMin}
                   detail={
                     poopAvg != null
-                      ? `avg ${avgIntervalText(poopAvg)} antar BAB`
+                      ? `avg ${avgIntervalText(poopAvg)} antar BAB · 7 hari`
                       : undefined
                   }
                   href="/?act=diaper#aktivitas"
