@@ -29,6 +29,11 @@ import {
 } from "@/app/actions/handover";
 import { summarizeHandoverActivity } from "@/lib/compute/handover";
 import {
+  RoutineChecklist,
+  type RoutineItem,
+  type RoutineLogToday,
+} from "@/components/RoutineChecklist";
+import {
   computeTodayStats,
   computeLastByType,
   jakartaDayStartMs,
@@ -365,6 +370,8 @@ export default async function HomePage({
     { data: activeHandoverData },
     { data: householdMembersData },
     { data: poop7dData },
+    { data: routinesData },
+    { data: routineLogsTodayData },
   ] = await Promise.all([
       supabase
         .from("logs")
@@ -420,6 +427,21 @@ export default async function HomePage({
           new Date(Date.now() - 7 * 86400000).toISOString(),
         )
         .order("timestamp", { ascending: true }),
+      // Daily routines + today's logs
+      supabase
+        .from("routines")
+        .select("id, name, emoji, needs_duration, display_order")
+        .eq("baby_id", baby.id)
+        .order("display_order", { ascending: true }),
+      supabase
+        .from("routine_logs")
+        .select("id, routine_id, logged_at, duration_min")
+        .eq("baby_id", baby.id)
+        .gte(
+          "logged_at",
+          new Date(jakartaDayStartMs()).toISOString(),
+        )
+        .order("logged_at", { ascending: false }),
     ]);
   const medications = (medsData ?? []) as Medication[];
   const stockBatches = (stockData ?? []).map((b) => {
@@ -1348,6 +1370,11 @@ export default async function HomePage({
           </Link>
         </section>
       ) : null}
+
+      <RoutineChecklist
+        routines={(routinesData ?? []) as RoutineItem[]}
+        todayLogs={(routineLogsTodayData ?? []) as RoutineLogToday[]}
+      />
 
       <section className="mt-5">
         <div className="mb-2 flex items-center justify-between gap-2 px-1">

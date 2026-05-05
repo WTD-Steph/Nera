@@ -2,9 +2,14 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
+import { createClient } from "@/lib/supabase/server";
 import { SubmitButton } from "@/components/SubmitButton";
 import { updateBabyAction } from "./actions";
 import { DbfEstimateFieldset } from "./DbfEstimateFieldset";
+import {
+  addRoutineAction,
+  deleteRoutineAction,
+} from "@/app/actions/routines";
 
 type SearchParams = { error?: string; saved?: string };
 
@@ -21,6 +26,14 @@ export default async function ProfilePage({
 
   const error = searchParams.error;
   const saved = searchParams.saved === "1";
+
+  const supabase = createClient();
+  const { data: routinesData } = await supabase
+    .from("routines")
+    .select("id, name, emoji, needs_duration, display_order")
+    .eq("baby_id", baby.id)
+    .order("display_order", { ascending: true });
+  const routines = routinesData ?? [];
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl">
@@ -163,6 +176,97 @@ export default async function ProfilePage({
           Simpan perubahan
         </SubmitButton>
       </form>
+
+      <section className="mt-8 border-t border-gray-100 pt-6">
+        <h2 className="text-base font-bold text-gray-900">Ceklis Harian</h2>
+        <p className="mt-1 text-xs text-gray-500">
+          Item rutin yang dilakukan tiap hari (vitamin, jemur, dll). Muncul
+          sebagai checklist di Beranda. Tap ✓ saat sudah dilakukan.
+        </p>
+
+        {routines.length > 0 ? (
+          <ul className="mt-3 space-y-1.5">
+            {routines.map((r) => (
+              <li
+                key={r.id}
+                className="flex items-center justify-between gap-2 rounded-xl border border-gray-100 bg-white px-3 py-2"
+              >
+                <div className="flex items-center gap-2 text-sm text-gray-800">
+                  <span aria-hidden>{r.emoji ?? "✓"}</span>
+                  <span className="font-medium">{r.name}</span>
+                  {r.needs_duration ? (
+                    <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                      + durasi
+                    </span>
+                  ) : null}
+                </div>
+                <form action={deleteRoutineAction}>
+                  <input type="hidden" name="id" value={r.id} />
+                  <input
+                    type="hidden"
+                    name="return_to"
+                    value="/more/profile"
+                  />
+                  <SubmitButton
+                    pendingText="…"
+                    className="text-[11px] text-gray-300 hover:text-red-500"
+                  >
+                    Hapus
+                  </SubmitButton>
+                </form>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-xs italic text-gray-400">
+            Belum ada item. Tambah di bawah.
+          </p>
+        )}
+
+        <form
+          action={addRoutineAction}
+          className="mt-4 space-y-2 rounded-xl border border-rose-100 bg-rose-50/40 p-3"
+        >
+          <input type="hidden" name="return_to" value="/more/profile" />
+          <div className="text-[11px] font-semibold text-rose-700">
+            ＋ Tambah ceklis
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              name="emoji"
+              maxLength={4}
+              placeholder="✓"
+              className="w-12 rounded-lg border border-gray-200 bg-white px-2 py-2 text-center text-sm outline-none focus:border-rose-400"
+            />
+            <input
+              type="text"
+              name="name"
+              required
+              maxLength={80}
+              placeholder="Nama (mis. Vitamin D)"
+              className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-rose-400"
+            />
+          </div>
+          <label className="flex items-center gap-2 rounded-lg bg-white px-2 py-2 text-[12px] text-gray-700">
+            <input
+              type="checkbox"
+              name="needs_duration"
+              value="1"
+              className="h-4 w-4 accent-amber-500"
+            />
+            <span>
+              Pakai durasi (mis. jemur 5–15 menit)
+            </span>
+          </label>
+          <SubmitButton
+            pendingText="…"
+            className="w-full rounded-lg bg-rose-500 py-2 text-sm font-semibold text-white hover:bg-rose-600"
+          >
+            Tambah
+          </SubmitButton>
+        </form>
+      </section>
 
       <div className="mt-8 border-t border-gray-100 pt-4">
         <p className="mb-2 text-[11px] text-gray-400">
