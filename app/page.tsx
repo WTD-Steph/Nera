@@ -249,7 +249,7 @@ function wakeBeforeSleepText(l: LogRow, allLogs: LogRow[]): string {
   const h = Math.floor(gapMin / 60);
   const m = gapMin % 60;
   const fmt = h === 0 ? `${m}m` : m === 0 ? `${h}j` : `${h}j ${m}m`;
-  return ` · awake ${fmt} sebelum`;
+  return ` · awake ${fmt} sebelum tidur`;
 }
 
 function logDetail(l: LogRow, dbfRate: number, allLogs: LogRow[] = []): string {
@@ -585,8 +585,9 @@ export default async function HomePage({
   })();
   const milkBreakdownParts: string[] = [];
   if (feedingSessionCount > 0) {
+    const avgMl = Math.round(milkTotalMl / feedingSessionCount);
     milkBreakdownParts.push(
-      `${feedingSessionCount} sesi (gap >1j = sesi baru)`,
+      `${feedingSessionCount} sesi · avg ${avgMl} ml/sesi`,
     );
   }
   if (stats.feedingMlCount > 0) {
@@ -2002,6 +2003,9 @@ export default async function HomePage({
                   ? `${dbfEst.mlPerMin.toFixed(1)} ml/menit dari pumping terakhir`
                   : `default ${dbfEst.mlPerMin} ml/menit`}{" "}
             — bukan ukuran pasti. Selalu konsultasi DSA untuk evaluasi medis.
+            <br />
+            Sesi feeding: entries dengan gap ≤1 jam digabung jadi 1 sesi
+            (mis. DBF + sufor + ASIP top-up dalam menit yang sama = 1 sesi).
           </p>
         </div>
       </section>
