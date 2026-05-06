@@ -13,6 +13,13 @@ html, body {
 body {
   background: linear-gradient(180deg, #fff7f5 0%, #fff 60%);
   -webkit-font-smoothing: antialiased;
+  /* Respect Android/iOS PWA notch + status bar — without ini, header
+     area kepotong di balik status bar. Pakai env() supaya support
+     viewport-fit=cover. */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 @keyframes flash-in {
