@@ -39,9 +39,11 @@ const SIGNAL_STYLES: Record<
 export function CryDiagnostic({
   causes,
   asiBatches,
+  babyName,
 }: {
   causes: CryCause[];
   asiBatches: AsiBatchOption[];
+  babyName: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -55,7 +57,7 @@ export function CryDiagnostic({
       >
         <span className="flex items-center gap-2">
           <span aria-hidden>😢</span>
-          <span>Bayi nangis? Cek penyebab</span>
+          <span>{babyName} nangis? Cek penyebab</span>
         </span>
         {strongCount > 0 ? (
           <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
@@ -72,6 +74,7 @@ export function CryDiagnostic({
     <CryDiagnosticModal
       causes={causes}
       asiBatches={asiBatches}
+      babyName={babyName}
       onClose={() => setOpen(false)}
     />
   );
@@ -80,10 +83,12 @@ export function CryDiagnostic({
 function CryDiagnosticModal({
   causes,
   asiBatches,
+  babyName,
   onClose,
 }: {
   causes: CryCause[];
   asiBatches: AsiBatchOption[];
+  babyName: string;
   onClose: () => void;
 }) {
   const [showIlu, setShowIlu] = useState(false);
@@ -93,7 +98,7 @@ function CryDiagnosticModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Cek penyebab bayi nangis"
+        aria-label={`Cek penyebab ${babyName} nangis`}
         className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center"
         onClick={onClose}
       >
@@ -104,7 +109,7 @@ function CryDiagnosticModal({
           <div className="mb-2 flex items-start justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-800">
-                😢 Cek penyebab bayi nangis
+                😢 Cek penyebab {babyName} nangis
               </h2>
               <p className="text-[11px] text-gray-500">
                 Berdasarkan data log terakhir. Sinyal kuat tampil di atas.
