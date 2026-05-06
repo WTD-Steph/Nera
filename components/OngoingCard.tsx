@@ -59,6 +59,7 @@ export function OngoingCard({
   dbfMlPerMin,
   autoOpenLamp,
   otherPumpingOngoing,
+  reminders,
 }: {
   id: string;
   subtype: Subtype;
@@ -76,6 +77,8 @@ export function OngoingCard({
   /** True if a separate pumping session is already ongoing — used by
    *  DBF card to hide "Sambil pumping" combo shortcut. */
   otherPumpingOngoing?: boolean;
+  /** Reminders to surface in NightLamp dark mode (feeding/diaper/pumping). */
+  reminders?: NightLampReminder[];
 }) {
   const [showLamp, setShowLamp] = useState(!!autoOpenLamp);
   const [showPumpEnd, setShowPumpEnd] = useState(false);
@@ -205,6 +208,7 @@ export function OngoingCard({
           pumpStartRAt={pumpStartRAt ?? null}
           pumpEndRAt={pumpEndRAt ?? null}
           dbfMlPerMin={dbfMlPerMin ?? null}
+          reminders={reminders}
           onClose={() => setShowLamp(false)}
           onPumpStop={() => {
             setShowLamp(false);
@@ -227,6 +231,12 @@ export function OngoingCard({
   );
 }
 
+type NightLampReminder = {
+  text: string;
+  tone: "warning" | "urgent";
+  emoji?: string;
+};
+
 function NightLamp({
   id,
   subtype,
@@ -238,6 +248,7 @@ function NightLamp({
   pumpStartRAt,
   pumpEndRAt,
   dbfMlPerMin,
+  reminders,
   onClose,
   onPumpStop,
 }: {
@@ -251,6 +262,7 @@ function NightLamp({
   pumpStartRAt: string | null;
   pumpEndRAt: string | null;
   dbfMlPerMin: number | null;
+  reminders?: NightLampReminder[];
   onClose: () => void;
   onPumpStop: () => void;
 }) {
@@ -347,6 +359,24 @@ function NightLamp({
       <div className="mt-3 text-lg font-semibold tracking-widest text-red-600/90 sm:text-xl">
         Sejak {fmtClock(startIso)}
       </div>
+
+      {reminders && reminders.length > 0 ? (
+        <div className="mt-4 flex w-full max-w-md flex-col items-center gap-1.5 px-6">
+          {reminders.map((r, i) => (
+            <div
+              key={i}
+              className={`flash-in flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                r.tone === "urgent"
+                  ? "border-red-500/60 bg-red-950/40 text-red-300"
+                  : "border-amber-500/40 bg-amber-950/30 text-amber-300"
+              }`}
+            >
+              {r.emoji ? <span aria-hidden>{r.emoji}</span> : null}
+              <span>{r.text}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {subtype === "dbf" ? (
         <DbfDarkSummary

@@ -890,6 +890,8 @@ export default async function HomePage({
       minsRunning: Math.round(minsRunning),
     };
   })();
+  // (diaper computed later)
+  // We'll assemble darkReminders below after diaperReminder is computed.
   // Diaper reminder: warn at 4h, urgent at 6h. Newborn pee target ~6-8×
   // per day → ~3-4h average gap. >4h is worth checking.
   const diaperReminder = (() => {
@@ -905,6 +907,17 @@ export default async function HomePage({
       tone: minsSince >= 360 ? ("urgent" as const) : ("warning" as const),
     };
   })();
+  // Unified reminders array untuk dark mode (Mode Jam + NightLamp).
+  // Show feeding/diaper/pumping warnings supaya parent yang sedang
+  // monitoring dark mode tetap aware tanpa keluar mode.
+  const darkReminders: { text: string; tone: "warning" | "urgent"; emoji?: string }[] =
+    [];
+  if (feedingReminder)
+    darkReminders.push({ ...feedingReminder, emoji: "🍼" });
+  if (diaperReminder)
+    darkReminders.push({ ...diaperReminder, emoji: "🧷" });
+  if (pumpingReminder)
+    darkReminders.push({ ...pumpingReminder, emoji: "💧" });
   const activeAct = parseAct(searchParams.act);
   // Filter logs by selected day:
   // - Today + no filter: 36-hour rolling window (default home view)
@@ -955,6 +968,7 @@ export default async function HomePage({
           sinceSleep={sleepSinceText}
           sinceDiaper={last.diaper ? timeSince(last.diaper.timestamp) : null}
           reminder={feedingReminder}
+          reminders={darkReminders}
           stats={{
             milkTotalMl,
             milkTargetMin: milkTarget.min,
@@ -1406,6 +1420,7 @@ export default async function HomePage({
                 dbfMlPerMin={dbfEst.mlPerMin}
                 autoOpenLamp={shouldAutoOpenLamp}
                 otherPumpingOngoing={ongoingSubtypes.has("pumping")}
+                reminders={darkReminders}
               />
             );
           })}
