@@ -21,6 +21,7 @@ export type IdleClockStats = {
 export type IdleClockReminder = {
   text: string;
   tone: "warning" | "urgent";
+  emoji?: string;
 };
 
 function fmtH(min: number): string {
@@ -40,6 +41,7 @@ export function IdleClockMode({
   sinceDiaper,
   sinceSleep,
   reminder,
+  reminders,
   stats,
   ongoingSubtypes,
   onClose,
@@ -48,6 +50,7 @@ export function IdleClockMode({
   sinceDiaper?: string | null;
   sinceSleep?: string | null;
   reminder: IdleClockReminder | null;
+  reminders?: IdleClockReminder[];
   stats: IdleClockStats;
   ongoingSubtypes: string[];
   onClose: () => void;
@@ -126,17 +129,34 @@ export function IdleClockMode({
           className={`font-mono text-7xl font-light tabular-nums ${accentColor} sm:text-[10rem]`}
         />
 
-        {reminder ? (
-          <div
-            className={`flash-in rounded-full border px-4 py-2 text-sm font-semibold ${
-              reminder.tone === "urgent"
-                ? "border-red-500/60 bg-red-950/40 text-red-300"
-                : "border-amber-500/40 bg-amber-950/30 text-amber-300"
-            }`}
-          >
-            {reminder.text}
-          </div>
-        ) : null}
+        {(() => {
+          // Combine legacy single + new array, dedupe by text
+          const all: IdleClockReminder[] = [
+            ...(reminder ? [reminder] : []),
+            ...(reminders ?? []),
+          ];
+          const uniq = Array.from(
+            new Map(all.map((r) => [r.text, r])).values(),
+          );
+          if (uniq.length === 0) return null;
+          return (
+            <div className="flex w-full max-w-2xl flex-col items-center gap-1.5">
+              {uniq.map((r, i) => (
+                <div
+                  key={i}
+                  className={`flash-in flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold ${
+                    r.tone === "urgent"
+                      ? "border-red-500/60 bg-red-950/40 text-red-300"
+                      : "border-amber-500/40 bg-amber-950/30 text-amber-300"
+                  }`}
+                >
+                  {r.emoji ? <span aria-hidden>{r.emoji}</span> : null}
+                  <span>{r.text}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
 
         <div className="grid w-full max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
           <SinceCard
@@ -384,6 +404,7 @@ export function IdleClockToggle({
   sinceDiaper,
   sinceSleep,
   reminder,
+  reminders,
   stats,
   ongoingSubtypes,
   variant = "full",
@@ -392,6 +413,7 @@ export function IdleClockToggle({
   sinceDiaper?: string | null;
   sinceSleep?: string | null;
   reminder: IdleClockReminder | null;
+  reminders?: IdleClockReminder[];
   stats: IdleClockStats;
   ongoingSubtypes: string[];
   /** "full" = wide button row; "icon" = circular icon for header. */
@@ -426,6 +448,7 @@ export function IdleClockToggle({
           sinceDiaper={sinceDiaper}
           sinceSleep={sinceSleep}
           reminder={reminder}
+          reminders={reminders}
           stats={stats}
           ongoingSubtypes={ongoingSubtypes}
           onClose={() => setOpen(false)}
