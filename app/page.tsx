@@ -1033,6 +1033,11 @@ export default async function HomePage({
           {logerror}
         </div>
       ) : null}
+      <CryDiagnostic
+        causes={cryCauses}
+        asiBatches={asiBatchOptions}
+        babyName={baby.name}
+      />
       {wakeAssessment ? <WakeWindowCard assessment={wakeAssessment} /> : null}
       {feedingReminder ||
       diaperReminder ||
@@ -1933,7 +1938,6 @@ export default async function HomePage({
           <SinceCard label="Diaper" log={last.diaper} />
           <SinceCard label="Tidur" log={last.sleep} />
         </div>
-        <CryDiagnostic causes={cryCauses} asiBatches={asiBatchOptions} />
       </section>
 
       <section id="aktivitas" className="mt-5 scroll-mt-4">
