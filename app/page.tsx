@@ -220,7 +220,39 @@ const SUBTYPE_LABEL: Record<string, string> = {
   tummy: "Tummy Time",
 };
 
-function logDetail(l: LogRow, dbfRate: number): string {
+/**
+ * Compute wake duration sebelum sleep ini (gap antara sleep sebelumnya
+ * end_timestamp → sleep ini timestamp). Pakai sorted log array as
+ * context. Cap 12h gap (filter outlier — kalau gap besar, biasanya
+ * data hari sebelumnya / first sleep of day).
+ */
+function wakeBeforeSleepText(l: LogRow, allLogs: LogRow[]): string {
+  const myTime = new Date(l.timestamp).getTime();
+  const prevSleep = allLogs
+    .filter(
+      (x) =>
+        x.subtype === "sleep" &&
+        x.id !== l.id &&
+        x.end_timestamp != null &&
+        new Date(x.end_timestamp).getTime() <= myTime,
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.end_timestamp!).getTime() -
+        new Date(a.end_timestamp!).getTime(),
+    )[0];
+  if (!prevSleep || !prevSleep.end_timestamp) return "";
+  const gapMin = Math.round(
+    (myTime - new Date(prevSleep.end_timestamp).getTime()) / 60000,
+  );
+  if (gapMin <= 0 || gapMin > 12 * 60) return "";
+  const h = Math.floor(gapMin / 60);
+  const m = gapMin % 60;
+  const fmt = h === 0 ? `${m}m` : m === 0 ? `${h}j` : `${h}j ${m}m`;
+  return ` · awake ${fmt} sebelum`;
+}
+
+function logDetail(l: LogRow, dbfRate: number, allLogs: LogRow[] = []): string {
   // Ongoing pumping / DBF rows have null ml and null durations — show
   // which side is active rather than "L 0 / R 0 ml".
   const isOngoing = l.end_timestamp === null;
@@ -329,7 +361,8 @@ function logDetail(l: LogRow, dbfRate: number): string {
           : l.sleep_quality === "sering_bangun"
             ? " · 😢 sering bangun"
             : "";
-    return `${range}${quality}`;
+    const wakeBefore = wakeBeforeSleepText(l, allLogs);
+    return `${range}${wakeBefore}${quality}`;
   }
   if (l.subtype === "temp") return `${l.temp_celsius}°C`;
   if (l.subtype === "med")
@@ -2094,9 +2127,9 @@ export default async function HomePage({
                           berlangsung
                         </span>
                       ) : null}
-                      {logDetail(l, dbfEst.mlPerMin) ? (
+                      {logDetail(l, dbfEst.mlPerMin, logsArray) ? (
                         <span className="truncate text-xs text-gray-500">
-                          • {logDetail(l, dbfEst.mlPerMin)}
+                          • {logDetail(l, dbfEst.mlPerMin, logsArray)}
                         </span>
                       ) : null}
                     </div>
