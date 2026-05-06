@@ -82,12 +82,12 @@ function WakeDarkOverlay({
     };
   }, [onClose]);
 
-  // Re-derive awakeMin from rest of assessment context. We can't recompute
-  // since we don't have end_timestamp here — but tick triggers re-render.
-  // Use original awakeMin + tick deltas as approximation.
   void tick;
   const elapsed = assessment.awakeMin;
-  const pct = Math.min(100, Math.round((elapsed / assessment.window.maxMin) * 100));
+  const max = assessment.window.maxMin;
+  const remaining = max - elapsed;
+  const overtiredBy = elapsed - max; // positive only when over
+  const pct = Math.min(100, Math.round((elapsed / max) * 100));
   const toneText: Record<WakeAssessment["tone"], string> = {
     ok: "text-emerald-300",
     warn: "text-amber-300",
@@ -115,14 +115,15 @@ function WakeDarkOverlay({
         ✕
       </button>
       <div className="text-[11px] uppercase tracking-widest text-white/60">
-        Wake Window · usia {assessment.window.label}
+        {remaining > 0 ? "Sebelum Overtired" : "Sudah Overtired"} · usia{" "}
+        {assessment.window.label}
       </div>
       <div className="mt-3 font-mono text-7xl font-bold tabular-nums">
-        {elapsed}
+        {remaining > 0 ? remaining : `+${overtiredBy}`}
         <span className="text-3xl text-white/50">m</span>
       </div>
       <div className="mt-2 text-sm text-white/60">
-        / {assessment.window.minMin}–{assessment.window.maxMin}m
+        sudah bangun {elapsed}m · window {assessment.window.minMin}–{max}m
       </div>
       <div className="mt-6 h-2 w-64 overflow-hidden rounded-full bg-white/10">
         <div
