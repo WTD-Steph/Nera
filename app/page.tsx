@@ -32,6 +32,7 @@ import { assessWake, getWakeWindow } from "@/lib/constants/wake-window";
 import { getCurrentRegression } from "@/lib/constants/sleep-regressions";
 import { computeCryCauses } from "@/lib/compute/cry-diagnostic";
 import { CryDiagnostic } from "@/components/CryDiagnostic";
+import { WakeWindowCard } from "@/components/WakeWindowCard";
 import {
   RoutineChecklist,
   type RoutineItem,
@@ -800,6 +801,49 @@ export default async function HomePage({
       tone: minsSince >= 480 ? ("urgent" as const) : ("warning" as const),
     };
   })();
+  // Pumping reminder: 3j sejak last pumping selesai. Lactation
+  // recommendation: pump every 2-3h supaya supply maintained.
+  const lastPumpEnded = (() => {
+    const completed = logsArray.filter(
+      (l) => l.subtype === "pumping" && l.end_timestamp != null,
+    );
+    if (completed.length === 0) return null;
+    return completed.reduce((latest, l) => {
+      const t = new Date(l.end_timestamp!).getTime();
+      return t > latest ? t : latest;
+    }, 0);
+  })();
+  const pumpingReminder = (() => {
+    if (lastPumpEnded == null) return null;
+    if (ongoingSubtypes.has("pumping")) return null;
+    const minsSince = (Date.now() - lastPumpEnded) / 60000;
+    if (minsSince < 180) return null;
+    const hours = Math.floor(minsSince / 60);
+    const mins = Math.round(minsSince % 60);
+    return {
+      text: `Sudah ${hours}j ${mins}m sejak pump terakhir — supply maintain tiap 2-3j`,
+      tone: minsSince >= 270 ? ("urgent" as const) : ("warning" as const),
+    };
+  })();
+  // Active pumping check: kalau pumping ongoing lebih dari 30m, tampilkan
+  // confirmation banner. User bisa Selesai sekarang atau abaikan
+  // (pause/Selesai manual handled by OngoingCard).
+  const longPumpOngoing = (() => {
+    const ongoing = logsArray.find(
+      (l) =>
+        l.subtype === "pumping" &&
+        l.end_timestamp == null &&
+        l.started_with_stopwatch,
+    );
+    if (!ongoing) return null;
+    const minsRunning =
+      (Date.now() - new Date(ongoing.timestamp).getTime()) / 60000;
+    if (minsRunning < 30) return null;
+    return {
+      id: ongoing.id,
+      minsRunning: Math.round(minsRunning),
+    };
+  })();
   // Diaper reminder: warn at 4h, urgent at 6h. Newborn pee target ~6-8×
   // per day → ~3-4h average gap. >4h is worth checking.
   const diaperReminder = (() => {
@@ -972,11 +1016,11 @@ export default async function HomePage({
           {logerror}
         </div>
       ) : null}
+      {wakeAssessment ? <WakeWindowCard assessment={wakeAssessment} /> : null}
       {feedingReminder ||
       diaperReminder ||
-      (wakeAssessment &&
-        (wakeAssessment.tone === "warn" ||
-          wakeAssessment.tone === "alert")) ? (
+      pumpingReminder ||
+      longPumpOngoing ? (
         <div className="mt-3 space-y-1.5">
           {feedingReminder ? (
             <div
@@ -1002,22 +1046,32 @@ export default async function HomePage({
               <span>{diaperReminder.text}</span>
             </div>
           ) : null}
-          {wakeAssessment &&
-          (wakeAssessment.tone === "warn" ||
-            wakeAssessment.tone === "alert") ? (
+          {pumpingReminder ? (
             <div
               className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium ${
-                wakeAssessment.tone === "alert"
+                pumpingReminder.tone === "urgent"
                   ? "border-red-200 bg-red-50 text-red-800"
                   : "border-amber-200 bg-amber-50 text-amber-800"
               }`}
             >
-              <span aria-hidden>🌙</span>
-              <span>
-                Sudah {wakeAssessment.awakeMin}m bangun · window{" "}
-                {wakeAssessment.window.minMin}–{wakeAssessment.window.maxMin}m
-                · {wakeAssessment.statusLabel}
+              <span aria-hidden>💧</span>
+              <span>{pumpingReminder.text}</span>
+            </div>
+          ) : null}
+          {longPumpOngoing ? (
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
+              <span className="flex items-center gap-2">
+                <span aria-hidden>💧</span>
+                <span>
+                  Pumping sudah {longPumpOngoing.minsRunning}m · masih jalan?
+                </span>
               </span>
+              <Link
+                href="#aktivitas"
+                className="rounded-full border border-blue-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100"
+              >
+                Selesai
+              </Link>
             </div>
           ) : null}
         </div>
@@ -1586,6 +1640,31 @@ export default async function HomePage({
             }, 0);
             const sleep24hAvgPerSession =
               sleep24h.length > 0 ? sleep24hMins / sleep24h.length : 0;
+            // Avg wake time = avg gap antara sleep end → next sleep start
+            // dalam 24h window. Useful untuk lihat pola "jaga" rata-rata.
+            const sleep24hSorted = [...sleep24h]
+              .filter((l) => l.end_timestamp)
+              .sort(
+                (a, b) =>
+                  new Date(a.timestamp).getTime() -
+                  new Date(b.timestamp).getTime(),
+              );
+            const wakeGaps: number[] = [];
+            for (let i = 1; i < sleep24hSorted.length; i++) {
+              const prev = sleep24hSorted[i - 1];
+              const cur = sleep24hSorted[i];
+              if (prev?.end_timestamp && cur) {
+                const gap =
+                  (new Date(cur.timestamp).getTime() -
+                    new Date(prev.end_timestamp).getTime()) /
+                  60000;
+                if (gap > 0 && gap < 12 * 60) wakeGaps.push(gap); // cap 12h
+              }
+            }
+            const avgWakeMin =
+              wakeGaps.length > 0
+                ? wakeGaps.reduce((s, g) => s + g, 0) / wakeGaps.length
+                : null;
             const avgIntervalText = (mins: number | null): string => {
               if (mins == null) return "";
               const h = Math.floor(mins / 60);
@@ -1647,7 +1726,12 @@ export default async function HomePage({
                   progress={stats.sleepMin / 60 / target.sleepHoursMin}
                   detail={
                     stats.sleepCount > 0
-                      ? `${stats.sleepCount} sesi · avg ${fmtDuration(Math.round(sleep24hAvgPerSession))}/sesi · 24 jam`
+                      ? [
+                          `${stats.sleepCount} sesi · avg ${fmtDuration(Math.round(sleep24hAvgPerSession))}/sesi · 24 jam`,
+                          avgWakeMin != null
+                            ? `avg wake ${avgIntervalText(avgWakeMin)} antar tidur`
+                            : "",
+                        ].filter(Boolean)
                       : undefined
                   }
                   href="/?act=sleep#aktivitas"
@@ -1833,49 +1917,6 @@ export default async function HomePage({
           <SinceCard label="Tidur" log={last.sleep} />
         </div>
         <CryDiagnostic causes={cryCauses} asiBatches={asiBatchOptions} />
-        {wakeAssessment ? (
-          <div
-            className={`mt-2 rounded-xl border px-3 py-2 text-[11px] ${
-              wakeAssessment.tone === "alert"
-                ? "border-red-200 bg-red-50/60 text-red-800"
-                : wakeAssessment.tone === "warn"
-                  ? "border-amber-200 bg-amber-50/60 text-amber-800"
-                  : "border-emerald-100 bg-emerald-50/40 text-emerald-800"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-semibold">
-                Wake window · usia {wakeAssessment.window.label}
-              </span>
-              <span className="tabular-nums">
-                {wakeAssessment.awakeMin}m / {wakeAssessment.window.minMin}–
-                {wakeAssessment.window.maxMin}m
-              </span>
-            </div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/60">
-              <div
-                className={`h-full transition-all ${
-                  wakeAssessment.tone === "alert"
-                    ? "bg-red-400"
-                    : wakeAssessment.tone === "warn"
-                      ? "bg-amber-400"
-                      : "bg-emerald-400"
-                }`}
-                style={{
-                  width: `${Math.min(
-                    100,
-                    Math.round(
-                      (wakeAssessment.awakeMin /
-                        wakeAssessment.window.maxMin) *
-                        100,
-                    ),
-                  )}%`,
-                }}
-              />
-            </div>
-            <div className="mt-1">{wakeAssessment.statusLabel}</div>
-          </div>
-        ) : null}
       </section>
 
       <section id="aktivitas" className="mt-5 scroll-mt-4">
