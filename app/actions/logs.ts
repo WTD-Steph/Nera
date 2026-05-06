@@ -99,20 +99,36 @@ export async function createLogAction(formData: FormData) {
   if (subtype === "feeding") {
     const mode = String(formData.get("feeding_mode") ?? "sufor");
     if (mode === "sufor") {
-      const amount = num(formData, "amount_ml");
-      if (amount === null || amount <= 0) {
-        redirect(
-          `${returnTo}?logerror=${encodeURIComponent("Jumlah susu harus diisi.")}`,
-        );
-      }
-      payload.amount_ml = amount;
       const content = String(formData.get("bottle_content") ?? "sufor");
-      if (content !== "sufor" && content !== "asi") {
+      if (content !== "sufor" && content !== "asi" && content !== "mix") {
         redirect(
-          `${returnTo}?logerror=${encodeURIComponent("Pilih ASI atau Sufor.")}`,
+          `${returnTo}?logerror=${encodeURIComponent("Pilih ASI/Sufor/Mix.")}`,
         );
       }
       payload.bottle_content = content;
+      if (content === "mix") {
+        const asiMl = num(formData, "amount_asi_ml") ?? 0;
+        const suforMl = num(formData, "amount_sufor_ml") ?? 0;
+        if (asiMl <= 0 && suforMl <= 0) {
+          redirect(
+            `${returnTo}?logerror=${encodeURIComponent("Mix botol: minimal salah satu sisi > 0.")}`,
+          );
+        }
+        payload.amount_asi_ml = asiMl;
+        payload.amount_sufor_ml = suforMl;
+        payload.amount_ml = asiMl + suforMl;
+      } else {
+        const amount = num(formData, "amount_ml");
+        if (amount === null || amount <= 0) {
+          redirect(
+            `${returnTo}?logerror=${encodeURIComponent("Jumlah susu harus diisi.")}`,
+          );
+        }
+        payload.amount_ml = amount;
+        // Mirror untuk konsistensi: asi-only → asi_ml = total, sufor → sufor_ml
+        if (content === "asi") payload.amount_asi_ml = amount;
+        else payload.amount_sufor_ml = amount;
+      }
     } else {
       const l = num(formData, "duration_l_min");
       const r = num(formData, "duration_r_min");
@@ -260,12 +276,17 @@ export async function createLogAction(formData: FormData) {
   // If the user picked a specific batch via the modal, allocate from
   // that batch first, then fall back to FIFO across the rest if the
   // feed exceeds the picked batch's remaining stock.
-  if (
+  // Deduct ASI ml only — works for both 'asi' (full) and 'mix' (partial,
+  // pakai amount_asi_ml saja, sisanya sufor tidak nge-touch stock).
+  const asiToDeduct =
     subtype === "feeding" &&
-    payload.bottle_content === "asi" &&
-    typeof payload.amount_ml === "number" &&
-    payload.amount_ml > 0
-  ) {
+    (payload.bottle_content === "asi" ||
+      payload.bottle_content === "mix") &&
+    typeof payload.amount_asi_ml === "number" &&
+    payload.amount_asi_ml > 0
+      ? payload.amount_asi_ml
+      : 0;
+  if (asiToDeduct > 0) {
     const pickedBatchId = String(formData.get("asi_batch_id") ?? "").trim();
     const { data: batches } = await supabase
       .from("logs")
@@ -284,7 +305,7 @@ export async function createLogAction(formData: FormData) {
         ]
       : all;
 
-    let remaining = payload.amount_ml;
+    let remaining = asiToDeduct;
     for (const b of ordered) {
       if (remaining <= 0) break;
       const produced = (b.amount_l_ml ?? 0) + (b.amount_r_ml ?? 0);
@@ -1085,7 +1106,7 @@ export async function updateLogAction(formData: FormData) {
   const { data: existing } = await supabase
     .from("logs")
     .select(
-      "id, baby_id, subtype, bottle_content, amount_ml, end_timestamp",
+      "id, baby_id, subtype, bottle_content, amount_ml, amount_asi_ml, amount_sufor_ml, end_timestamp",
     )
     .eq("id", id)
     .single();
@@ -1146,20 +1167,36 @@ export async function updateLogAction(formData: FormData) {
   if (subtype === "feeding") {
     const mode = String(formData.get("feeding_mode") ?? "sufor");
     if (mode === "sufor") {
-      const amount = num(formData, "amount_ml");
-      if (amount === null || amount <= 0) {
-        redirect(
-          `${returnTo}?logerror=${encodeURIComponent("Jumlah susu harus diisi.")}`,
-        );
-      }
-      payload.amount_ml = amount;
       const content = String(formData.get("bottle_content") ?? "sufor");
-      if (content !== "sufor" && content !== "asi") {
+      if (content !== "sufor" && content !== "asi" && content !== "mix") {
         redirect(
-          `${returnTo}?logerror=${encodeURIComponent("Pilih ASI atau Sufor.")}`,
+          `${returnTo}?logerror=${encodeURIComponent("Pilih ASI/Sufor/Mix.")}`,
         );
       }
       payload.bottle_content = content;
+      if (content === "mix") {
+        const asiMl = num(formData, "amount_asi_ml") ?? 0;
+        const suforMl = num(formData, "amount_sufor_ml") ?? 0;
+        if (asiMl <= 0 && suforMl <= 0) {
+          redirect(
+            `${returnTo}?logerror=${encodeURIComponent("Mix botol: minimal salah satu sisi > 0.")}`,
+          );
+        }
+        payload.amount_asi_ml = asiMl;
+        payload.amount_sufor_ml = suforMl;
+        payload.amount_ml = asiMl + suforMl;
+      } else {
+        const amount = num(formData, "amount_ml");
+        if (amount === null || amount <= 0) {
+          redirect(
+            `${returnTo}?logerror=${encodeURIComponent("Jumlah susu harus diisi.")}`,
+          );
+        }
+        payload.amount_ml = amount;
+        // Mirror untuk konsistensi: asi-only → asi_ml = total, sufor → sufor_ml
+        if (content === "asi") payload.amount_asi_ml = amount;
+        else payload.amount_sufor_ml = amount;
+      }
     } else {
       // DBF mode in EDIT modal: per-side Mulai/Selesai datetimes →
       // auto-compute duration. Falls back to direct duration input
@@ -1305,16 +1342,21 @@ export async function updateLogAction(formData: FormData) {
     payload.end_timestamp = isoOrNull(formData, "end_timestamp");
   }
 
-  // ASI re-allocation: if old row was an ASI feed, refund first; if new
-  // row is also (or now) an ASI feed, allocate fresh. This keeps stock
-  // counts consistent when amount/content changes via Edit.
-  const wasAsiFeed =
+  // ASI re-allocation: refund based on existing.amount_asi_ml (covers
+  // both 'asi' full and 'mix' partial). Fallback ke amount_ml untuk
+  // legacy rows (sebelum mix migration) yang ngga punya amount_asi_ml.
+  const oldAsiMl =
     existing.subtype === "feeding" &&
-    existing.bottle_content === "asi" &&
-    typeof existing.amount_ml === "number" &&
-    existing.amount_ml > 0;
+    (existing.bottle_content === "asi" || existing.bottle_content === "mix")
+      ? typeof existing.amount_asi_ml === "number" && existing.amount_asi_ml > 0
+        ? existing.amount_asi_ml
+        : existing.bottle_content === "asi" &&
+            typeof existing.amount_ml === "number"
+          ? existing.amount_ml
+          : 0
+      : 0;
 
-  if (wasAsiFeed) {
+  if (oldAsiMl > 0) {
     const { data: batches } = await supabase
       .from("logs")
       .select("id, amount_l_ml, amount_r_ml, consumed_ml, timestamp")
@@ -1323,7 +1365,7 @@ export async function updateLogAction(formData: FormData) {
       .gt("consumed_ml", 0)
       .order("timestamp", { ascending: false });
 
-    let toRefund = existing.amount_ml as number;
+    let toRefund = oldAsiMl;
     for (const b of batches ?? []) {
       if (toRefund <= 0) break;
       const consumed = b.consumed_ml ?? 0;
@@ -1348,13 +1390,16 @@ export async function updateLogAction(formData: FormData) {
     );
   }
 
-  // Re-allocate ASI for the new row state
-  if (
+  // Re-allocate ASI for the new row state — pakai amount_asi_ml supaya
+  // mix mode hanya deduct porsi ASIP-nya saja (sufor ngga touch stock).
+  const newAsiMl =
     subtype === "feeding" &&
-    payload.bottle_content === "asi" &&
-    typeof payload.amount_ml === "number" &&
-    payload.amount_ml > 0
-  ) {
+    (payload.bottle_content === "asi" || payload.bottle_content === "mix") &&
+    typeof payload.amount_asi_ml === "number" &&
+    payload.amount_asi_ml > 0
+      ? payload.amount_asi_ml
+      : 0;
+  if (newAsiMl > 0) {
     const { data: batches } = await supabase
       .from("logs")
       .select("id, amount_l_ml, amount_r_ml, consumed_ml")
@@ -1363,7 +1408,7 @@ export async function updateLogAction(formData: FormData) {
       .not("end_timestamp", "is", null)
       .order("timestamp", { ascending: true });
 
-    let remaining = payload.amount_ml;
+    let remaining = newAsiMl;
     for (const b of batches ?? []) {
       if (remaining <= 0) break;
       const produced = (b.amount_l_ml ?? 0) + (b.amount_r_ml ?? 0);

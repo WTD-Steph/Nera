@@ -336,9 +336,11 @@ export type Database = {
       }
       logs: {
         Row: {
+          amount_asi_ml: number | null
           amount_l_ml: number | null
           amount_ml: number | null
           amount_r_ml: number | null
+          amount_sufor_ml: number | null
           baby_id: string
           bath_clean_tali_pusat: boolean | null
           bath_pijat_ilu: boolean | null
@@ -372,9 +374,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          amount_asi_ml?: number | null
           amount_l_ml?: number | null
           amount_ml?: number | null
           amount_r_ml?: number | null
+          amount_sufor_ml?: number | null
           baby_id: string
           bath_clean_tali_pusat?: boolean | null
           bath_pijat_ilu?: boolean | null
@@ -408,9 +412,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          amount_asi_ml?: number | null
           amount_l_ml?: number | null
           amount_ml?: number | null
           amount_r_ml?: number | null
+          amount_sufor_ml?: number | null
           baby_id?: string
           bath_clean_tali_pusat?: boolean | null
           bath_pijat_ilu?: boolean | null

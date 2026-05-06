@@ -226,6 +226,14 @@ function logDetail(l: LogRow, dbfRate: number): string {
   const isOngoing = l.end_timestamp === null;
   if (l.subtype === "feeding") {
     if (l.amount_ml != null) {
+      // Mix: tampil breakdown ASIP + Sufor
+      if (
+        l.bottle_content === "mix" &&
+        (l.amount_asi_ml ?? 0) > 0 &&
+        (l.amount_sufor_ml ?? 0) > 0
+      ) {
+        return `🍼 Mix · ASI ${l.amount_asi_ml} + Sufor ${l.amount_sufor_ml} = ${l.amount_ml} ml`;
+      }
       const src =
         l.bottle_content === "asi"
           ? "ASI"
@@ -381,7 +389,7 @@ export default async function HomePage({
       supabase
         .from("logs")
         .select(
-          "id, subtype, timestamp, end_timestamp, amount_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, paused_at, started_with_stopwatch, sleep_quality, effectiveness, dbf_rate_override, bath_pijat_ilu, bath_clean_tali_pusat, notes",
+          "id, subtype, timestamp, end_timestamp, amount_ml, amount_asi_ml, amount_sufor_ml, amount_l_ml, amount_r_ml, duration_l_min, duration_r_min, has_pee, has_poop, poop_color, poop_consistency, temp_celsius, med_name, med_dose, bottle_content, consumed_ml, start_l_at, end_l_at, start_r_at, end_r_at, paused_at, started_with_stopwatch, sleep_quality, effectiveness, dbf_rate_override, bath_pijat_ilu, bath_clean_tali_pusat, notes",
         )
         .eq("baby_id", baby.id)
         .gte("timestamp", since)
@@ -544,8 +552,17 @@ export default async function HomePage({
       if (l.amount_ml == null || l.amount_ml <= 0) continue;
       const t = new Date(l.timestamp).getTime();
       if (t < startMs || t >= endMs) continue;
-      if (l.bottle_content === "asi") asiBottle += l.amount_ml;
-      else suforBottle += l.amount_ml;
+      // Pakai breakdown amount_asi_ml + amount_sufor_ml saat ada (untuk
+      // mix mode + new rows). Fallback ke bottle_content untuk legacy
+      // rows yang belum ada breakdown.
+      if (l.amount_asi_ml != null || l.amount_sufor_ml != null) {
+        asiBottle += l.amount_asi_ml ?? 0;
+        suforBottle += l.amount_sufor_ml ?? 0;
+      } else if (l.bottle_content === "asi") {
+        asiBottle += l.amount_ml;
+      } else {
+        suforBottle += l.amount_ml;
+      }
     }
     const dbfMl = dbfEst.ml; // DBF is breastmilk → ASI
     return {
