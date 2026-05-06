@@ -39,7 +39,9 @@ export type EditLog = {
   temp_celsius: number | null;
   med_name: string | null;
   med_dose: string | null;
-  bottle_content: "sufor" | "asi" | null;
+  bottle_content: "sufor" | "asi" | "mix" | null;
+  amount_asi_ml: number | null;
+  amount_sufor_ml: number | null;
   start_l_at: string | null;
   end_l_at: string | null;
   start_r_at: string | null;
@@ -235,9 +237,14 @@ function LogModal({
     }
     return "sufor";
   });
-  // Bottle content (only when feedingMode='sufor'): formula vs expressed ASI
-  const [bottleContent, setBottleContent] = useState<"sufor" | "asi">(
-    editLog?.bottle_content === "asi" ? "asi" : "sufor",
+  // Bottle content: 'asi' | 'sufor' | 'mix' (combined ASIP+sufor in
+  // satu botol). Mix mode menampilkan dua input ml — total = asi + sufor.
+  const [bottleContent, setBottleContent] = useState<"sufor" | "asi" | "mix">(
+    editLog?.bottle_content === "asi"
+      ? "asi"
+      : editLog?.bottle_content === "mix"
+        ? "mix"
+        : "sufor",
   );
   // ASI batch override: "" = auto FIFO (oldest first); else specific batch id
   const [asiBatchId, setAsiBatchId] = useState<string>("");
@@ -245,6 +252,14 @@ function LogModal({
   const [bottleMl, setBottleMl] = useState<string>(
     String(editLog?.amount_ml ?? 60),
   );
+  // Mix mode: separate ml for ASIP + Sufor. Total = sum.
+  const [mixAsiMl, setMixAsiMl] = useState<string>(
+    String(editLog?.amount_asi_ml ?? 30),
+  );
+  const [mixSuforMl, setMixSuforMl] = useState<string>(
+    String(editLog?.amount_sufor_ml ?? 30),
+  );
+  const mixTotalMl = (Number(mixAsiMl) || 0) + (Number(mixSuforMl) || 0);
 
   // Pumping per-side timestamps. In create mode: Kiri now → now+15,
   // Kanan sequentially after. In edit mode: pre-fill from existing row.
@@ -440,28 +455,39 @@ function LogModal({
               {feedingMode === "sufor" ? (
                 <>
                   <Field label="Isi botol">
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
                         onClick={() => setBottleContent("asi")}
-                        className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
+                        className={`rounded-xl border px-2 py-2.5 text-xs font-medium transition-colors ${
                           bottleContent === "asi"
                             ? "border-rose-400 bg-rose-50 text-rose-700"
                             : "border-gray-200 bg-white text-gray-700"
                         }`}
                       >
-                        🤱 ASI perah
+                        🤱 ASI
                       </button>
                       <button
                         type="button"
                         onClick={() => setBottleContent("sufor")}
-                        className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
+                        className={`rounded-xl border px-2 py-2.5 text-xs font-medium transition-colors ${
                           bottleContent === "sufor"
                             ? "border-rose-400 bg-rose-50 text-rose-700"
                             : "border-gray-200 bg-white text-gray-700"
                         }`}
                       >
                         🥛 Sufor
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBottleContent("mix")}
+                        className={`rounded-xl border px-2 py-2.5 text-xs font-medium transition-colors ${
+                          bottleContent === "mix"
+                            ? "border-rose-400 bg-rose-50 text-rose-700"
+                            : "border-gray-200 bg-white text-gray-700"
+                        }`}
+                      >
+                        🤱+🥛 Mix
                       </button>
                     </div>
                   </Field>
@@ -504,14 +530,85 @@ function LogModal({
                       </p>
                     </Field>
                   ) : null}
-                  <Field label="Jumlah (ml)">
-                    <MlInput
-                      name="amount_ml"
-                      initial={editLog?.amount_ml ?? 60}
-                      controlledValue={bottleMl}
-                      onValueChange={setBottleMl}
-                    />
-                  </Field>
+                  {bottleContent === "mix" ? (
+                    <>
+                      {!isEdit && asiBatches.length > 0 ? (
+                        <Field label="Batch ASI (untuk porsi ASIP)">
+                          <input
+                            type="hidden"
+                            name="asi_batch_id"
+                            value={asiBatchId}
+                          />
+                          <select
+                            value={asiBatchId}
+                            onChange={(e) => {
+                              const id = e.target.value;
+                              setAsiBatchId(id);
+                              if (id) {
+                                const batch = asiBatches.find(
+                                  (b) => b.id === id,
+                                );
+                                if (batch)
+                                  setMixAsiMl(String(batch.remainingMl));
+                              }
+                            }}
+                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+                          >
+                            <option value="">Auto · FIFO (oldest first)</option>
+                            {asiBatches.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {asiBatchLabel(b)}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                      ) : null}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <span className="mb-1.5 block text-xs font-semibold text-rose-700">
+                            🤱 ASIP (ml)
+                          </span>
+                          <MlInput
+                            name="amount_asi_ml"
+                            initial={editLog?.amount_asi_ml ?? 30}
+                            controlledValue={mixAsiMl}
+                            onValueChange={setMixAsiMl}
+                          />
+                        </div>
+                        <div>
+                          <span className="mb-1.5 block text-xs font-semibold text-amber-700">
+                            🥛 Sufor (ml)
+                          </span>
+                          <MlInput
+                            name="amount_sufor_ml"
+                            initial={editLog?.amount_sufor_ml ?? 30}
+                            controlledValue={mixSuforMl}
+                            onValueChange={setMixSuforMl}
+                          />
+                        </div>
+                      </div>
+                      <input
+                        type="hidden"
+                        name="amount_ml"
+                        value={mixTotalMl}
+                      />
+                      <div className="rounded-lg bg-gray-50 px-3 py-2 text-center text-xs text-gray-600">
+                        Total botol:{" "}
+                        <span className="font-bold text-gray-900">
+                          {mixTotalMl} ml
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <Field label="Jumlah (ml)">
+                      <MlInput
+                        name="amount_ml"
+                        initial={editLog?.amount_ml ?? 60}
+                        controlledValue={bottleMl}
+                        onValueChange={setBottleMl}
+                      />
+                    </Field>
+                  )}
                 </>
               ) : editLog ? (
                 // Edit mode: per-side Mulai/Selesai for precision. Duration

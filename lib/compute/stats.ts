@@ -17,7 +17,9 @@ export type LogRow = {
   temp_celsius: number | null;
   med_name: string | null;
   med_dose: string | null;
-  bottle_content: "sufor" | "asi" | null;
+  bottle_content: "sufor" | "asi" | "mix" | null;
+  amount_asi_ml: number | null;
+  amount_sufor_ml: number | null;
   consumed_ml: number | null;
   start_l_at: string | null;
   end_l_at: string | null;
