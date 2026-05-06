@@ -1827,7 +1827,7 @@ export default async function HomePage({
                   detail={
                     stats.sleepCount > 0
                       ? [
-                          `${stats.sleepCount} sesi · avg ${fmtDuration(Math.round(sleep24hAvgPerSession))}/sesi · 24 jam`,
+                          `${stats.sleepCount} sesi · avg ${fmtDuration(Math.round(sleep24hAvgPerSession))}/sesi`,
                           avgWakeMin != null
                             ? `avg wake ${avgIntervalText(avgWakeMin)} antar tidur`
                             : "",
@@ -1845,7 +1845,7 @@ export default async function HomePage({
                   progress={stats.diaperPeeCount / target.peeMin}
                   detail={
                     peeAvg != null
-                      ? `avg ${avgIntervalText(peeAvg)} antar pipis · 24 jam`
+                      ? `avg ${avgIntervalText(peeAvg)} antar pipis`
                       : undefined
                   }
                   href="/?act=diaper#aktivitas"
@@ -1859,7 +1859,7 @@ export default async function HomePage({
                   progress={stats.diaperPoopCount / target.poopMin}
                   detail={
                     poopAvg != null
-                      ? `avg ${avgIntervalText(poopAvg)} antar BAB · 7 hari`
+                      ? `avg ${avgIntervalText(poopAvg)} antar BAB`
                       : undefined
                   }
                   href="/?act=diaper#aktivitas"
@@ -1986,26 +1986,24 @@ export default async function HomePage({
             </>
           ) : null}
           <p className="border-t border-gray-100 pt-2 text-[10px] leading-snug text-gray-400">
-            Target referensi WHO/IDAI/AAP usia{" "}
+            <span className="font-semibold">Target</span> WHO/IDAI/AAP usia{" "}
             {Math.floor(
               (Date.now() - new Date(baby.dob).getTime()) / 86400000,
             )}{" "}
             hari
             {milkTarget.source === "weight"
-              ? `, susu ${target.milkMlPerKgMin}–${target.milkMlPerKgMax} ml/kg/hari × ${currentWeightKg} kg`
+              ? `, ${target.milkMlPerKgMin}–${target.milkMlPerKgMax} ml/kg × ${currentWeightKg} kg`
               : ""}
-            . DBF estimasi{" "}
+            . <span className="font-semibold">DBF</span>{" "}
             {dbfEst.source === "multiplier" && dbfEst.pumpingRate != null
-              ? `${dbfEst.mlPerMin.toFixed(1)} ml/menit (${baby.dbf_pumping_multiplier}× pumping ${dbfEst.pumpingRate.toFixed(1)} ml/menit)`
+              ? `≈${dbfEst.mlPerMin.toFixed(1)} ml/m (${baby.dbf_pumping_multiplier}× pump ${dbfEst.pumpingRate.toFixed(1)})`
               : dbfEst.source === "fixed"
-                ? `${dbfEst.mlPerMin} ml/menit (override fixed)`
+                ? `${dbfEst.mlPerMin} ml/m (fixed)`
                 : dbfEst.source === "pumping"
-                  ? `${dbfEst.mlPerMin.toFixed(1)} ml/menit dari pumping terakhir`
-                  : `default ${dbfEst.mlPerMin} ml/menit`}{" "}
-            — bukan ukuran pasti. Selalu konsultasi DSA untuk evaluasi medis.
-            <br />
-            Sesi feeding: entries dengan gap ≤1 jam digabung jadi 1 sesi
-            (mis. DBF + sufor + ASIP top-up dalam menit yang sama = 1 sesi).
+                  ? `${dbfEst.mlPerMin.toFixed(1)} ml/m (pump terakhir)`
+                  : `default ${dbfEst.mlPerMin} ml/m`}
+            . <span className="font-semibold">Window</span> avg tidur/pipis
+            = 24 jam, BAB = 7 hari, sesi feeding = gap ≤1 jam digabung.
           </p>
         </div>
       </section>
