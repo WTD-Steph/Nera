@@ -526,7 +526,36 @@ export default async function HomePage({
     pumpingMultiplier: baby.dbf_pumping_multiplier,
   });
   const milkTotalMl = stats.feedingMlTotal + dbfEst.ml;
+  // Merged feeding session count — entries dalam window 60 menit
+  // dianggap satu sesi (mis. DBF + Sufor + ASIP top-up dalam 1 sesi makan).
+  // Raw event counts (botol 12×, DBF 5×) tetap ditampilkan untuk granularity,
+  // tapi sesi count lebih representative untuk 'frekuensi makan'.
+  const SESSION_MERGE_MIN = 60;
+  const feedingSessionCount = (() => {
+    const startMs = selectedDayMs;
+    const endMs = startMs + 86400000;
+    const ts = logsArray
+      .filter((l) => l.subtype === "feeding")
+      .map((l) => new Date(l.timestamp).getTime())
+      .filter((t) => t >= startMs && t < endMs)
+      .sort((a, b) => a - b);
+    if (ts.length === 0) return 0;
+    let sessions = 1;
+    for (let i = 1; i < ts.length; i++) {
+      const a = ts[i - 1];
+      const b = ts[i];
+      if (a !== undefined && b !== undefined) {
+        if ((b - a) / 60000 > SESSION_MERGE_MIN) sessions += 1;
+      }
+    }
+    return sessions;
+  })();
   const milkBreakdownParts: string[] = [];
+  if (feedingSessionCount > 0) {
+    milkBreakdownParts.push(
+      `${feedingSessionCount} sesi (gap >1j = sesi baru)`,
+    );
+  }
   if (stats.feedingMlCount > 0) {
     milkBreakdownParts.push(
       `${stats.feedingMlTotal} ml botol (${stats.feedingMlCount}×)`,
