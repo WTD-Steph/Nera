@@ -34,6 +34,7 @@ import { computeCryCauses } from "@/lib/compute/cry-diagnostic";
 import { logDetail } from "@/lib/compute/log-detail";
 import { CupFeedTrigger } from "@/components/CupFeedTrigger";
 import { getCupFeedPace } from "@/lib/constants/cup-feed";
+import { computeRealtimeAdvice } from "@/lib/compute/sleep-coach-realtime";
 import { CryDiagnostic } from "@/components/CryDiagnostic";
 import { WakeWindowCard } from "@/components/WakeWindowCard";
 import {
@@ -574,6 +575,9 @@ export default async function HomePage({
   })();
   // Sleep regression — banner saat in-window OR upcoming dalam 14 hari
   const sleepRegression = getCurrentRegression(baby.dob);
+  // Realtime sleep coach advice — compact pill di top, full detail di
+  // /sleep-coach page.
+  const realtimeAdvice = computeRealtimeAdvice(logsArray, baby.dob);
   // Cry diagnostic — rank kemungkinan penyebab nangis dari log terbaru
   const lastTemp =
     logsArray.find((l) => l.subtype === "temp") ?? null;
@@ -962,6 +966,27 @@ export default async function HomePage({
         asiBatches={asiBatchOptions}
         babyName={baby.name}
       />
+      <Link
+        href="/sleep-coach"
+        className={`mt-3 flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-xs shadow-sm hover:opacity-90 ${
+          realtimeAdvice.tone === "alert"
+            ? "border-red-200 bg-red-50/70 text-red-900"
+            : realtimeAdvice.tone === "warn"
+              ? "border-amber-200 bg-amber-50/70 text-amber-900"
+              : "border-emerald-200 bg-emerald-50/50 text-emerald-900"
+        }`}
+      >
+        <span className="text-base" aria-hidden>
+          {realtimeAdvice.emoji}
+        </span>
+        <span className="flex-1">
+          <span className="block text-[10px] font-semibold uppercase tracking-wider opacity-70">
+            Sleep Coach
+          </span>
+          <span className="block font-semibold">{realtimeAdvice.primary}</span>
+        </span>
+        <span className="text-[10px] opacity-60">→</span>
+      </Link>
       {wakeAssessment ? <WakeWindowCard assessment={wakeAssessment} /> : null}
       {feedingReminder ||
       diaperReminder ||
