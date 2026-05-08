@@ -32,6 +32,8 @@ import { assessWake, getWakeWindow } from "@/lib/constants/wake-window";
 import { getCurrentRegression } from "@/lib/constants/sleep-regressions";
 import { computeCryCauses } from "@/lib/compute/cry-diagnostic";
 import { logDetail } from "@/lib/compute/log-detail";
+import { CupFeedTrigger } from "@/components/CupFeedTrigger";
+import { getCupFeedPace } from "@/lib/constants/cup-feed";
 import { CryDiagnostic } from "@/components/CryDiagnostic";
 import { WakeWindowCard } from "@/components/WakeWindowCard";
 import {
@@ -1463,6 +1465,19 @@ export default async function HomePage({
               </span>
             </LogModalTrigger>
           ))}
+        </div>
+        <div className="mt-2">
+          <CupFeedTrigger
+            pace={getCupFeedPace(baby.dob)}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50/60 px-3 py-2.5 text-sm font-semibold text-rose-700 shadow-sm hover:bg-rose-100 active:scale-[0.99]"
+          >
+            <span aria-hidden>🥤</span>
+            <span>Cup Feed Coach</span>
+            <span className="text-[10px] font-medium text-rose-600/70">
+              · pace {getCupFeedPace(baby.dob).mlPerMinMin}–
+              {getCupFeedPace(baby.dob).mlPerMinMax} ml/m
+            </span>
+          </CupFeedTrigger>
         </div>
       </section>
 
