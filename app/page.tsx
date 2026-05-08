@@ -2144,6 +2144,15 @@ export default async function HomePage({
           Laporan
         </Link>
         <Link
+          href="/sleep-coach"
+          className="flex flex-col items-center gap-1 rounded-xl border border-gray-200 bg-white px-2 py-3 text-center text-xs font-semibold text-gray-700 hover:bg-gray-50"
+        >
+          <span className="text-lg" aria-hidden>
+            🌙
+          </span>
+          Sleep Coach
+        </Link>
+        <Link
           href="/more/household"
           className="flex flex-col items-center gap-1 rounded-xl border border-gray-200 bg-white px-2 py-3 text-center text-xs font-semibold text-gray-700 hover:bg-gray-50"
         >
