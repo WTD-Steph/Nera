@@ -8,12 +8,12 @@ import { deleteLogAction } from "@/app/actions/logs";
 import { type LogRow } from "@/lib/compute/stats";
 import {
   fmtDate,
-  fmtSleepRange,
   fmtTime,
-  pumpDur,
   timeSince,
 } from "@/lib/compute/format";
 import { LogsRealtime } from "@/components/LogsRealtime";
+import { logDetail } from "@/lib/compute/log-detail";
+import { dbfEstimateMl } from "@/lib/compute/dbf-estimate";
 
 type Filter =
   | "all"
@@ -47,81 +47,6 @@ const SUBTYPE_LABEL: Record<string, string> = {
   med: "Obat / Suplemen",
 };
 
-function logDetail(l: LogRow): string {
-  if (l.subtype === "feeding") {
-    if (l.amount_ml != null) {
-      const src =
-        l.bottle_content === "asi"
-          ? "ASI"
-          : l.bottle_content === "sufor"
-            ? "Sufor"
-            : null;
-      return src ? `🍼 ${src} ${l.amount_ml} ml` : `🍼 ${l.amount_ml} ml`;
-    }
-    const fmtDbfSide = (
-      mins: number | null,
-      startAt: string | null,
-      endAt: string | null,
-    ): string | null => {
-      if (mins == null && !startAt) return null;
-      const m = mins ?? 0;
-      if (m === 0 && startAt && endAt) {
-        const sec = Math.round(
-          (new Date(endAt).getTime() - new Date(startAt).getTime()) / 1000,
-        );
-        if (sec >= 1 && sec < 60) return `${sec}s`;
-      }
-      return `${m}m`;
-    };
-    const lFmt = fmtDbfSide(l.duration_l_min, l.start_l_at, l.end_l_at);
-    const rFmt = fmtDbfSide(l.duration_r_min, l.start_r_at, l.end_r_at);
-    if (!lFmt && !rFmt) return `🤱 (kosong)`;
-    if (!lFmt) return `🤱 R ${rFmt}`;
-    if (!rFmt) return `🤱 L ${lFmt}`;
-    return `🤱 L ${lFmt} | R ${rFmt}`;
-  }
-  if (l.subtype === "pumping") {
-    const lDur = pumpDur(l.start_l_at, l.end_l_at);
-    const rDur = pumpDur(l.start_r_at, l.end_r_at);
-    const lUsed = l.amount_l_ml != null || !!l.start_l_at;
-    const rUsed = l.amount_r_ml != null || !!l.start_r_at;
-    const left = lUsed
-      ? `L ${l.amount_l_ml ?? 0} ml` + (lDur ? ` · ${lDur} mnt` : "")
-      : null;
-    const right = rUsed
-      ? `R ${l.amount_r_ml ?? 0} ml` + (rDur ? ` · ${rDur} mnt` : "")
-      : null;
-    if (!left && !right) return "(kosong)";
-    if (!left) return right!;
-    if (!right) return left;
-    return `${left} | ${right}`;
-  }
-  if (l.subtype === "diaper") {
-    const parts: string[] = [];
-    if (l.has_pee) parts.push("💛");
-    if (l.has_poop) {
-      const p = [l.poop_color, l.poop_consistency].filter(Boolean).join(" ");
-      parts.push(p ? `💩 ${p}` : "💩");
-    }
-    return parts.join(" + ");
-  }
-  if (l.subtype === "sleep") {
-    const range = fmtSleepRange(l.timestamp, l.end_timestamp);
-    const quality =
-      l.sleep_quality === "nyenyak"
-        ? " · 😴 nyenyak"
-        : l.sleep_quality === "gelisah"
-          ? " · 😣 gelisah"
-          : l.sleep_quality === "sering_bangun"
-            ? " · 😢 sering bangun"
-            : "";
-    return `${range}${quality}`;
-  }
-  if (l.subtype === "temp") return `${l.temp_celsius}°C`;
-  if (l.subtype === "med")
-    return [l.med_name, l.med_dose].filter(Boolean).join(" ");
-  return "";
-}
 
 export default async function HistoryPage({
   searchParams,
@@ -154,6 +79,13 @@ export default async function HistoryPage({
 
   const { data: logs } = await query;
   const logsArray: LogRow[] = (logs ?? []) as LogRow[];
+
+  // dbfRate untuk logDetail formatting (ml estimate per menit DBF).
+  // Pakai priority chain dbfEstimateMl seperti home page.
+  const dbfRate = dbfEstimateMl(0, logsArray, {
+    fixedMlPerMin: baby.dbf_ml_per_min,
+    pumpingMultiplier: baby.dbf_pumping_multiplier,
+  }).mlPerMin;
 
   // Group by Jakarta-local date (YYYY-MM-DD). Server runs UTC, so naive
   // toDateString() puts timestamps 21:00–23:59 UTC (= 04:00–06:59 next
@@ -224,9 +156,9 @@ export default async function HistoryPage({
                           <span className="text-sm font-semibold text-gray-800">
                             {SUBTYPE_LABEL[l.subtype] ?? l.subtype}
                           </span>
-                          {logDetail(l) ? (
+                          {logDetail(l, dbfRate, logsArray) ? (
                             <span className="truncate text-xs text-gray-500">
-                              • {logDetail(l)}
+                              • {logDetail(l, dbfRate, logsArray)}
                             </span>
                           ) : null}
                         </div>
