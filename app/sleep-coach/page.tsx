@@ -5,6 +5,10 @@ import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
 import { type LogRow } from "@/lib/compute/stats";
 import { analyzeSleep, type CoachLevel } from "@/lib/compute/sleep-coach";
+import {
+  computeRealtimeAdvice,
+  type RealtimeAdvice,
+} from "@/lib/compute/sleep-coach-realtime";
 
 const LEVEL_STYLE: Record<
   CoachLevel,
@@ -53,6 +57,7 @@ export default async function SleepCoachPage() {
     .order("timestamp", { ascending: true });
   const logsArray = (logs ?? []) as LogRow[];
   const report = analyzeSleep(logsArray, baby.dob, 7);
+  const realtime = computeRealtimeAdvice(logsArray, baby.dob);
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl">
@@ -68,6 +73,8 @@ export default async function SleepCoachPage() {
         Analisis 7 hari terakhir · usia {report.ageDays} hari · wake
         window {report.wakeWindow.label}.
       </p>
+
+      <RealtimeAdviceCard advice={realtime} />
 
       <section className="mt-4 grid grid-cols-2 gap-2">
         <SummaryCard
@@ -147,6 +154,62 @@ export default async function SleepCoachPage() {
         konsultasi medis — pattern berdasarkan data Anda.
       </p>
     </main>
+  );
+}
+
+function RealtimeAdviceCard({ advice }: { advice: RealtimeAdvice }) {
+  const toneStyle: Record<RealtimeAdvice["tone"], string> = {
+    ok: "border-emerald-200 bg-emerald-50/60",
+    warn: "border-amber-200 bg-amber-50/60",
+    alert: "border-red-200 bg-red-50/60",
+  };
+  const actionLabel: Record<RealtimeAdvice["action"], string> = {
+    settle: "Tidurkan",
+    wake: "Bangunkan",
+    wait: "Biarkan",
+    check: "Cek dulu",
+  };
+  const actionColor: Record<RealtimeAdvice["action"], string> = {
+    settle: "bg-indigo-500 text-white",
+    wake: "bg-amber-500 text-white",
+    wait: "bg-emerald-500 text-white",
+    check: "bg-rose-500 text-white",
+  };
+  return (
+    <section
+      className={`rounded-2xl border p-4 shadow-sm ${toneStyle[advice.tone]}`}
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+          Saran Sekarang
+        </span>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${actionColor[advice.action]}`}
+        >
+          {actionLabel[advice.action]}
+        </span>
+      </div>
+      <div className="flex items-start gap-2">
+        <span className="text-2xl" aria-hidden>
+          {advice.emoji}
+        </span>
+        <div className="flex-1">
+          <div className="text-base font-bold text-gray-900">
+            {advice.primary}
+          </div>
+          <p className="mt-1 text-[12px] leading-snug text-gray-700">
+            {advice.reason}
+          </p>
+          {advice.details.length > 0 ? (
+            <ul className="mt-2 space-y-0.5 text-[11px] text-gray-600">
+              {advice.details.map((d, i) => (
+                <li key={i}>· {d}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      </div>
+    </section>
   );
 }
 
