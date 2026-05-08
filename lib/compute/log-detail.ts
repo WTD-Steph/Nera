@@ -15,44 +15,75 @@ import {
   type EffectivenessLevel,
 } from "@/lib/compute/dbf-effectiveness";
 
-/** Min duration buat dianggap "real sleep" (bukan catnap) saat hitung
- *  wake window sebelum tidur ini. <15 min biasanya catnap dan tidak
- *  reset wake counter biologically. */
-const MIN_PREV_SLEEP_MIN = 15;
+/** Threshold untuk merge sleeps jadi 1 cluster. Sleep dengan gap antar
+ *  ≤ 30 menit dianggap satu sesi tidur (catnap + recall back to sleep,
+ *  atau brief wake yang tidak fully alert). 30 menit konservatif —
+ *  bayi yang awake >30m biasanya mostly alert + reset wake clock. */
+const SLEEP_CLUSTER_GAP_MIN = 30;
 
 /**
- * Compute wake duration sebelum sleep ini. Skip catnap < 15 min —
- * ambil prev sleep yang punya duration ≥ MIN_PREV_SLEEP_MIN.
- * Cap 12h gap (filter outlier seperti first sleep of day).
+ * Group sleeps ke clusters: sleep dengan gap antar end → next.start
+ * ≤ SLEEP_CLUSTER_GAP_MIN dianggap satu cluster. Returns sorted asc.
  */
-export function wakeBeforeSleepText(l: LogRow, allLogs: LogRow[]): string {
-  const myTime = new Date(l.timestamp).getTime();
-  const candidates = allLogs
-    .filter(
-      (x) =>
-        x.subtype === "sleep" &&
-        x.id !== l.id &&
-        x.end_timestamp != null &&
-        new Date(x.end_timestamp).getTime() <= myTime,
-    )
+function buildSleepClusters(
+  allLogs: LogRow[],
+  includeOngoingId?: string,
+): { firstStart: number; lastEnd: number; ids: Set<string> }[] {
+  const sleeps = allLogs
+    .filter((x) => {
+      if (x.subtype !== "sleep") return false;
+      // Include ongoing only if it's the row being assessed
+      if (x.end_timestamp == null) {
+        return includeOngoingId === x.id;
+      }
+      return true;
+    })
     .sort(
       (a, b) =>
-        new Date(b.end_timestamp!).getTime() -
-        new Date(a.end_timestamp!).getTime(),
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
     );
-  // Filter: prev sleep harus ≥ MIN_PREV_SLEEP_MIN duration. Catnap
-  // tidak count sebagai "tidur beneran" yang reset wake clock.
-  const prevSleep = candidates.find((x) => {
-    if (!x.end_timestamp) return false;
-    const durMin =
-      (new Date(x.end_timestamp).getTime() -
-        new Date(x.timestamp).getTime()) /
-      60000;
-    return durMin >= MIN_PREV_SLEEP_MIN;
-  });
-  if (!prevSleep || !prevSleep.end_timestamp) return "";
+  const clusters: {
+    firstStart: number;
+    lastEnd: number;
+    ids: Set<string>;
+  }[] = [];
+  for (const s of sleeps) {
+    const start = new Date(s.timestamp).getTime();
+    // For ongoing sleep being assessed, treat lastEnd = start (wake-before
+    // is computed from start anyway; ongoing doesn't have a real end yet).
+    const end = s.end_timestamp ? new Date(s.end_timestamp).getTime() : start;
+    const last = clusters[clusters.length - 1];
+    if (last && (start - last.lastEnd) / 60000 <= SLEEP_CLUSTER_GAP_MIN) {
+      last.lastEnd = Math.max(last.lastEnd, end);
+      last.ids.add(s.id);
+    } else {
+      clusters.push({ firstStart: start, lastEnd: end, ids: new Set([s.id]) });
+    }
+  }
+  return clusters;
+}
+
+/**
+ * Compute wake duration sebelum sleep ini. Pakai cluster logic — catnap
+ * yang berdekatan (≤30m gap) dengan sleep ini di-merge jadi satu cluster.
+ * Wake-before = thisCluster.firstStart − prevCluster.lastEnd.
+ *
+ * Contoh: catnap 16:47→16:54 + main sleep 17:11→sekarang → 1 cluster
+ * mulai 16:47. Prev cluster end 15:43 → wake-before = 1j 4m.
+ *
+ * Cap 12h gap (filter outlier — first sleep of day).
+ */
+export function wakeBeforeSleepText(l: LogRow, allLogs: LogRow[]): string {
+  if (l.subtype !== "sleep") return "";
+  const clusters = buildSleepClusters(allLogs, l.id);
+  // Find cluster containing this sleep
+  const myIdx = clusters.findIndex((c) => c.ids.has(l.id));
+  if (myIdx < 0) return "";
+  const myCluster = clusters[myIdx]!;
+  const prevCluster = clusters[myIdx - 1];
+  if (!prevCluster) return "";
   const gapMin = Math.round(
-    (myTime - new Date(prevSleep.end_timestamp).getTime()) / 60000,
+    (myCluster.firstStart - prevCluster.lastEnd) / 60000,
   );
   if (gapMin <= 0 || gapMin > 12 * 60) return "";
   const h = Math.floor(gapMin / 60);
