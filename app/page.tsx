@@ -32,8 +32,13 @@ import { assessWake, getWakeWindow } from "@/lib/constants/wake-window";
 import { getCurrentRegression } from "@/lib/constants/sleep-regressions";
 import { computeCryCauses } from "@/lib/compute/cry-diagnostic";
 import { logDetail } from "@/lib/compute/log-detail";
+import {
+  computeLastEnded,
+  fmtSelesaiLalu,
+  fmtGap,
+} from "@/lib/compute/last-ended";
 import { CupFeedTrigger } from "@/components/CupFeedTrigger";
-import { getCupFeedPace } from "@/lib/constants/cup-feed";
+import { getCupFeedPace, getBottleFeedPace } from "@/lib/constants/cup-feed";
 import { computeRealtimeAdvice } from "@/lib/compute/sleep-coach-realtime";
 import { CryDiagnostic } from "@/components/CryDiagnostic";
 import { WakeWindowCard } from "@/components/WakeWindowCard";
@@ -375,6 +380,8 @@ export default async function HomePage({
       l.subtype === "feeding" ? "dbf" : l.subtype,
     ),
   );
+  const lastEnded = computeLastEnded(logsArray);
+  const nowMsForGap = Date.now();
   // Selected date: from ?date=YYYY-MM-DD (Jakarta) or today.
   const todayMs = jakartaDayStartMs();
   const selectedDayMs = parseJakartaDate(searchParams.date) ?? todayMs;
@@ -1312,6 +1319,16 @@ export default async function HomePage({
               idx === 0 &&
               searchParams.darklamp === "sleep" &&
               cardSubtype === "sleep";
+            const lastEndedMs = lastEnded[cardSubtype];
+            const startMs = new Date(l.timestamp).getTime();
+            const gapMin =
+              lastEndedMs != null && lastEndedMs < startMs
+                ? Math.round((startMs - lastEndedMs) / 60000)
+                : null;
+            const prevEndedGapLabel =
+              gapMin != null && gapMin > 0 && gapMin <= 24 * 60
+                ? fmtGap(gapMin)
+                : null;
             return (
               <OngoingCard
                 key={l.id}
@@ -1327,6 +1344,7 @@ export default async function HomePage({
                 autoOpenLamp={shouldAutoOpenLamp}
                 otherPumpingOngoing={ongoingSubtypes.has("pumping")}
                 reminders={darkReminders}
+                prevEndedGapLabel={prevEndedGapLabel}
               />
             );
           })}
@@ -1343,6 +1361,7 @@ export default async function HomePage({
               subtype="sleep"
               label="Tidur"
               emoji="😴"
+              lastEndedLabel={fmtSelesaiLalu(lastEnded.sleep, nowMsForGap)}
             />
           ) : (
             <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-rose-100 bg-rose-50/40 p-3 text-rose-400">
@@ -1360,6 +1379,7 @@ export default async function HomePage({
               label="DBF"
               emoji="🤱"
               pumpingOngoing={ongoingSubtypes.has("pumping")}
+              lastEndedLabel={fmtSelesaiLalu(lastEnded.dbf, nowMsForGap)}
             />
           ) : (
             <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-rose-100 bg-rose-50/40 p-3 text-rose-400">
@@ -1376,6 +1396,7 @@ export default async function HomePage({
               subtype="pumping"
               label="Pumping"
               emoji="💧"
+              lastEndedLabel={fmtSelesaiLalu(lastEnded.pumping, nowMsForGap)}
             />
           ) : (
             <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-rose-100 bg-rose-50/40 p-3 text-rose-400">
@@ -1392,6 +1413,7 @@ export default async function HomePage({
               subtype="hiccup"
               label="Cegukan"
               emoji="🫨"
+              lastEndedLabel={fmtSelesaiLalu(lastEnded.hiccup, nowMsForGap)}
             />
           ) : (
             <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-rose-100 bg-rose-50/40 p-3 text-rose-400">
@@ -1408,6 +1430,7 @@ export default async function HomePage({
               subtype="tummy"
               label="Tummy"
               emoji="🐢"
+              lastEndedLabel={fmtSelesaiLalu(lastEnded.tummy, nowMsForGap)}
             />
           ) : (
             <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-rose-100 bg-rose-50/40 p-3 text-rose-400">
@@ -1493,14 +1516,14 @@ export default async function HomePage({
         </div>
         <div className="mt-2">
           <CupFeedTrigger
-            pace={getCupFeedPace(baby.dob)}
+            cupPace={getCupFeedPace(baby.dob)}
+            bottlePace={getBottleFeedPace(baby.dob)}
             className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50/60 px-3 py-2.5 text-sm font-semibold text-rose-700 shadow-sm hover:bg-rose-100 active:scale-[0.99]"
           >
-            <span aria-hidden>🥤</span>
-            <span>Cup Feed Coach</span>
+            <span aria-hidden>🍼</span>
+            <span>Feeding Coach</span>
             <span className="text-[10px] font-medium text-rose-600/70">
-              · pace {getCupFeedPace(baby.dob).mlPerMinMin}–
-              {getCupFeedPace(baby.dob).mlPerMinMax} ml/m
+              · bikin sufor + tracker pace
             </span>
           </CupFeedTrigger>
         </div>

@@ -60,6 +60,7 @@ export function OngoingCard({
   autoOpenLamp,
   otherPumpingOngoing,
   reminders,
+  prevEndedGapLabel,
 }: {
   id: string;
   subtype: Subtype;
@@ -79,6 +80,9 @@ export function OngoingCard({
   otherPumpingOngoing?: boolean;
   /** Reminders to surface in NightLamp dark mode (feeding/diaper/pumping). */
   reminders?: NightLampReminder[];
+  /** Fixed gap from prev ended session of same subtype → this start.
+   *  e.g. "11m setelah selesai sebelumnya" — confirms intended gap. */
+  prevEndedGapLabel?: string | null;
 }) {
   const [showLamp, setShowLamp] = useState(!!autoOpenLamp);
   const [showPumpEnd, setShowPumpEnd] = useState(false);
@@ -111,6 +115,12 @@ export function OngoingCard({
             </div>
             <div className="text-[11px] text-gray-500">
               Sejak {fmtClock(startIso)}
+              {prevEndedGapLabel ? (
+                <span className="text-gray-400">
+                  {" · "}
+                  {prevEndedGapLabel} setelah selesai sebelumnya
+                </span>
+              ) : null}
               {isPaused
                 ? subtype === "sleep" ||
                   subtype === "hiccup" ||
