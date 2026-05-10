@@ -1355,7 +1355,7 @@ export default async function HomePage({
         <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
           Mulai Sekarang
         </h2>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
           {!ongoingSubtypes.has("sleep") ? (
             <StartOngoingButton
               subtype="sleep"
@@ -1391,6 +1391,21 @@ export default async function HomePage({
               </span>
             </div>
           )}
+          <CupFeedTrigger
+            cupPace={getCupFeedPace(baby.dob)}
+            bottlePace={getBottleFeedPace(baby.dob)}
+            className="flex w-full flex-col items-center gap-0.5 rounded-2xl border border-rose-200 bg-white p-3 shadow-sm transition-transform active:scale-95"
+          >
+            <span className="text-2xl" aria-hidden>
+              🍼
+            </span>
+            <span className="text-[11px] font-semibold text-rose-700">
+              Sufor/Cup
+            </span>
+            <span className="text-[9px] font-medium text-gray-400">
+              bikin + paced
+            </span>
+          </CupFeedTrigger>
           {!ongoingSubtypes.has("pumping") ? (
             <StartOngoingButton
               subtype="pumping"
@@ -1513,19 +1528,6 @@ export default async function HomePage({
               </span>
             </LogModalTrigger>
           ))}
-        </div>
-        <div className="mt-2">
-          <CupFeedTrigger
-            cupPace={getCupFeedPace(baby.dob)}
-            bottlePace={getBottleFeedPace(baby.dob)}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50/60 px-3 py-2.5 text-sm font-semibold text-rose-700 shadow-sm hover:bg-rose-100 active:scale-[0.99]"
-          >
-            <span aria-hidden>🍼</span>
-            <span>Feeding Coach</span>
-            <span className="text-[10px] font-medium text-rose-600/70">
-              · bikin sufor + tracker pace
-            </span>
-          </CupFeedTrigger>
         </div>
       </section>
 
