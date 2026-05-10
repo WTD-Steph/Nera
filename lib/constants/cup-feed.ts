@@ -51,6 +51,23 @@ export const CUP_FEED_PACES: CupFeedPace[] = [
   { ageDaysMin: 180, ageDaysMax: 99999, mlPerMinMin: 5, mlPerMinMax: 8, label: "6+ bln" },
 ];
 
+/**
+ * Paced bottle feeding (botol) — slightly faster ranges than cup karena
+ * bottle nipple flow lebih steady. Tetap konservatif untuk hindari
+ * overfeeding + mimic breastfeed pace (Hookway, Pacing Bottle Feed).
+ *
+ * Sources:
+ * - Hookway L. "Holistic Sleep Coaching" — paced bottle for breastfed.
+ * - Kassing D. "Bottle-Feeding as a Tool to Reinforce Breastfeeding."
+ *   J Hum Lact 2002;18:56-60.
+ */
+export const BOTTLE_FEED_PACES: CupFeedPace[] = [
+  { ageDaysMin: 0, ageDaysMax: 30, mlPerMinMin: 3, mlPerMinMax: 5, label: "0–1 bln" },
+  { ageDaysMin: 30, ageDaysMax: 90, mlPerMinMin: 4, mlPerMinMax: 6, label: "1–3 bln" },
+  { ageDaysMin: 90, ageDaysMax: 180, mlPerMinMin: 5, mlPerMinMax: 8, label: "3–6 bln" },
+  { ageDaysMin: 180, ageDaysMax: 99999, mlPerMinMin: 6, mlPerMinMax: 10, label: "6+ bln" },
+];
+
 export function getCupFeedPace(dobIso: string): CupFeedPace {
   const days = Math.max(
     0,
@@ -60,6 +77,17 @@ export function getCupFeedPace(dobIso: string): CupFeedPace {
     if (days >= p.ageDaysMin && days < p.ageDaysMax) return p;
   }
   return CUP_FEED_PACES[0]!;
+}
+
+export function getBottleFeedPace(dobIso: string): CupFeedPace {
+  const days = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(dobIso).getTime()) / 86400000),
+  );
+  for (const p of BOTTLE_FEED_PACES) {
+    if (days >= p.ageDaysMin && days < p.ageDaysMax) return p;
+  }
+  return BOTTLE_FEED_PACES[0]!;
 }
 
 export type PaceStatus = "too_slow" | "ok_slow" | "ok" | "ok_fast" | "too_fast";

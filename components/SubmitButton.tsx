@@ -6,16 +6,19 @@ export function SubmitButton({
   children,
   pendingText,
   className,
+  disabled,
 }: {
   children: React.ReactNode;
   pendingText?: React.ReactNode;
   className?: string;
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
+  const isDisabled = pending || !!disabled;
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={isDisabled}
       aria-busy={pending}
       className={`${className ?? ""} ${pending ? "cursor-wait opacity-70" : ""}`}
     >

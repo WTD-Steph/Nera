@@ -18,6 +18,7 @@ export function StartOngoingButton({
   label,
   emoji,
   pumpingOngoing,
+  lastEndedLabel,
 }: {
   subtype: "sleep" | "pumping" | "feeding" | "hiccup" | "tummy";
   label: string;
@@ -25,6 +26,8 @@ export function StartOngoingButton({
   /** When subtype=feeding, used to gate the combo "+ pump sisi lain"
    *  toggle — only meaningful when no pumping is ongoing yet. */
   pumpingOngoing?: boolean;
+  /** "selesai 1j 30m lalu" — gap since last ended session of this type. */
+  lastEndedLabel?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [offsetMin, setOffsetMin] = useState(0);
@@ -35,12 +38,17 @@ export function StartOngoingButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-full flex-col items-center gap-1 rounded-2xl border border-rose-200 bg-white p-3 shadow-sm transition-transform active:scale-95"
+        className="flex w-full flex-col items-center gap-0.5 rounded-2xl border border-rose-200 bg-white p-3 shadow-sm transition-transform active:scale-95"
       >
         <span className="text-2xl" aria-hidden>
           {emoji}
         </span>
         <span className="text-[11px] font-semibold text-rose-700">{label}</span>
+        {lastEndedLabel ? (
+          <span className="text-[9px] font-medium text-gray-400">
+            selesai {lastEndedLabel}
+          </span>
+        ) : null}
       </button>
     );
   }

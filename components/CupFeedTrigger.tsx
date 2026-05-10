@@ -5,11 +5,13 @@ import { CupFeedCoach } from "@/components/CupFeedCoach";
 import type { CupFeedPace } from "@/lib/constants/cup-feed";
 
 export function CupFeedTrigger({
-  pace,
+  cupPace,
+  bottlePace,
   className,
   children,
 }: {
-  pace: CupFeedPace;
+  cupPace: CupFeedPace;
+  bottlePace: CupFeedPace;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -23,7 +25,13 @@ export function CupFeedTrigger({
       >
         {children}
       </button>
-      {open ? <CupFeedCoach pace={pace} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        <CupFeedCoach
+          cupPace={cupPace}
+          bottlePace={bottlePace}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
     </>
   );
 }
