@@ -42,6 +42,8 @@ export type EditLog = {
   bottle_content: "sufor" | "asi" | "mix" | null;
   amount_asi_ml: number | null;
   amount_sufor_ml: number | null;
+  amount_spilled_ml: number | null;
+  spilled_attribution: "asi" | "sufor" | "proporsional" | null;
   start_l_at: string | null;
   end_l_at: string | null;
   start_r_at: string | null;
@@ -260,6 +262,20 @@ function LogModal({
     String(editLog?.amount_sufor_ml ?? 30),
   );
   const mixTotalMl = (Number(mixAsiMl) || 0) + (Number(mixSuforMl) || 0);
+  // Spillage — ml tumpah / sisa di cup yang ngga terminum. Stock ASI
+  // tetap deduct ASI portion of spilled.
+  const [spilledMl, setSpilledMl] = useState<string>(
+    String(editLog?.amount_spilled_ml ?? 0),
+  );
+  const [spilledAttribution, setSpilledAttribution] = useState<
+    "asi" | "sufor" | "proporsional"
+  >(
+    editLog?.spilled_attribution === "asi"
+      ? "asi"
+      : editLog?.spilled_attribution === "sufor"
+        ? "sufor"
+        : "proporsional",
+  );
 
   // Pumping per-side timestamps. In create mode: Kiri now → now+15,
   // Kanan sequentially after. In edit mode: pre-fill from existing row.
@@ -600,7 +616,7 @@ function LogModal({
                       </div>
                     </>
                   ) : (
-                    <Field label="Jumlah (ml)">
+                    <Field label="Jumlah diminum (ml)">
                       <MlInput
                         name="amount_ml"
                         initial={editLog?.amount_ml ?? 60}
@@ -609,6 +625,13 @@ function LogModal({
                       />
                     </Field>
                   )}
+                  <SpillageField
+                    spilledMl={spilledMl}
+                    setSpilledMl={setSpilledMl}
+                    bottleContent={bottleContent}
+                    spilledAttribution={spilledAttribution}
+                    setSpilledAttribution={setSpilledAttribution}
+                  />
                 </>
               ) : editLog ? (
                 // Edit mode: per-side Mulai/Selesai for precision. Duration
@@ -1075,6 +1098,80 @@ function DbfEditPerSide({ editLog }: { editLog: EditLog }) {
           Durasi: {rMin != null ? `${rMin} menit` : "—"}
         </div>
       </div>
+    </div>
+  );
+}
+
+function SpillageField({
+  spilledMl,
+  setSpilledMl,
+  bottleContent,
+  spilledAttribution,
+  setSpilledAttribution,
+}: {
+  spilledMl: string;
+  setSpilledMl: (v: string) => void;
+  bottleContent: "asi" | "sufor" | "mix";
+  spilledAttribution: "asi" | "sufor" | "proporsional";
+  setSpilledAttribution: (a: "asi" | "sufor" | "proporsional") => void;
+}) {
+  const spilledNum = Number(spilledMl) || 0;
+  return (
+    <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <label className="text-xs font-semibold text-amber-800">
+          Tumpah / sisa (ml)
+        </label>
+        <select
+          name="amount_spilled_ml"
+          value={spilledMl}
+          onChange={(e) => setSpilledMl(e.target.value)}
+          className="appearance-none rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-sm font-semibold tabular-nums text-amber-900 outline-none focus:border-amber-400"
+        >
+          {Array.from({ length: 51 }, (_, i) => (
+            <option key={i} value={i}>
+              {i} ml
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="mt-1 text-[10px] leading-snug text-amber-700/70">
+        Tumpah = stock ASI tetap berkurang, tapi intake bayi tidak.
+      </p>
+      {bottleContent === "mix" && spilledNum > 0 ? (
+        <div className="mt-2">
+          <label className="block text-[11px] font-semibold text-amber-800">
+            Tumpahnya dari sisi mana?
+          </label>
+          <div className="mt-1 grid grid-cols-3 gap-1">
+            {(
+              [
+                { v: "asi", label: "🤱 ASI" },
+                { v: "proporsional", label: "≈ Mix" },
+                { v: "sufor", label: "🥛 Sufor" },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.v}
+                type="button"
+                onClick={() => setSpilledAttribution(opt.v)}
+                className={`rounded-lg border px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                  spilledAttribution === opt.v
+                    ? "border-amber-400 bg-amber-100 text-amber-900"
+                    : "border-amber-200 bg-white text-amber-700"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <input
+            type="hidden"
+            name="spilled_attribution"
+            value={spilledAttribution}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

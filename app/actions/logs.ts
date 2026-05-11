@@ -7,6 +7,7 @@ import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
 import { dbfEstimateMl } from "@/lib/compute/dbf-estimate";
 import type { LogRow } from "@/lib/compute/stats";
+import { asiSpilledMl } from "@/lib/compute/spillage";
 
 const SUBTYPES = [
   "feeding",
@@ -71,6 +72,34 @@ function isoOrNull(formData: FormData, key: string): string | null {
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+/**
+ * Read optional spillage fields for bottle feeding rows. Mutates
+ * payload with amount_spilled_ml + spilled_attribution when applicable.
+ * Mix tanpa explicit attribution → default 'proporsional'.
+ */
+function applySpillageToPayload(
+  formData: FormData,
+  payload: Record<string, unknown>,
+  content: "asi" | "sufor" | "mix",
+): void {
+  const spilledRaw = num(formData, "amount_spilled_ml");
+  if (spilledRaw !== null && spilledRaw > 0) {
+    payload.amount_spilled_ml = spilledRaw;
+    if (content === "mix") {
+      const attrRaw = String(formData.get("spilled_attribution") ?? "");
+      payload.spilled_attribution =
+        attrRaw === "asi" || attrRaw === "sufor" || attrRaw === "proporsional"
+          ? attrRaw
+          : "proporsional";
+    } else {
+      payload.spilled_attribution = null;
+    }
+  } else {
+    payload.amount_spilled_ml = null;
+    payload.spilled_attribution = null;
+  }
+}
+
 export async function createLogAction(formData: FormData) {
   const subtype = String(formData.get("subtype") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/");
@@ -129,6 +158,7 @@ export async function createLogAction(formData: FormData) {
         if (content === "asi") payload.amount_asi_ml = amount;
         else payload.amount_sufor_ml = amount;
       }
+      applySpillageToPayload(formData, payload, content);
     } else {
       const l = num(formData, "duration_l_min");
       const r = num(formData, "duration_r_min");
@@ -278,7 +308,7 @@ export async function createLogAction(formData: FormData) {
   // feed exceeds the picked batch's remaining stock.
   // Deduct ASI ml only — works for both 'asi' (full) and 'mix' (partial,
   // pakai amount_asi_ml saja, sisanya sufor tidak nge-touch stock).
-  const asiToDeduct =
+  const asiDrunk =
     subtype === "feeding" &&
     (payload.bottle_content === "asi" ||
       payload.bottle_content === "mix") &&
@@ -286,6 +316,24 @@ export async function createLogAction(formData: FormData) {
     payload.amount_asi_ml > 0
       ? payload.amount_asi_ml
       : 0;
+  const asiSpilled =
+    subtype === "feeding" && asiDrunk > 0
+      ? asiSpilledMl({
+          bottle_content:
+            (payload.bottle_content as "asi" | "sufor" | "mix") ?? null,
+          amount_ml: (payload.amount_ml as number) ?? null,
+          amount_asi_ml: (payload.amount_asi_ml as number) ?? null,
+          amount_sufor_ml: (payload.amount_sufor_ml as number) ?? null,
+          amount_spilled_ml: (payload.amount_spilled_ml as number) ?? null,
+          spilled_attribution:
+            (payload.spilled_attribution as
+              | "asi"
+              | "sufor"
+              | "proporsional"
+              | null) ?? null,
+        })
+      : 0;
+  const asiToDeduct = asiDrunk + asiSpilled;
   if (asiToDeduct > 0) {
     const pickedBatchId = String(formData.get("asi_batch_id") ?? "").trim();
     const { data: batches } = await supabase
@@ -1106,7 +1154,7 @@ export async function updateLogAction(formData: FormData) {
   const { data: existing } = await supabase
     .from("logs")
     .select(
-      "id, baby_id, subtype, bottle_content, amount_ml, amount_asi_ml, amount_sufor_ml, end_timestamp",
+      "id, baby_id, subtype, bottle_content, amount_ml, amount_asi_ml, amount_sufor_ml, amount_spilled_ml, spilled_attribution, end_timestamp",
     )
     .eq("id", id)
     .single();
@@ -1197,6 +1245,7 @@ export async function updateLogAction(formData: FormData) {
         if (content === "asi") payload.amount_asi_ml = amount;
         else payload.amount_sufor_ml = amount;
       }
+      applySpillageToPayload(formData, payload, content);
     } else {
       // DBF mode in EDIT modal: per-side Mulai/Selesai datetimes →
       // auto-compute duration. Falls back to direct duration input
@@ -1345,7 +1394,8 @@ export async function updateLogAction(formData: FormData) {
   // ASI re-allocation: refund based on existing.amount_asi_ml (covers
   // both 'asi' full and 'mix' partial). Fallback ke amount_ml untuk
   // legacy rows (sebelum mix migration) yang ngga punya amount_asi_ml.
-  const oldAsiMl =
+  // Termasuk asi portion dari spillage lama.
+  const oldAsiDrunk =
     existing.subtype === "feeding" &&
     (existing.bottle_content === "asi" || existing.bottle_content === "mix")
       ? typeof existing.amount_asi_ml === "number" && existing.amount_asi_ml > 0
@@ -1355,6 +1405,23 @@ export async function updateLogAction(formData: FormData) {
           ? existing.amount_ml
           : 0
       : 0;
+  const oldAsiSpilled =
+    existing.subtype === "feeding" && oldAsiDrunk > 0
+      ? asiSpilledMl({
+          bottle_content:
+            (existing.bottle_content as "asi" | "sufor" | "mix") ?? null,
+          amount_ml: existing.amount_ml,
+          amount_asi_ml: existing.amount_asi_ml,
+          amount_sufor_ml: existing.amount_sufor_ml,
+          amount_spilled_ml: existing.amount_spilled_ml,
+          spilled_attribution: existing.spilled_attribution as
+            | "asi"
+            | "sufor"
+            | "proporsional"
+            | null,
+        })
+      : 0;
+  const oldAsiMl = oldAsiDrunk + oldAsiSpilled;
 
   if (oldAsiMl > 0) {
     const { data: batches } = await supabase
@@ -1392,13 +1459,33 @@ export async function updateLogAction(formData: FormData) {
 
   // Re-allocate ASI for the new row state — pakai amount_asi_ml supaya
   // mix mode hanya deduct porsi ASIP-nya saja (sufor ngga touch stock).
-  const newAsiMl =
+  // Include asi spillage di deduction (stock keluar dari freezer = asi
+  // diminum + asi tumpah).
+  const newAsiDrunk =
     subtype === "feeding" &&
     (payload.bottle_content === "asi" || payload.bottle_content === "mix") &&
     typeof payload.amount_asi_ml === "number" &&
     payload.amount_asi_ml > 0
       ? payload.amount_asi_ml
       : 0;
+  const newAsiSpilled =
+    subtype === "feeding" && newAsiDrunk > 0
+      ? asiSpilledMl({
+          bottle_content:
+            (payload.bottle_content as "asi" | "sufor" | "mix") ?? null,
+          amount_ml: (payload.amount_ml as number) ?? null,
+          amount_asi_ml: (payload.amount_asi_ml as number) ?? null,
+          amount_sufor_ml: (payload.amount_sufor_ml as number) ?? null,
+          amount_spilled_ml: (payload.amount_spilled_ml as number) ?? null,
+          spilled_attribution:
+            (payload.spilled_attribution as
+              | "asi"
+              | "sufor"
+              | "proporsional"
+              | null) ?? null,
+        })
+      : 0;
+  const newAsiMl = newAsiDrunk + newAsiSpilled;
   if (newAsiMl > 0) {
     const { data: batches } = await supabase
       .from("logs")

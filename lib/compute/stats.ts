@@ -20,6 +20,8 @@ export type LogRow = {
   bottle_content: "sufor" | "asi" | "mix" | null;
   amount_asi_ml: number | null;
   amount_sufor_ml: number | null;
+  amount_spilled_ml: number | null;
+  spilled_attribution: "asi" | "sufor" | "proporsional" | null;
   consumed_ml: number | null;
   start_l_at: string | null;
   end_l_at: string | null;
