@@ -340,6 +340,7 @@ export type Database = {
           amount_l_ml: number | null
           amount_ml: number | null
           amount_r_ml: number | null
+          amount_spilled_ml: number | null
           amount_sufor_ml: number | null
           baby_id: string
           bath_clean_tali_pusat: boolean | null
@@ -365,6 +366,7 @@ export type Database = {
           poop_color: string | null
           poop_consistency: string | null
           sleep_quality: string | null
+          spilled_attribution: string | null
           start_l_at: string | null
           start_r_at: string | null
           started_with_stopwatch: boolean
@@ -378,6 +380,7 @@ export type Database = {
           amount_l_ml?: number | null
           amount_ml?: number | null
           amount_r_ml?: number | null
+          amount_spilled_ml?: number | null
           amount_sufor_ml?: number | null
           baby_id: string
           bath_clean_tali_pusat?: boolean | null
@@ -403,6 +406,7 @@ export type Database = {
           poop_color?: string | null
           poop_consistency?: string | null
           sleep_quality?: string | null
+          spilled_attribution?: string | null
           start_l_at?: string | null
           start_r_at?: string | null
           started_with_stopwatch?: boolean
@@ -416,6 +420,7 @@ export type Database = {
           amount_l_ml?: number | null
           amount_ml?: number | null
           amount_r_ml?: number | null
+          amount_spilled_ml?: number | null
           amount_sufor_ml?: number | null
           baby_id?: string
           bath_clean_tali_pusat?: boolean | null
@@ -441,6 +446,7 @@ export type Database = {
           poop_color?: string | null
           poop_consistency?: string | null
           sleep_quality?: string | null
+          spilled_attribution?: string | null
           start_l_at?: string | null
           start_r_at?: string | null
           started_with_stopwatch?: boolean

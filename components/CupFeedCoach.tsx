@@ -77,6 +77,11 @@ export function CupFeedCoach({
   const [curStart, setCurStart] = useState<number | null>(null);
   const [curMl, setCurMl] = useState<number>(0);
 
+  // Spillage (ml tumpah/sisa) + attribution for mix
+  const [spilledMl, setSpilledMl] = useState<number>(0);
+  const [spilledAttribution, setSpilledAttribution] = useState<
+    "asi" | "sufor" | "proporsional"
+  >("proporsional");
   const [tick, setTick] = useState(0);
 
   // Auto split mix proportionally
@@ -295,12 +300,22 @@ export function CupFeedCoach({
         )}
 
         {step === "active-bottle" || step === "active-cup" ? (
-          <div className="mt-3">
+          <div className="mt-3 space-y-2">
+            <SpillagePicker
+              spilledMl={spilledMl}
+              setSpilledMl={setSpilledMl}
+              content={content}
+              spilledAttribution={spilledAttribution}
+              setSpilledAttribution={setSpilledAttribution}
+              suggested={Math.max(0, targetMl - totalMl)}
+            />
             <SaveButton
               content={content}
               mlConsumed={totalMl}
               mixAsi={mixAsi}
               mixSufor={mixSufor}
+              spilledMl={spilledMl}
+              spilledAttribution={spilledAttribution}
               noteText={noteText}
               elapsedSec={totalSec ?? 0}
               onSubmitDone={onClose}
@@ -891,11 +906,92 @@ function ActiveCup({
   );
 }
 
+function SpillagePicker({
+  spilledMl,
+  setSpilledMl,
+  content,
+  spilledAttribution,
+  setSpilledAttribution,
+  suggested,
+}: {
+  spilledMl: number;
+  setSpilledMl: (n: number) => void;
+  content: "asi" | "sufor" | "mix";
+  spilledAttribution: "asi" | "sufor" | "proporsional";
+  setSpilledAttribution: (a: "asi" | "sufor" | "proporsional") => void;
+  suggested: number;
+}) {
+  const showSuggest = suggested > 0 && suggested !== spilledMl;
+  return (
+    <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <label className="text-xs font-semibold text-amber-800">
+          Tumpah / sisa (ml)
+        </label>
+        <div className="flex items-center gap-1.5">
+          {showSuggest ? (
+            <button
+              type="button"
+              onClick={() => setSpilledMl(suggested)}
+              className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 hover:bg-amber-200"
+              title="Set ke selisih target − terminum"
+            >
+              {suggested}
+            </button>
+          ) : null}
+          <select
+            value={spilledMl}
+            onChange={(e) => setSpilledMl(Number(e.target.value))}
+            className="appearance-none rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-sm font-semibold tabular-nums text-amber-900 outline-none focus:border-amber-400"
+          >
+            {Array.from({ length: 51 }, (_, i) => (
+              <option key={i} value={i}>
+                {i} ml
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {content === "mix" && spilledMl > 0 ? (
+        <div className="mt-2">
+          <label className="block text-[11px] font-semibold text-amber-800">
+            Tumpahnya dari sisi mana?
+          </label>
+          <div className="mt-1 grid grid-cols-3 gap-1">
+            {(
+              [
+                { v: "asi", label: "🤱 ASI" },
+                { v: "proporsional", label: "≈ Mix" },
+                { v: "sufor", label: "🥛 Sufor" },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.v}
+                type="button"
+                onClick={() => setSpilledAttribution(opt.v)}
+                className={`rounded-lg border px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                  spilledAttribution === opt.v
+                    ? "border-amber-400 bg-amber-100 text-amber-900"
+                    : "border-amber-200 bg-white text-amber-700"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function SaveButton({
   content,
   mlConsumed,
   mixAsi,
   mixSufor,
+  spilledMl,
+  spilledAttribution,
   noteText,
   elapsedSec,
   onSubmitDone,
@@ -905,6 +1001,8 @@ function SaveButton({
   mlConsumed: number;
   mixAsi: number;
   mixSufor: number;
+  spilledMl: number;
+  spilledAttribution: "asi" | "sufor" | "proporsional";
   noteText: string;
   elapsedSec: number;
   onSubmitDone: () => void;
@@ -933,6 +1031,18 @@ function SaveButton({
         </>
       ) : null}
       <input type="hidden" name="amount_ml" value={mlConsumed} />
+      {spilledMl > 0 ? (
+        <>
+          <input type="hidden" name="amount_spilled_ml" value={spilledMl} />
+          {content === "mix" ? (
+            <input
+              type="hidden"
+              name="spilled_attribution"
+              value={spilledAttribution}
+            />
+          ) : null}
+        </>
+      ) : null}
       <input type="hidden" name="notes" value={noteText} />
       <input type="hidden" name="return_to" value="/" />
       <SubmitButton
@@ -941,6 +1051,7 @@ function SaveButton({
         className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white hover:bg-rose-600 disabled:opacity-50"
       >
         ✓ Selesai sesi · Simpan {mlConsumed} ml
+        {spilledMl > 0 ? ` (+${spilledMl} tumpah)` : ""}
       </SubmitButton>
       <input type="hidden" value={elapsedSec} readOnly />
     </form>
