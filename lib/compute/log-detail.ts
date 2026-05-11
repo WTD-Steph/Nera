@@ -107,10 +107,23 @@ export function logDetail(
 
   if (l.subtype === "feeding") {
     if (l.amount_ml != null) {
-      const spillSuffix =
-        (l.amount_spilled_ml ?? 0) > 0
-          ? ` · ${l.amount_spilled_ml}ml tumpah`
-          : "";
+      const spillSuffix = (() => {
+        const spilled = l.amount_spilled_ml ?? 0;
+        if (spilled <= 0) return "";
+        const label = (() => {
+          if (l.bottle_content === "asi") return "ASI";
+          if (l.bottle_content === "sufor") return "Sufor";
+          if (l.bottle_content === "mix") {
+            if (l.spilled_attribution === "asi") return "ASI";
+            if (l.spilled_attribution === "sufor") return "Sufor";
+            return "Mix";
+          }
+          return null;
+        })();
+        return label
+          ? ` · ${spilled}ml tumpah ${label}`
+          : ` · ${spilled}ml tumpah`;
+      })();
       // Mix: tampil breakdown ASIP + Sufor
       if (
         l.bottle_content === "mix" &&
