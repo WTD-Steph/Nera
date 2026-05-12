@@ -988,6 +988,47 @@ const PINDAH_OFFSETS: { value: number; label: string }[] = [
   { value: 10, label: "10 mnt lalu" },
 ];
 
+function SideTimeChip({
+  label,
+  startIso,
+  endIso,
+  active,
+}: {
+  label: string;
+  startIso: string | null;
+  endIso: string | null;
+  active: boolean;
+}) {
+  if (!startIso) return null;
+  const cls = active
+    ? "rounded-full border border-rose-300 bg-rose-100 px-2 py-0.5 font-medium text-rose-700"
+    : "rounded-full border border-gray-200 bg-white px-2 py-0.5 font-medium text-gray-600";
+  return (
+    <span className={cls}>
+      🤱 {label}{" "}
+      {endIso ? (
+        <span className="tabular-nums">
+          {fmtStaticDur(startIso, endIso)}
+        </span>
+      ) : (
+        <Stopwatch startIso={startIso} className="tabular-nums" />
+      )}
+      {active ? <span className="ml-1 text-[9px]">aktif</span> : null}
+    </span>
+  );
+}
+
+function fmtStaticDur(startIso: string, endIso: string): string {
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+  return `${pad(m)}:${pad(s)}`;
+}
+
 function PindahForm({
   id,
   fromSide,
@@ -1229,23 +1270,34 @@ function DbfControls({
         : "kiri"
       : null;
 
+  const hasL = !!startLAt;
+  const hasR = !!startRAt;
   return (
     <div className="mt-3 space-y-2">
-      <div className="flex items-center justify-center gap-2 text-[11px] text-gray-500">
-        {lActive ? (
-          <span className="rounded-full bg-rose-100 px-2 py-0.5 font-medium text-rose-700">
-            🤱 Kiri aktif
-          </span>
-        ) : null}
-        {rActive ? (
-          <span className="rounded-full bg-rose-100 px-2 py-0.5 font-medium text-rose-700">
-            🤱 Kanan aktif
-          </span>
-        ) : null}
-        {!lActive && !rActive ? (
-          <span>Tidak ada sisi aktif — selesai untuk menyimpan</span>
-        ) : null}
-      </div>
+      {hasL || hasR ? (
+        <div className="flex flex-wrap items-center justify-center gap-1.5 text-[11px]">
+          {hasL ? (
+            <SideTimeChip
+              label="Kiri"
+              startIso={startLAt}
+              endIso={endLAt}
+              active={lActive}
+            />
+          ) : null}
+          {hasR ? (
+            <SideTimeChip
+              label="Kanan"
+              startIso={startRAt}
+              endIso={endRAt}
+              active={rActive}
+            />
+          ) : null}
+        </div>
+      ) : (
+        <div className="text-center text-[11px] text-gray-500">
+          Tidak ada sisi aktif — selesai untuk menyimpan
+        </div>
+      )}
       {!askingEffectiveness && canPindah && fromSide ? (
         <PindahForm id={id} fromSide={fromSide} otherSide={otherSide} />
       ) : null}
