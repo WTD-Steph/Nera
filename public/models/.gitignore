@@ -1,0 +1,5 @@
+# YAMNet model binaries — ~17 MB total, jangan commit ke git.
+# Fetch via: node scripts/fetch-yamnet.mjs
+*.bin
+*.json
+!.gitignore
