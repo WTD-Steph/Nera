@@ -254,10 +254,16 @@ export class CryInferenceEngine {
     }
   }
 
+  /** Per-inference timing FIFO (in ms). Last N entries used untuk
+   *  sustained latency reporting + populated di TuningSessionDump
+   *  metadata.tick_timings (validation script reads this). */
+  private inferenceTimings: number[] = [];
+
   /** Single window inference. Returns max prob across cry class indices. */
   private async inferOne(window: Float32Array<ArrayBuffer>): Promise<number> {
     if (!this.model) return 0;
-    return tf.tidy(() => {
+    const t0 = performance.now();
+    const result = tf.tidy(() => {
       // YAMNet expects 1D Float32 tensor of shape [n_samples], output
       // (scores, embeddings, log_mel) — we only need scores.
       const input = tf.tensor1d(window);
@@ -277,6 +283,18 @@ export class CryInferenceEngine {
       }
       return maxProb;
     });
+    const dt = performance.now() - t0;
+    this.inferenceTimings.push(dt);
+    if (this.inferenceTimings.length > RAW_PROB_BUFFER_MAX_SAMPLES) {
+      this.inferenceTimings.shift();
+    }
+    return result;
+  }
+
+  /** Expose inference timings untuk metrics reporting (test harness +
+   *  validation script). Returns copy supaya consumer aman mutate. */
+  getInferenceTimings(): number[] {
+    return [...this.inferenceTimings];
   }
 
   private pushSample(sample: ProbabilitySample): void {

@@ -3,8 +3,9 @@
 // Maintains rolling buffer di 16kHz sample rate. Saat buffer reaches
 // WINDOW_SAMPLES (15,360 = 0.96s), emit "ready" event ke consumer
 // dengan exact-sized slice; then advance head by WINDOW_STRIDE_SAMPLES
-// (8,000 = 500ms) untuk next inference tick. Overlap ~52% = low latency
-// detection tanpa rasakan boundary lag.
+// (8,000 = 500ms) untuk next inference tick. Stride = 8000/15360 ≈ 52%
+// advance per tick → 48% overlap between consecutive windows = low
+// latency detection tanpa rasakan boundary lag.
 //
 // Backpressure: kalau consumer (inference) lambat, buffer numpuk.
 // Implementation strategy: drop oldest excess samples (keep newest) —

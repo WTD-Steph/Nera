@@ -100,6 +100,12 @@ export function CryInferenceHarness() {
       await engine.start();
       setModelStatus(engine.getModelLoadStatus());
       setRunning(true);
+      // Validation hook (gated dev-only) — expose engine ke window so
+      // Playwright script bisa read getInferenceTimings + dumpTuningSession
+      // tanpa parsing DOM.
+      if (IS_DEV && typeof window !== "undefined") {
+        (window as unknown as Record<string, unknown>).__cryEngine = engine;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }

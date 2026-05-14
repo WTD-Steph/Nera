@@ -13,6 +13,7 @@
 
 import * as tf from "@tensorflow/tfjs-core";
 import { loadGraphModel, type GraphModel } from "@tensorflow/tfjs-converter";
+import { setWasmPaths } from "@tensorflow/tfjs-backend-wasm";
 import "@tensorflow/tfjs-backend-wasm";
 import {
   MODEL_CACHE_KEY,
@@ -26,10 +27,18 @@ let backendReadyPromise: Promise<void> | null = null;
 /**
  * Initialize WASM backend (single-threaded; SharedArrayBuffer + threads
  * not viable di iOS Safari per Phase 0). Idempotent.
+ *
+ * setWasmPaths() points ke jsdelivr CDN — webpack-bundled apps cannot
+ * resolve relative WASM paths from inside node_modules at runtime,
+ * so explicit CDN URL needed. Version pinned ke @4.22.0 (matches
+ * package.json) supaya WASM dan JS versions in lock-step.
  */
 async function ensureBackend(): Promise<void> {
   if (backendReadyPromise) return backendReadyPromise;
   backendReadyPromise = (async () => {
+    setWasmPaths(
+      "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.22.0/dist/",
+    );
     await tf.setBackend("wasm");
     await tf.ready();
   })();

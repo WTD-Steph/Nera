@@ -44,7 +44,8 @@ export const WINDOW_SAMPLES = 15_360;
 export const TARGET_SAMPLE_RATE = 16_000;
 
 /** Sliding window advance per inference tick (samples @ 16kHz).
- *  500ms × 16,000 Hz = 8,000 samples = ~52% overlap dengan window. */
+ *  500ms × 16,000 Hz = 8,000 samples. Stride = 8000/15360 ≈ 52%
+ *  advance per tick → 48% overlap between consecutive windows. */
 export const WINDOW_STRIDE_SAMPLES = 8_000;
 
 /** Raw probability buffer capacity untuk dev tuning harness.

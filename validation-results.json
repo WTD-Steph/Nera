@@ -1,0 +1,40 @@
+{
+  "executed_at": "2026-05-14T18:42:59.391Z",
+  "playwright_version": "1.60.0",
+  "fixture": {
+    "path": "test-fixtures\\synthetic-cry.wav",
+    "type": "synthetic (NOT real cry)",
+    "note": "Metrics content-independent. Detection accuracy validated hands-on per docs/cry-detection.md"
+  },
+  "metrics": {
+    "model_load_time_ms": 4608,
+    "inference_cold_start_ms": 588,
+    "sustained_inference_latency_ms": {
+      "avg": 13,
+      "p50": 12,
+      "p95": 16,
+      "max": 84,
+      "samples_count": 241
+    },
+    "bundle_wire_payload_bytes": {
+      "total": 16792933,
+      "js_gzipped": 523524,
+      "wasm_gzipped": 130334,
+      "model_on_disk": 16139075,
+      "_note": "Measured dari production .next/static/chunks/*.js gzipSync (Node zlib). WASM size dari dev-server CDN response (identical prod/dev). Model size dari Supabase storage.objects metadata."
+    }
+  },
+  "decision_matrix": {
+    "model_load_time": "pass",
+    "inference_cold_start": "pass",
+    "sustained_latency": "pass",
+    "bundle_wire_payload": "soft_warn",
+    "overall": "soft_warn"
+  },
+  "model_status": {
+    "loaded": true,
+    "sizeBytes": 16038316,
+    "loadTimeMs": 3845.8000000044703,
+    "source": "network"
+  }
+}
