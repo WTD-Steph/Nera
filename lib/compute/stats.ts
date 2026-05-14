@@ -30,6 +30,8 @@ export type LogRow = {
   paused_at: string | null;
   started_with_stopwatch: boolean;
   sleep_quality: "nyenyak" | "gelisah" | "sering_bangun" | null;
+  avg_db_a: number | null;
+  max_db_a: number | null;
   effectiveness: "efektif" | "sedang" | "kurang_efektif" | null;
   dbf_rate_override: number | null;
   bath_pijat_ilu: boolean | null;

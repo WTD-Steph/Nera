@@ -229,7 +229,13 @@ export function logDetail(
             ? " · 😢 sering bangun"
             : "";
     const wakeBefore = wakeBeforeSleepText(l, allLogs);
-    return `${range}${wakeBefore}${quality}`;
+    const dbStat =
+      l.avg_db_a != null || l.max_db_a != null
+        ? ` · 🔊 ${l.avg_db_a != null ? `avg ${Math.round(l.avg_db_a)}` : ""}${
+            l.avg_db_a != null && l.max_db_a != null ? "/" : ""
+          }${l.max_db_a != null ? `max ${Math.round(l.max_db_a)}` : ""} dB`
+        : "";
+    return `${range}${wakeBefore}${quality}${dbStat}`;
   }
 
   if (l.subtype === "temp") return `${l.temp_celsius}°C`;
