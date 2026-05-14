@@ -17,6 +17,7 @@ import { Stopwatch } from "@/components/Stopwatch";
 import { LiveClock } from "@/components/LiveClock";
 import { SubmitButton } from "@/components/SubmitButton";
 import { FormCloser } from "@/components/FormCloser";
+import { useDbMeter, dbTone } from "@/components/DbMeter";
 
 type Subtype = "sleep" | "pumping" | "dbf" | "hiccup" | "tummy";
 
@@ -278,7 +279,15 @@ function NightLamp({
 }) {
   const [askingQuality, setAskingQuality] = useState(false);
   const [askingDbfEff, setAskingDbfEff] = useState(false);
+  const [micEnabled, setMicEnabled] = useState(false);
   const isPaused = !!pausedAtIso;
+  // Mic only relevant untuk sleep (cek volume white noise). Opt-in
+  // supaya permission prompt tidak surprise saat user buka dark mode
+  // untuk non-sleep activities (DBF, pumping).
+  const isSleep = subtype === "sleep";
+  const { reading: dbReading, permissionDenied: micDenied } = useDbMeter(
+    isSleep && micEnabled,
+  );
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -424,15 +433,28 @@ function NightLamp({
               onClose={onClose}
               onCancel={() => setAskingQuality(false)}
               darkBtn={darkBtn}
+              avgDb={dbReading.samples > 0 ? dbReading.avg : null}
+              maxDb={dbReading.samples > 0 ? dbReading.max : null}
             />
           ) : (
-            <button
-              type="button"
-              onClick={() => setAskingQuality(true)}
-              className={`w-full ${darkBtn}`}
-            >
-              Bangun · Stop
-            </button>
+            <>
+              <DbDarkRow
+                enabled={micEnabled}
+                denied={micDenied}
+                current={dbReading.current}
+                avg={dbReading.avg}
+                max={dbReading.max}
+                samples={dbReading.samples}
+                onToggle={() => setMicEnabled((v) => !v)}
+              />
+              <button
+                type="button"
+                onClick={() => setAskingQuality(true)}
+                className={`w-full ${darkBtn}`}
+              >
+                Bangun · Stop
+              </button>
+            </>
           )
         ) : subtype === "dbf" ? (
           askingDbfEff ? (
@@ -571,16 +593,89 @@ function DarkPindahButton({
   );
 }
 
+function DbDarkRow({
+  enabled,
+  denied,
+  current,
+  avg,
+  max,
+  samples,
+  onToggle,
+}: {
+  enabled: boolean;
+  denied: boolean;
+  current: number;
+  avg: number;
+  max: number;
+  samples: number;
+  onToggle: () => void;
+}) {
+  if (denied) {
+    return (
+      <div className="rounded-2xl border border-red-900/40 px-3 py-2 text-center text-[11px] text-red-700/70">
+        🎤 Akses mikrofon ditolak
+      </div>
+    );
+  }
+  if (!enabled) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full rounded-2xl border border-red-900/40 bg-transparent py-2.5 text-sm font-semibold text-red-700/80 hover:bg-red-950/30 active:bg-red-950/50"
+      >
+        🔊 Cek dB white noise
+      </button>
+    );
+  }
+  const tone = dbTone(current);
+  const toneClass =
+    tone === "ok"
+      ? "text-emerald-500"
+      : tone === "warn"
+        ? "text-amber-500"
+        : "text-red-500";
+  return (
+    <div className="flex items-center justify-between rounded-2xl border border-red-900/40 px-4 py-2.5">
+      <div className="flex items-baseline gap-2">
+        <span className={`font-mono text-2xl font-bold tabular-nums ${toneClass}`}>
+          {current > 0 ? Math.round(current) : "--"}
+        </span>
+        <span className="text-[10px] uppercase tracking-widest text-red-700/70">
+          dB
+        </span>
+      </div>
+      {samples > 0 ? (
+        <div className="text-right text-[10px] leading-tight text-red-700/70">
+          <div>avg {Math.round(avg)}</div>
+          <div>max {Math.round(max)}</div>
+        </div>
+      ) : null}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="rounded-full px-2 py-1 text-[10px] uppercase tracking-widest text-red-700/70 hover:bg-red-950/30"
+      >
+        Stop mic
+      </button>
+    </div>
+  );
+}
+
 function SleepQualityStep({
   id,
   onClose,
   onCancel,
   darkBtn,
+  avgDb,
+  maxDb,
 }: {
   id: string;
   onClose: () => void;
   onCancel: () => void;
   darkBtn: string;
+  avgDb?: number | null;
+  maxDb?: number | null;
 }) {
   const [endOffset, setEndOffset] = useState(0);
   return (
@@ -606,6 +701,20 @@ function SleepQualityStep({
           <input type="hidden" name="return_to" value="/" />
           <input type="hidden" name="sleep_quality" value={opt.value} />
           <input type="hidden" name="end_offset_min" value={endOffset} />
+          {avgDb != null ? (
+            <input
+              type="hidden"
+              name="avg_db_a"
+              value={avgDb.toFixed(1)}
+            />
+          ) : null}
+          {maxDb != null ? (
+            <input
+              type="hidden"
+              name="max_db_a"
+              value={maxDb.toFixed(1)}
+            />
+          ) : null}
           <FormCloser onClose={onClose} />
           <SubmitButton
             pendingText="Menyimpan…"

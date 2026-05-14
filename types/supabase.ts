@@ -342,6 +342,8 @@ export type Database = {
           amount_r_ml: number | null
           amount_spilled_ml: number | null
           amount_sufor_ml: number | null
+          avg_db_a: number | null
+          max_db_a: number | null
           baby_id: string
           bath_clean_tali_pusat: boolean | null
           bath_pijat_ilu: boolean | null
@@ -382,6 +384,8 @@ export type Database = {
           amount_r_ml?: number | null
           amount_spilled_ml?: number | null
           amount_sufor_ml?: number | null
+          avg_db_a?: number | null
+          max_db_a?: number | null
           baby_id: string
           bath_clean_tali_pusat?: boolean | null
           bath_pijat_ilu?: boolean | null
@@ -422,6 +426,8 @@ export type Database = {
           amount_r_ml?: number | null
           amount_spilled_ml?: number | null
           amount_sufor_ml?: number | null
+          avg_db_a?: number | null
+          max_db_a?: number | null
           baby_id?: string
           bath_clean_tali_pusat?: boolean | null
           bath_pijat_ilu?: boolean | null

@@ -516,6 +516,10 @@ export async function endOngoingSleepAction(formData: FormData) {
     paused_at: null,
   };
   if (sleepQuality) updates.sleep_quality = sleepQuality;
+  const avgDb = num(formData, "avg_db_a");
+  const maxDb = num(formData, "max_db_a");
+  if (avgDb !== null && avgDb >= 0 && avgDb <= 140) updates.avg_db_a = avgDb;
+  if (maxDb !== null && maxDb >= 0 && maxDb <= 140) updates.max_db_a = maxDb;
 
   const { error } = await supabase
     .from("logs")
