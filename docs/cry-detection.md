@@ -91,18 +91,38 @@ Defined di [`lib/cry-detection/thresholds.ts`](../lib/cry-detection/thresholds.t
 
 ## Model setup
 
-```bash
-# After clone:
-npm install
-npm run fetch:yamnet   # downloads ~17 MB ke public/models/yamnet-v1/
+Model di-host di **Supabase Storage** (bucket `yamnet-models`, public, di project `glbkdemanhkybwdlmjns`). Runtime fetch langsung dari Supabase public URL — TIDAK ada local copy di repo.
+
+```
+MODEL_ORIGIN_URL =
+  https://glbkdemanhkybwdlmjns.supabase.co/storage/v1/object/public/yamnet-models/model.json
 ```
 
-Production deploy (Vercel): build command harus include fetch step:
-```
-npm run fetch:yamnet && npm run build
-```
+Files di bucket (flat, no subfolder):
+- `model.json` (99 KB, topology)
+- `group1-shard1of4.bin` (~4 MB)
+- `group1-shard2of4.bin` (~4 MB)
+- `group1-shard3of4.bin` (~4 MB)
+- `group1-shard4of4.bin` (~3.3 MB)
 
-Model binaries di `public/models/*/{model.json,*.bin}` ter-exclude dari git via `.gitignore` (17 MB binary in git = bad practice).
+**Total wire: ~15.7 MB** (well within 18 MB cap).
+
+CORS verified: Supabase Storage public bucket returns `Access-Control-Allow-Origin: *` — works for TFJS loadGraphModel cross-origin fetch.
+
+**TFJS IndexedDB cache** kick in setelah first load — subsequent loads sub-second tanpa fetch ulang ke Supabase.
+
+### Historical context (background, bukan instruction)
+
+Original PR B awal pakai `npm run fetch:yamnet` script yang download dari `storage.googleapis.com/tfhub-tfjs-modules/...` ke `public/models/yamnet-v1/`. URL itu **broken** sejak TFHub → Kaggle Models migration (legacy storage paths return 403/404). Vendored ke Supabase Storage sebagai Option D resolution. fetch script + `public/models/` directory + `.gitignore` workaround sudah di-remove sebagai dead code.
+
+### Model upgrade procedure
+
+Untuk replace model (mis. YAMNet v2 atau fine-tuned variant):
+
+1. Upload new files ke Supabase Storage bucket — bisa pakai sub-path `yamnet-v2/` untuk parallel hosting selama transition
+2. Bump `MODEL_VERSION` di [`lib/cry-detection/thresholds.ts`](../lib/cry-detection/thresholds.ts) — invalidates IndexedDB cache via key change
+3. Update `MODEL_ORIGIN_URL` ke new path
+4. Deploy. User devices akan re-fetch + re-cache.
 
 ## Dev test harness
 

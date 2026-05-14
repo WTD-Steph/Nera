@@ -8,8 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit",
-    "fetch:yamnet": "node scripts/fetch-yamnet.mjs"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

@@ -62,9 +62,17 @@ export const CRY_CLASS_INDICES = [19, 20] as const;
 export const MODEL_VERSION = 1;
 export const MODEL_CACHE_KEY = `indexeddb://nera.cry.model.v${MODEL_VERSION}`;
 
-/** Origin-relative path untuk model.json (Vercel static).
- *  Per PR prompt: public/models/yamnet-v{n}/model.json */
-export const MODEL_ORIGIN_URL = `/models/yamnet-v${MODEL_VERSION}/model.json`;
+/** Public URL untuk model.json — di-host di Supabase Storage public
+ *  bucket `yamnet-models` (Option D vendored, lihat docs).
+ *
+ *  TFJS GraphModel loader resolves shard paths relative ke model.json
+ *  URL, jadi shards harus di same flat path di bucket — sudah verified
+ *  saat upload (no subfolder).
+ *
+ *  Migrasi dari TFHub yang URL-nya broken (legacy /tfhub-tfjs-modules/
+ *  path returns 403/404 sejak TFHub → Kaggle Models migration). */
+export const MODEL_ORIGIN_URL =
+  "https://glbkdemanhkybwdlmjns.supabase.co/storage/v1/object/public/yamnet-models/model.json";
 
 export const DEFAULT_DETECTION_CONFIG: DetectionConfig = {
   startProbability: CRY_START_PROBABILITY,
