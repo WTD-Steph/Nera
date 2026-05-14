@@ -33,12 +33,38 @@ export const CRY_END_DURATION_SEC = 10;
 /** Inference frequency — sliding window with overlap untuk low latency. */
 export const INFERENCE_INTERVAL_MS = 500;
 
-/** YAMNet native input: 0.975 s @ 16 kHz = 15,600 samples. */
-export const WINDOW_SAMPLES = 15_600;
+/** YAMNet native input window: 0.96 s @ 16 kHz = 15,360 samples.
+ *  Per AudioSet paper + TFHub docs: 96 frames × 10 ms hop = 960 ms.
+ *  (Fixed dari PR A inherited typo `15_600` yang reference TFLite-
+ *  specific shape, bukan YAMNet trained window.) */
+export const WINDOW_SAMPLES = 15_360;
 
 /** YAMNet trained sample rate. Browser AudioContext biasanya 44.1/48 kHz
  *  → perlu resample di inference engine (PR B). */
 export const TARGET_SAMPLE_RATE = 16_000;
+
+/** Sliding window advance per inference tick (samples @ 16kHz).
+ *  500ms × 16,000 Hz = 8,000 samples = ~52% overlap dengan window. */
+export const WINDOW_STRIDE_SAMPLES = 8_000;
+
+/** Raw probability buffer capacity untuk dev tuning harness.
+ *  5 minutes × (1000ms / 500ms inference interval) = 600 samples FIFO. */
+export const RAW_PROB_BUFFER_MAX_SAMPLES = 600;
+
+/** Cry class indices di AudioSet 521-class output dari YAMNet.
+ *  - 19: "Baby cry, infant cry"
+ *  - 20: "Crying, sobbing"
+ *  Confidence per window = max(score[19], score[20]). */
+export const CRY_CLASS_INDICES = [19, 20] as const;
+
+/** IndexedDB key namespace untuk model cache. Version bump = forced
+ *  re-download (per Anda decision di PR B planning). */
+export const MODEL_VERSION = 1;
+export const MODEL_CACHE_KEY = `indexeddb://nera.cry.model.v${MODEL_VERSION}`;
+
+/** Origin-relative path untuk model.json (Vercel static).
+ *  Per PR prompt: public/models/yamnet-v{n}/model.json */
+export const MODEL_ORIGIN_URL = `/models/yamnet-v${MODEL_VERSION}/model.json`;
 
 export const DEFAULT_DETECTION_CONFIG: DetectionConfig = {
   startProbability: CRY_START_PROBABILITY,

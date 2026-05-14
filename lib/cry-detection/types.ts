@@ -66,3 +66,56 @@ export type DetectionEvent =
       durationSeconds: number;
     }
   | { kind: "error"; message: string };
+
+/** Model load lifecycle status untuk reporting di test harness + UI. */
+export type ModelLoadStatus = {
+  loaded: boolean;
+  sizeBytes: number;
+  /** Total time (ms) from start to ready — includes download + IndexedDB
+   *  write + runtime init. null = not yet loaded. */
+  loadTimeMs: number | null;
+  /** Source of last load: 'cache' (IndexedDB hit) | 'network' (origin). */
+  source: "cache" | "network" | null;
+};
+
+/** Emitted event metadata, mirror of cry_events row tapi pre-DB.
+ *  Stored di TuningSessionDump untuk offline analysis correlation. */
+export type EmittedEventSummary = {
+  started_at: string;
+  ended_at: string | null;
+  peak: number;
+};
+
+/**
+ * JSON dump shape untuk offline threshold tuning.
+ *
+ * Tanpa contextual metadata, samples array adalah angka tanpa makna —
+ * tidak tahu thresholds apa yang aktif, device apa, atau event apa yang
+ * sudah emit selama window. Apple-to-apple comparison saat tune
+ * thresholds (mis. 0.7 → 0.65) rely ke `active_thresholds` block ini.
+ */
+export type TuningSessionDump = {
+  /** Random UUID per listener session (not user/device id). */
+  session_id: string;
+  /** Wall-clock ISO saat session start. */
+  session_started_at: string;
+  device_info: {
+    ua: string;
+    /** Actual AudioContext.sampleRate (iOS lock 48kHz, Android variable). */
+    negotiated_sample_rate: number;
+    /** Best-effort parse from UA — "iOS Safari 17.4", "Chrome 130/macOS", etc. */
+    platform: string;
+  };
+  /** Snapshot of thresholds aktif saat session — supaya replay analysis
+   *  bisa compare apple-to-apple kalau thresholds berubah antara dumps. */
+  active_thresholds: {
+    START_PROB: number;
+    START_DURATION_MS: number;
+    END_PROB: number;
+    END_DURATION_MS: number;
+  };
+  events_emitted: EmittedEventSummary[];
+  /** FIFO ring buffer of probability samples. Last N (capacity 600 =
+   *  5 min @ 500ms interval) preserved. */
+  samples: ProbabilitySample[];
+};
