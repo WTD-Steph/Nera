@@ -67,6 +67,60 @@ export type Database = {
           },
         ]
       }
+      cry_events: {
+        Row: {
+          avg_confidence: number | null
+          baby_id: string
+          created_at: string
+          device_id: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          household_id: string
+          id: string
+          peak_confidence: number
+          started_at: string
+        }
+        Insert: {
+          avg_confidence?: number | null
+          baby_id: string
+          created_at?: string
+          device_id?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          household_id: string
+          id?: string
+          peak_confidence: number
+          started_at: string
+        }
+        Update: {
+          avg_confidence?: number | null
+          baby_id?: string
+          created_at?: string
+          device_id?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          household_id?: string
+          id?: string
+          peak_confidence?: number
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cry_events_baby_id_fkey"
+            columns: ["baby_id"]
+            isOneToOne: false
+            referencedRelation: "babies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cry_events_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_milestones: {
         Row: {
           achieved_at: string
