@@ -490,8 +490,10 @@ function DbfDarkEffectivenessStep({
   onCancel: () => void;
   darkBtn: string;
 }) {
+  const [endOffset, setEndOffset] = useState(0);
   return (
     <div className="space-y-2">
+      <EndOffsetSelect value={endOffset} onChange={setEndOffset} dark />
       <p className="mb-2 text-center text-xs uppercase tracking-widest text-red-700/70">
         Efektivitas DBF?
       </p>
@@ -511,6 +513,7 @@ function DbfDarkEffectivenessStep({
           <input type="hidden" name="id" value={id} />
           <input type="hidden" name="return_to" value="/" />
           <input type="hidden" name="effectiveness" value={opt.value} />
+          <input type="hidden" name="end_offset_min" value={endOffset} />
           <FormCloser onClose={onClose} />
           <SubmitButton
             pendingText="Menyimpan…"
@@ -579,8 +582,10 @@ function SleepQualityStep({
   onCancel: () => void;
   darkBtn: string;
 }) {
+  const [endOffset, setEndOffset] = useState(0);
   return (
     <div className="space-y-2">
+      <EndOffsetSelect value={endOffset} onChange={setEndOffset} dark />
       <p className="mb-2 text-center text-xs uppercase tracking-widest text-red-700/70">
         Bagaimana kualitas tidurnya?
       </p>
@@ -600,6 +605,7 @@ function SleepQualityStep({
           <input type="hidden" name="id" value={id} />
           <input type="hidden" name="return_to" value="/" />
           <input type="hidden" name="sleep_quality" value={opt.value} />
+          <input type="hidden" name="end_offset_min" value={endOffset} />
           <FormCloser onClose={onClose} />
           <SubmitButton
             pendingText="Menyimpan…"
@@ -1121,13 +1127,22 @@ const END_OFFSETS: { value: number; label: string }[] = [
  * highlighted. Used konsisten di semua end flows (sleep, dbf, pumping,
  * hiccup, tummy) supaya UX-nya familiar.
  */
-function EndOffsetSelect({ value, onChange }: {
+function EndOffsetSelect({
+  value,
+  onChange,
+  dark,
+}: {
   value: number;
   onChange: (v: number) => void;
+  dark?: boolean;
 }) {
   return (
     <div>
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+      <div
+        className={`mb-1 text-[10px] font-semibold uppercase tracking-wide ${
+          dark ? "text-red-700/60" : "text-gray-500"
+        }`}
+      >
         Berhenti
       </div>
       <div className="flex flex-wrap gap-1">
@@ -1138,8 +1153,12 @@ function EndOffsetSelect({ value, onChange }: {
             onClick={() => onChange(o.value)}
             className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
               value === o.value
-                ? "bg-rose-500 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-rose-100 hover:text-rose-700"
+                ? dark
+                  ? "bg-red-800 text-red-50"
+                  : "bg-rose-500 text-white"
+                : dark
+                  ? "bg-red-950/30 text-red-300 hover:bg-red-900/40"
+                  : "bg-gray-100 text-gray-700 hover:bg-rose-100 hover:text-rose-700"
             }`}
           >
             {o.value === 0 ? "Sekarang" : `${o.value}m lalu`}
