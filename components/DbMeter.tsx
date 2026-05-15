@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AudioCaptureBase } from "@/lib/audio/capture-base";
 
 // Hardcoded calibration offset. Web Audio dBFS is roughly -X (negative
 // for typical levels), and SPL = dBFS + offset. 94 dB is the standard
@@ -37,10 +38,7 @@ export function useDbMeter(enabled: boolean): {
 } {
   const [reading, setReading] = useState<DbReading>(ZERO_READING);
   const [permissionDenied, setPermissionDenied] = useState(false);
-  const streamRef = useRef<MediaStream | null>(null);
-  const ctxRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const rafRef = useRef<number | null>(null);
+  const captureRef = useRef<AudioCaptureBase | null>(null);
   const sumRef = useRef(0);
   const countRef = useRef(0);
   const maxRef = useRef(0);
@@ -54,83 +52,42 @@ export function useDbMeter(enabled: boolean): {
 
   useEffect(() => {
     if (!enabled) {
-      // Cleanup
-      if (rafRef.current != null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-      ctxRef.current?.close();
-      ctxRef.current = null;
-      analyserRef.current = null;
+      captureRef.current?.stop();
+      captureRef.current = null;
       return;
     }
     let cancelled = false;
-    (async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-          },
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
+    const capture = new AudioCaptureBase();
+    captureRef.current = capture;
+    capture
+      .start((frame) => {
+        if (cancelled) return;
+        // RMS → dBFS → dB SPL estimate (offset calibrated, lihat const di atas).
+        let sumSq = 0;
+        for (let i = 0; i < frame.length; i++) {
+          const v = frame[i] ?? 0;
+          sumSq += v * v;
         }
-        streamRef.current = stream;
-        const Ctx =
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext })
-            .webkitAudioContext;
-        const ctx = new Ctx();
-        ctxRef.current = ctx;
-        const src = ctx.createMediaStreamSource(stream);
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 2048;
-        src.connect(analyser);
-        analyserRef.current = analyser;
-        const buf = new Float32Array(analyser.fftSize);
-        const loop = () => {
-          if (cancelled) return;
-          analyser.getFloatTimeDomainData(buf);
-          let sumSq = 0;
-          for (let i = 0; i < buf.length; i++) {
-            const v = buf[i] ?? 0;
-            sumSq += v * v;
-          }
-          const rms = Math.sqrt(sumSq / buf.length);
-          const dbfs = rms > 0 ? 20 * Math.log10(rms) : -100;
-          const spl = Math.max(FLOOR_DB, Math.min(CEIL_DB, dbfs + DB_OFFSET));
-          sumRef.current += spl;
-          countRef.current += 1;
-          if (spl > maxRef.current) maxRef.current = spl;
-          setReading({
-            current: spl,
-            avg: sumRef.current / countRef.current,
-            max: maxRef.current,
-            samples: countRef.current,
-          });
-          rafRef.current = requestAnimationFrame(loop);
-        };
-        loop();
-      } catch {
+        const rms = Math.sqrt(sumSq / frame.length);
+        const dbfs = rms > 0 ? 20 * Math.log10(rms) : -100;
+        const spl = Math.max(FLOOR_DB, Math.min(CEIL_DB, dbfs + DB_OFFSET));
+        sumRef.current += spl;
+        countRef.current += 1;
+        if (spl > maxRef.current) maxRef.current = spl;
+        setReading({
+          current: spl,
+          avg: sumRef.current / countRef.current,
+          max: maxRef.current,
+          samples: countRef.current,
+        });
+      })
+      .catch(() => {
         if (!cancelled) setPermissionDenied(true);
-      }
-    })();
+      });
     return () => {
       cancelled = true;
-      if (rafRef.current != null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-      ctxRef.current?.close();
-      ctxRef.current = null;
-      analyserRef.current = null;
+      captureRef.current?.stop();
+      captureRef.current = null;
     };
   }, [enabled]);
 
