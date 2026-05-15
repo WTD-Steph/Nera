@@ -52,6 +52,14 @@ export function CryListener() {
   const [wakeLockSupported, setWakeLockSupported] = useState<boolean | null>(
     null,
   );
+  // Diagnostic state — live probability surface untuk threshold tuning
+  // observability. Tanpa ini, threshold tuning = blind guessing.
+  const [latestProb, setLatestProb] = useState<number | null>(null);
+  const [maxProb60s, setMaxProb60s] = useState<number>(0);
+  const [sampleCount, setSampleCount] = useState<number>(0);
+  // Ring buffer of recent samples (last 120 = 60s @ 500ms interval)
+  // untuk compute rolling max display.
+  const recentProbsRef = useRef<Array<{ p: number; t: number }>>([]);
 
   type WakeLockSentinelLike = { release: () => Promise<void> };
   const engineRef = useRef<CryInferenceEngine | null>(null);
@@ -163,6 +171,18 @@ export function CryListener() {
         setState(to);
       });
 
+      engine.onProbabilitySample((sample) => {
+        setLatestProb(sample.p);
+        setSampleCount((c) => c + 1);
+        // Maintain rolling 60s window (= 120 samples @ 500ms interval).
+        const buffer = recentProbsRef.current;
+        buffer.push({ p: sample.p, t: sample.t });
+        const cutoff = sample.t - 60_000;
+        while (buffer.length > 0 && buffer[0]!.t < cutoff) buffer.shift();
+        const max = buffer.reduce((m, s) => (s.p > m ? s.p : m), 0);
+        setMaxProb60s(max);
+      });
+
       engine.onCryStart(async ({ startedAt, peakConfidence }) => {
         setCryStartedAtMs(startedAt.getTime());
         const deviceId = getDeviceId();
@@ -230,6 +250,22 @@ export function CryListener() {
     setState("stopped");
   };
 
+  // ----- Dump tuning session (diagnostic) -----
+  const handleDump = () => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const dump = engine.dumpTuningSession();
+    const blob = new Blob([JSON.stringify(dump, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `nera-tuning-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   void tick; // re-render trigger usage
 
   // ----- Render per state -----
@@ -262,6 +298,19 @@ export function CryListener() {
         cryStartedAtMs={cryStartedAtMs}
         errorMsg={errorMsg}
       />
+
+      {/* Diagnostic panel — live probability surface untuk threshold tuning */}
+      {(state === "listening" ||
+        state === "cry-detected" ||
+        state === "cry-ongoing" ||
+        state === "cry-ended") && (
+        <DiagnosticPanel
+          latestProb={latestProb}
+          maxProb60s={maxProb60s}
+          sampleCount={sampleCount}
+          onDump={handleDump}
+        />
+      )}
 
       {/* Stop button — one-tap, prominent kalau listening/cry */}
       {state !== "permission-denied" && state !== "error" && (
@@ -334,6 +383,82 @@ function ExplainerScreen({
       >
         {stopped ? "▶ Aktifkan Lagi" : "🎤 Aktifkan Deteksi"}
       </button>
+    </div>
+  );
+}
+
+function DiagnosticPanel({
+  latestProb,
+  maxProb60s,
+  sampleCount,
+  onDump,
+}: {
+  latestProb: number | null;
+  maxProb60s: number;
+  sampleCount: number;
+  onDump: () => void;
+}) {
+  // Color-code latest probability against current START threshold (0.4).
+  const probColor =
+    latestProb === null
+      ? "text-gray-400"
+      : latestProb >= 0.4
+        ? "text-rose-600 font-bold"
+        : latestProb >= 0.2
+          ? "text-amber-600 font-semibold"
+          : "text-gray-500";
+  const maxColor =
+    maxProb60s >= 0.4
+      ? "text-rose-600 font-bold"
+      : maxProb60s >= 0.2
+        ? "text-amber-600 font-semibold"
+        : "text-gray-500";
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3 text-[11px]">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-semibold uppercase tracking-wider text-gray-500">
+          Diagnostic
+        </span>
+        <button
+          type="button"
+          onClick={onDump}
+          disabled={sampleCount === 0}
+          className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-200 disabled:opacity-40"
+        >
+          💾 Dump JSON
+        </button>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-gray-500">
+            Latest
+          </div>
+          <div className={`mt-0.5 font-mono tabular-nums ${probColor}`}>
+            {latestProb !== null ? latestProb.toFixed(3) : "—"}
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-gray-500">
+            Max 60s
+          </div>
+          <div className={`mt-0.5 font-mono tabular-nums ${maxColor}`}>
+            {maxProb60s > 0 ? maxProb60s.toFixed(3) : "—"}
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-gray-500">
+            Samples
+          </div>
+          <div className="mt-0.5 font-mono tabular-nums text-gray-700">
+            {sampleCount}
+          </div>
+        </div>
+      </div>
+      <p className="mt-2 text-[10px] leading-snug text-gray-500">
+        Threshold start: 0.40 (≥ 1.5s sustained). Kalau Nera nangis, observe
+        Latest spike. Saat Nera reliably scores rendah, dump JSON → analyze
+        offline → tune thresholds.ts.
+      </p>
     </div>
   );
 }
