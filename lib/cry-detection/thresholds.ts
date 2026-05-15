@@ -18,14 +18,33 @@
 
 import type { DetectionConfig } from "./types";
 
-/** Cry START: probability ≥ this AND continuous selama START_DURATION_SEC. */
-export const CRY_START_PROBABILITY = 0.7;
+/** Cry START: probability ≥ this AND continuous selama START_DURATION_SEC.
+ *
+ *  TUNED 2026-05-15: lowered dari 0.7 → 0.4 setelah diagnose 0 events
+ *  selama production usage despite Nera actually crying. Original 0.7
+ *  was research-default — too strict untuk Nera + Anda mic distance
+ *  (~1-3m typical home positioning). Real-world YAMNet probability
+ *  pada cry events di range itu typically 0.3-0.6.
+ *
+ *  Trade-off: more false positives expected dari TV/dog/talking.
+ *  Mitigation: tag UI di /listen + banner supaya parent quick-classify
+ *  → unclear → effectively dismiss. */
+export const CRY_START_PROBABILITY = 0.4;
 
-/** Continuous duration di atas START_PROBABILITY untuk emit "started". */
-export const CRY_START_DURATION_SEC = 3;
+/** Continuous duration di atas START_PROBABILITY untuk emit "started".
+ *
+ *  TUNED 2026-05-15: lowered dari 3s → 1.5s. Real cries often start
+ *  dengan short whimper bursts pre-full-cry — 3s sustained filter was
+ *  missing those. 1.5s catches short cries while still filtering
+ *  isolated sharp noises (single bark, door slam). */
+export const CRY_START_DURATION_SEC = 1.5;
 
-/** Cry END: probability < this continuously selama END_DURATION_SEC. */
-export const CRY_END_PROBABILITY = 0.3;
+/** Cry END: probability < this continuously selama END_DURATION_SEC.
+ *
+ *  TUNED 2026-05-15: lowered dari 0.3 → 0.15 untuk match new start
+ *  threshold 0.4 — maintain hysteresis ratio. Otherwise events would
+ *  end too easily kalau prob bounced antara 0.15-0.3. */
+export const CRY_END_PROBABILITY = 0.15;
 
 /** Continuous silence (di bawah END_PROBABILITY) untuk emit "ended". */
 export const CRY_END_DURATION_SEC = 10;
