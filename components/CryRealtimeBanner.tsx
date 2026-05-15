@@ -6,6 +6,12 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getDeviceId } from "@/lib/cry-detection/device-id";
 import { fmtMinAge, type CryContextHint } from "@/lib/compute/cry-context";
+import { CryEventTagPicker } from "@/components/CryEventTagPicker";
+import {
+  REASON_EMOJIS,
+  REASON_LABELS,
+  type Reason,
+} from "@/lib/cry-detection/reason-heuristics";
 
 // Global cross-device banner — render di root layout supaya muncul
 // di semua page saat HP lain di household detect cry.
@@ -25,6 +31,9 @@ type IncomingEvent = {
   started_at: string;
   peak_confidence: number;
   device_id: string | null;
+  suggested_reason: string | null;
+  suggested_confidence: string | null;
+  tagged_reason: string | null;
 };
 
 export function CryRealtimeBanner({
@@ -124,6 +133,29 @@ export function CryRealtimeBanner({
               )}
             </div>
           ) : null}
+          {event.suggested_reason && event.suggested_reason !== "unclear" ? (
+            <div className="mt-1 text-[11px] text-red-50">
+              💡 Kemungkinan:{" "}
+              <span className="font-semibold">
+                {REASON_EMOJIS[event.suggested_reason as Reason]}{" "}
+                {REASON_LABELS[event.suggested_reason as Reason]}
+              </span>
+              {event.suggested_confidence
+                ? ` (${event.suggested_confidence})`
+                : null}
+            </div>
+          ) : event.suggested_reason === "unclear" ? (
+            <div className="mt-1 text-[11px] text-red-100/80">
+              💡 Suggestion: tidak pasti — cek manual
+            </div>
+          ) : null}
+          {/* Realtime tag affordance — confirm/correct inline */}
+          <CryEventTagPicker
+            eventId={event.id}
+            currentTag={event.tagged_reason}
+            suggested={event.suggested_reason}
+            compact
+          />
           <div className="mt-2 flex gap-2">
             <Link
               href="/listen"

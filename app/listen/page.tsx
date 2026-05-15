@@ -6,6 +6,12 @@ import { createClient } from "@/lib/supabase/server";
 import { CryListener } from "@/components/CryListener";
 import { deleteCryEventAction } from "@/app/actions/cry-events";
 import { fmtTime, fmtSleepRange } from "@/lib/compute/format";
+import { CryEventTagPicker } from "@/components/CryEventTagPicker";
+import {
+  REASON_EMOJIS,
+  REASON_LABELS,
+  type Reason,
+} from "@/lib/cry-detection/reason-heuristics";
 
 type CryEventRow = {
   id: string;
@@ -15,6 +21,10 @@ type CryEventRow = {
   avg_confidence: number | null;
   duration_seconds: number | null;
   device_id: string | null;
+  suggested_reason: string | null;
+  suggested_confidence: string | null;
+  tagged_reason: string | null;
+  tagged_at: string | null;
 };
 
 const HOUR_24_MS = 24 * 60 * 60 * 1000;
@@ -43,6 +53,23 @@ export default async function ListenPage({
 
   const eventsArray = (events ?? []) as CryEventRow[];
 
+  // Accuracy summary: rows that have both suggested + tagged (ignore
+  // unclear/other for accuracy compute).
+  const taggedRows = eventsArray.filter(
+    (e) =>
+      e.tagged_reason &&
+      e.suggested_reason &&
+      e.suggested_reason !== "unclear" &&
+      e.tagged_reason !== "other",
+  );
+  const matchCount = taggedRows.filter(
+    (e) => e.tagged_reason === e.suggested_reason,
+  ).length;
+  const accuracy =
+    taggedRows.length > 0
+      ? Math.round((matchCount / taggedRows.length) * 100)
+      : null;
+
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl">
       <header className="mb-4 flex items-center justify-between">
@@ -60,6 +87,20 @@ export default async function ListenPage({
       ) : null}
 
       <CryListener />
+
+      {accuracy !== null ? (
+        <section className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2 text-[11px] text-gray-600">
+          <div>
+            <span className="font-semibold text-gray-800">
+              Heuristic accuracy 24h:
+            </span>{" "}
+            {matchCount}/{taggedRows.length} = {accuracy}%
+            <span className="ml-2 text-gray-400">
+              (tagged events only, unclear/other excluded)
+            </span>
+          </div>
+        </section>
+      ) : null}
 
       <section className="mt-5">
         <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
@@ -121,43 +162,65 @@ function CryEventRow({ event }: { event: CryEventRow }) {
     : isOngoing
       ? "berlangsung"
       : "—";
+  const suggestedLabel =
+    event.suggested_reason && event.suggested_reason !== "unclear"
+      ? `${REASON_EMOJIS[event.suggested_reason as Reason]} ${REASON_LABELS[event.suggested_reason as Reason]}`
+      : event.suggested_reason === "unclear"
+        ? "❓ tidak pasti"
+        : null;
 
   return (
-    <div className="flex items-center justify-between px-3 py-2">
-      <div className="flex items-start gap-2 text-xs">
-        <span className="text-base" aria-hidden>
-          {isOngoing ? "🚨" : "😢"}
-        </span>
-        <div>
-          <div className="font-medium text-gray-900">
-            {rangeText}
-            {isOngoing ? null : (
-              <span className="text-gray-500">
-                {" "}
-                · {durationText}
-              </span>
-            )}
-          </div>
-          <div className="text-[10px] text-gray-500">
-            peak {event.peak_confidence.toFixed(2)}
-            {event.avg_confidence != null
-              ? ` · avg ${event.avg_confidence.toFixed(2)}`
-              : null}
-            {event.device_id ? ` · device ${event.device_id.slice(0, 6)}` : null}
+    <div className="px-3 py-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2 text-xs">
+          <span className="text-base" aria-hidden>
+            {isOngoing ? "🚨" : "😢"}
+          </span>
+          <div className="flex-1">
+            <div className="font-medium text-gray-900">
+              {rangeText}
+              {isOngoing ? null : (
+                <span className="text-gray-500">
+                  {" "}
+                  · {durationText}
+                </span>
+              )}
+            </div>
+            <div className="text-[10px] text-gray-500">
+              peak {event.peak_confidence.toFixed(2)}
+              {event.avg_confidence != null
+                ? ` · avg ${event.avg_confidence.toFixed(2)}`
+                : null}
+              {suggestedLabel ? (
+                <span className="ml-1">
+                  · suggested {suggestedLabel}
+                  {event.suggested_confidence
+                    ? ` (${event.suggested_confidence})`
+                    : null}
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
+        {!isOngoing ? (
+          <form action={deleteCryEventAction}>
+            <input type="hidden" name="id" value={event.id} />
+            <input type="hidden" name="return_to" value="/listen" />
+            <button
+              type="submit"
+              className="text-[11px] text-gray-400 hover:text-rose-600"
+            >
+              Hapus
+            </button>
+          </form>
+        ) : null}
       </div>
       {!isOngoing ? (
-        <form action={deleteCryEventAction}>
-          <input type="hidden" name="id" value={event.id} />
-          <input type="hidden" name="return_to" value="/listen" />
-          <button
-            type="submit"
-            className="text-[11px] text-gray-400 hover:text-rose-600"
-          >
-            Hapus
-          </button>
-        </form>
+        <CryEventTagPicker
+          eventId={event.id}
+          currentTag={event.tagged_reason}
+          suggested={event.suggested_reason}
+        />
       ) : null}
     </div>
   );
