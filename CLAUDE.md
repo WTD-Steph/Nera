@@ -41,7 +41,7 @@ Dokumen lengkap insiden + fix: [docs/troubleshooting.md](docs/troubleshooting.md
 - `babies.dbf_pumping_multiplier` nullable — multiplier mode for DBF rate (× pumping). CHECK 0 < x ≤ 5
 - `logs.effectiveness` nullable — DBF efektivitas: `'efektif'` (100%) / `'sedang'` (80%) / `'kurang_efektif'` (60%). Used to scale ml estimate.
 - `logs.dbf_rate_override` nullable — per-row DBF rate snapshot/override (ml/menit). Auto-saved at row creation/end (forward-only behavior). Edit modal field lets user override per-session. CHECK 0 < x ≤ 30.
-- `cry_events` separate table (NOT logs subtype) untuk Tier 1 cry detection. Schema: `started_at`, `ended_at`, `peak_confidence` (req), `avg_confidence`, `duration_seconds`, `device_id` (anonymous localStorage UUID). RLS mirror `logs` (direct EXISTS join). Realtime publication aktif. Audio NEVER leaves device — only event metadata persisted. Foundation di PR A (this branch). Inference (PR B) + UI/realtime sub (PR C) follow.
+- `cry_events` separate table (NOT logs subtype) untuk Tier 1 cry detection. Schema: `started_at`, `ended_at`, `peak_confidence` (req), `avg_confidence`, `duration_seconds`, `device_id` (anonymous localStorage UUID). RLS mirror `logs` (direct EXISTS join). Realtime publication aktif. Audio NEVER leaves device — only event metadata persisted. Foundation merged PR A (#135). Inference engine PR B (TFJS + YAMNet, single-threaded WASM, IndexedDB cache via `tf.io.browserIndexedDB`). UI/realtime sub PR C follows. Setup: `npm run fetch:yamnet` downloads ~17MB ke `public/models/yamnet-v1/`. Detail: [docs/cry-detection.md](docs/cry-detection.md).
 
 ## DBF rate priority chain
 
