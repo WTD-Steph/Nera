@@ -79,6 +79,11 @@ export type Database = {
           id: string
           peak_confidence: number
           started_at: string
+          suggested_confidence: string | null
+          suggested_reason: string | null
+          tagged_at: string | null
+          tagged_by: string | null
+          tagged_reason: string | null
         }
         Insert: {
           avg_confidence?: number | null
@@ -91,6 +96,11 @@ export type Database = {
           id?: string
           peak_confidence: number
           started_at: string
+          suggested_confidence?: string | null
+          suggested_reason?: string | null
+          tagged_at?: string | null
+          tagged_by?: string | null
+          tagged_reason?: string | null
         }
         Update: {
           avg_confidence?: number | null
@@ -103,6 +113,11 @@ export type Database = {
           id?: string
           peak_confidence?: number
           started_at?: string
+          suggested_confidence?: string | null
+          suggested_reason?: string | null
+          tagged_at?: string | null
+          tagged_by?: string | null
+          tagged_reason?: string | null
         }
         Relationships: [
           {

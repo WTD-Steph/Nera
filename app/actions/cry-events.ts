@@ -5,6 +5,13 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
+import {
+  suggestReason,
+  TAGGABLE_REASONS,
+  type Reason,
+} from "@/lib/cry-detection/reason-heuristics";
+import { computeCryContext } from "@/lib/compute/cry-context";
+import type { LogRow } from "@/lib/compute/stats";
 
 // Cry events server actions.
 //
@@ -47,6 +54,29 @@ export async function createCryStartedAction(
   }
 
   const supabase = createClient();
+
+  // Compute heuristic suggestion saat INSERT — frozen di DB as snapshot.
+  // Query last 6h logs (cukup untuk most-recent feed/diaper/sleep) +
+  // derive age dari baby.dob.
+  const since = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+  const { data: recentLogs } = await supabase
+    .from("logs")
+    .select("subtype, timestamp, end_timestamp")
+    .eq("baby_id", baby.id)
+    .gte("timestamp", since)
+    .order("timestamp", { ascending: false })
+    .limit(50);
+  const startedAtMs = new Date(args.startedAt).getTime();
+  const context = computeCryContext(
+    (recentLogs ?? []) as unknown as LogRow[],
+    startedAtMs,
+  );
+  const ageDays = Math.max(
+    0,
+    Math.floor((startedAtMs - new Date(baby.dob).getTime()) / 86400000),
+  );
+  const suggestion = suggestReason(context, ageDays);
+
   const { data, error } = await supabase
     .from("cry_events")
     .insert({
@@ -55,6 +85,8 @@ export async function createCryStartedAction(
       started_at: args.startedAt,
       peak_confidence: args.peakConfidence,
       device_id: args.deviceId || null,
+      suggested_reason: suggestion.reason,
+      suggested_confidence: suggestion.confidence,
     })
     .select("id")
     .single();
@@ -62,7 +94,43 @@ export async function createCryStartedAction(
     return { ok: false, error: error?.message ?? "Insert failed" };
   }
   revalidatePath("/listen");
+  revalidatePath("/");
   return { ok: true, id: data.id };
+}
+
+export type TagCryArgs = {
+  id: string;
+  reason: Reason | "other";
+};
+
+export type TagCryResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Tag (atau retag) cry event dengan ground-truth reason dari parent.
+ * Editable anytime — overwrites previous tagged_reason. Records
+ * tagged_at + tagged_by untuk audit.
+ */
+export async function tagCryEventAction(
+  args: TagCryArgs,
+): Promise<TagCryResult> {
+  const user = await getCachedUser();
+  if (!user) return { ok: false, error: "Not authenticated" };
+  if (!TAGGABLE_REASONS.includes(args.reason)) {
+    return { ok: false, error: "Invalid reason" };
+  }
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("cry_events")
+    .update({
+      tagged_reason: args.reason,
+      tagged_at: new Date().toISOString(),
+      tagged_by: user.id,
+    } as never)
+    .eq("id", args.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/listen");
+  revalidatePath("/");
+  return { ok: true };
 }
 
 export type EndCryArgs = {
