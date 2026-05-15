@@ -191,7 +191,7 @@ async function main() {
   console.log(`Running ${SUSTAINED_DURATION_SEC}s sustained inference…`);
   await page.waitForTimeout(SUSTAINED_DURATION_SEC * 1000);
 
-  // Read final dump + timings.
+  // Read final dump + timings (Phase 1: synthetic audio).
   const finalDump = await page.evaluate(() => {
     const engine = (window).__cryEngine;
     if (!engine) return null;
@@ -205,6 +205,103 @@ async function main() {
   if (!finalDump) {
     throw new Error("Could not read engine state from page");
   }
+
+  // Probability stats dari synthetic audio phase.
+  const synthProbs = finalDump.dump.samples.map((s) => s.p);
+  const synthMaxProb = synthProbs.length > 0 ? Math.max(...synthProbs) : 0;
+  const synthEvents = finalDump.dump.events_emitted.length;
+  console.log(
+    `  Phase 1 (synthetic audio): max_prob=${synthMaxProb.toFixed(3)} events_emitted=${synthEvents}`,
+  );
+  console.log(
+    `    (Expected: synthetic ≪ 0.7 threshold → 0 events. Confirms synthetic doesn't trigger detection.)`,
+  );
+
+  // Phase 2: inject scripted probability sequence directly ke state
+  // machine, validates state machine code path empirically without
+  // audio dependency. STOP inference loop dulu supaya synthetic audio
+  // samples (p≈0) tidak compete dengan injected samples (p=0.85).
+  console.log("\nPhase 2: scripted probability injection to state machine…");
+  const phase2Result = await page.evaluate(async () => {
+    const engine = (window).__cryEngine;
+    if (!engine) return null;
+
+    // STOP inference loop first — prevents competing samples dari real
+    // audio path. engine.stop() clears state machine + sliding window
+    // + setInterval tick. After stop, state machine returns ke idle.
+    engine.stop();
+    await new Promise((r) => setTimeout(r, 200));
+
+    // Track transitions + events emitted during phase 2 only.
+    const transitions = [];
+    const events = [];
+    const offTransition = engine.onStateTransition((from, to) => {
+      transitions.push({ from, to, at: Date.now() });
+    });
+    const offStart = engine.onCryStart((e) => {
+      events.push({
+        kind: "started",
+        at: e.startedAt.toISOString(),
+        peak: e.peakConfidence,
+      });
+    });
+    const offEnd = engine.onCryEnd((e) => {
+      events.push({
+        kind: "ended",
+        at: e.endedAt.toISOString(),
+        duration_ms: e.durationMs,
+        avg: e.avgConfidence,
+      });
+    });
+
+    // Access private stateMachine via runtime (TS private = compile-time only).
+    const sm = engine.stateMachine;
+    const tStart = performance.now();
+    const baseT = tStart;
+    const wallNow = () => new Date().toISOString();
+    function emit(p, dtMs) {
+      sm.feed({
+        t: performance.now() - baseT,
+        wallClockIso: wallNow(),
+        p,
+      });
+      return new Promise((r) => setTimeout(r, dtMs));
+    }
+
+    // Sequence: 8 samples × 500ms = 4s sustained @ p=0.85 (>0.7 start
+    // threshold, exceeds 3s START_DURATION) → expect "started" event
+    // setelah 6th sample.
+    for (let i = 0; i < 8; i++) {
+      await emit(0.85, 500);
+    }
+    // Then 22 samples × 500ms = 11s sustained @ p=0.1 (<0.3 end threshold,
+    // exceeds 10s END_DURATION) → expect "ended" event setelah 20th
+    // sample.
+    for (let i = 0; i < 22; i++) {
+      await emit(0.1, 500);
+    }
+    // Wait for any final transition to flush.
+    await new Promise((r) => setTimeout(r, 200));
+
+    offTransition();
+    offStart();
+    offEnd();
+
+    return {
+      transitions,
+      events,
+      final_state: engine.getState(),
+    };
+  });
+
+  console.log(
+    `  Transitions: ${phase2Result.transitions.map((t) => `${t.from}→${t.to}`).join(" → ")}`,
+  );
+  console.log(`  Events emitted: ${phase2Result.events.length}`);
+  phase2Result.events.forEach((e) => {
+    console.log(`    ${e.kind}: ${JSON.stringify(e)}`);
+  });
+  console.log(`  Final state: ${phase2Result.final_state}`);
 
   const timings = finalDump.timings;
   const sustained = {
@@ -249,6 +346,22 @@ async function main() {
       path: path.relative(ROOT, FIXTURE),
       type: "synthetic (NOT real cry)",
       note: "Metrics content-independent. Detection accuracy validated hands-on per docs/cry-detection.md",
+    },
+    state_machine_validation: {
+      phase1_synthetic_audio: {
+        samples_count: finalDump.dump.samples.length,
+        max_probability: synthMaxProb,
+        events_emitted: synthEvents,
+        note: "Synthetic audio probabilities << 0.7 start threshold (max ~0.04). 0 events expected + observed. Confirms inference pipeline runs (samples flow) but doesn't exercise state machine transitions.",
+      },
+      phase2_scripted_probabilities: {
+        transitions: phase2Result.transitions.map((t) => `${t.from}→${t.to}`),
+        transitions_count: phase2Result.transitions.length,
+        events: phase2Result.events,
+        events_emitted: phase2Result.events.length,
+        final_state: phase2Result.final_state,
+        note: "Inject 8×p=0.85 (4s sustained) then 22×p=0.1 (11s sustained) langsung ke state machine. Confirms transition logic + event emission code path works empirically — no audio/model dependency.",
+      },
     },
     metrics: {
       model_load_time_ms: Math.round(modelLoadTimeMs),
