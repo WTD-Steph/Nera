@@ -22,7 +22,7 @@ export default function manifest(): MetadataRoute.Manifest {
       "Track tumbuh kembang anak: log harian, chart pertumbuhan WHO, milestone, jadwal imunisasi IDAI.",
     start_url: "/",
     display: "standalone",
-    orientation: "portrait",
+    orientation: "natural",
     background_color: "#fff7f5",
     theme_color: "#f43f5e",
     lang: "id",
