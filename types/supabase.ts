@@ -268,18 +268,21 @@ export type Database = {
           joined_at: string
           role: string
           user_id: string
+          perinatal_role: string | null
         }
         Insert: {
           household_id: string
           joined_at?: string
           role?: string
           user_id: string
+          perinatal_role?: string | null
         }
         Update: {
           household_id?: string
           joined_at?: string
           role?: string
           user_id?: string
+          perinatal_role?: string | null
         }
         Relationships: [
           {
@@ -695,6 +698,156 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      wellness_entries: {
+        Row: {
+          id: string
+          user_id: string
+          household_id: string
+          subject_role: string
+          entry_type: string
+          entry_date: string
+          responses: Json
+          total_score: number | null
+          epds_q10_positive: boolean | null
+          crisis_acknowledged_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          household_id: string
+          subject_role: string
+          entry_type: string
+          entry_date: string
+          responses: Json
+          total_score?: number | null
+          epds_q10_positive?: boolean | null
+          crisis_acknowledged_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          household_id?: string
+          subject_role?: string
+          entry_type?: string
+          entry_date?: string
+          responses?: Json
+          total_score?: number | null
+          epds_q10_positive?: boolean | null
+          crisis_acknowledged_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      wellness_shares: {
+        Row: {
+          id: string
+          owner_user_id: string
+          shared_with_user_id: string
+          share_level: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          owner_user_id: string
+          shared_with_user_id: string
+          share_level?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          owner_user_id?: string
+          shared_with_user_id?: string
+          share_level?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      wellness_alert_preferences: {
+        Row: {
+          user_id: string
+          alert_partner_on_high_score: boolean
+          alert_partner_on_q10_positive: boolean
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          alert_partner_on_high_score?: boolean
+          alert_partner_on_q10_positive?: boolean
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          alert_partner_on_high_score?: boolean
+          alert_partner_on_q10_positive?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      wellness_access_log: {
+        Row: {
+          id: string
+          accessor_user_id: string
+          target_user_id: string
+          share_level_at_access: string
+          fields_returned: string
+          accessed_at: string
+        }
+        Insert: {
+          id?: string
+          accessor_user_id: string
+          target_user_id: string
+          share_level_at_access: string
+          fields_returned: string
+          accessed_at?: string
+        }
+        Update: {
+          id?: string
+          accessor_user_id?: string
+          target_user_id?: string
+          share_level_at_access?: string
+          fields_returned?: string
+          accessed_at?: string
+        }
+        Relationships: []
+      }
+      wellness_alerts: {
+        Row: {
+          id: string
+          source_user_id: string
+          target_user_id: string
+          source_entry_id: string | null
+          alert_kind: string
+          acknowledged_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          source_user_id: string
+          target_user_id: string
+          source_entry_id?: string | null
+          alert_kind: string
+          acknowledged_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          source_user_id?: string
+          target_user_id?: string
+          source_entry_id?: string | null
+          alert_kind?: string
+          acknowledged_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {
