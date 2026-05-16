@@ -41,7 +41,7 @@ Dokumen lengkap insiden + fix: [docs/troubleshooting.md](docs/troubleshooting.md
 - `babies.dbf_pumping_multiplier` nullable — multiplier mode for DBF rate (× pumping). CHECK 0 < x ≤ 5
 - `logs.effectiveness` nullable — DBF efektivitas: `'efektif'` (100%) / `'sedang'` (80%) / `'kurang_efektif'` (60%). Used to scale ml estimate.
 - `logs.dbf_rate_override` nullable — per-row DBF rate snapshot/override (ml/menit). Auto-saved at row creation/end (forward-only behavior). Edit modal field lets user override per-session. CHECK 0 < x ≤ 30.
-- `cry_events` separate table (NOT logs subtype) untuk Tier 1 cry detection. Schema: `started_at`, `ended_at`, `peak_confidence` (req), `avg_confidence`, `duration_seconds`, `device_id` (anonymous localStorage UUID). RLS mirror `logs` (direct EXISTS join). Realtime publication aktif. Audio NEVER leaves device — only event metadata persisted. Foundation merged PR A (#135). Inference engine PR B (TFJS + YAMNet, single-threaded WASM, IndexedDB cache via `tf.io.browserIndexedDB`). UI/realtime sub PR C follows. Setup: `npm run fetch:yamnet` downloads ~17MB ke `public/models/yamnet-v1/`. Detail: [docs/cry-detection.md](docs/cry-detection.md).
+- `cry_events` separate table (NOT logs subtype) untuk Tier 1 cry detection. Schema: `started_at`, `ended_at`, `peak_confidence` (req), `avg_confidence`, `duration_seconds`, `device_id` (anonymous localStorage UUID), `suggested_reason` + `suggested_confidence` (heuristic at INSERT), `tagged_reason` + `tagged_at` + `tagged_by` (parent ground truth, editable). RLS mirror `logs` (direct EXISTS join, 4 policies: select/insert/update/delete). Realtime publication aktif. Audio NEVER leaves device — only event metadata. **YAMNet model di-host di Supabase Storage** public bucket `yamnet-models` (16 MB), runtime fetch direct via `MODEL_ORIGIN_URL` di `lib/cry-detection/thresholds.ts` — TIDAK ada local copy, TIDAK ada fetch script (legacy TFHub URLs broken sejak Kaggle migration). Inference: TFJS + YAMNet, single-threaded WASM (multi-thread fails iOS Safari), IndexedDB cache via `tf.io.browserIndexedDB`. Mic capture shared via `lib/audio/capture-base.ts` AudioCaptureBase class (consolidated, also consumed by DbMeter useDbMeter hook). Detail: [docs/cry-detection.md](docs/cry-detection.md).
 
 ## DBF rate priority chain
 
@@ -232,15 +232,23 @@ CLAUDE.md                   # this file
 - **Sejak Terakhir Tidur** anchored at `end_timestamp` (waktu bangun), bukan `timestamp` (waktu mulai tidur). Ongoing → "sedang berjalan".
 - **Server-side guard** vs duplicate ongoing rows of same subtype.
 - **Display polish**: pumping/DBF row uses `|` separator antara L/R, skip null sides, sub-minute durations show seconds. Notes display inline italic in Aktivitas Terbaru. Profile saved alert prominent dengan checkmark.
+- **Spillage tracking** (PR #130): `logs.amount_spilled_ml` + `spilled_attribution` ('asi'|'sufor'|'proporsional') untuk ASI/Sufor/Mix feeding. Stock ASI deduct = drunk + asi-portion-of-spilled. UI di LogModal + CupFeedCoach. Display row detail "🍼 ASI 50 ml · 10ml tumpah Mix".
+- **dB Meter** (`/db-meter`): mic-based dB(A) SPL estimate untuk white noise volume check (AAP ≤50 dB di telinga bayi, Hugh 2014 Pediatrics). NightLamp sleep dark mode integration — saat sleep ongoing, opt-in mic, save avg/max ke `logs.avg_db_a` + `logs.max_db_a`. Pakai `lib/audio/capture-base.ts` AudioCaptureBase (shared dengan cry detection).
+- **Sleep Coach** (`/sleep-coach`): historical 7-day analyze (6 metrics: wake window compliance, day-night ratio, longest stretch, bedtime consistency, total sleep, pre-bed feed) → ranked findings (concern/opportunity/good). Plus realtime advice card di home (settle/wake/wait/check dengan action decision tree).
+- **Cry Detection Tier 1.5** (PR #135 #137 #138 #139 #140 #141): production `/listen` route dengan state machine UX (idle → permission → listening → cry-detected → cry-ongoing → cry-ended). Wake Lock active, Battery API <20% warning, Firefox graceful skip. Realtime cross-device banner di home dengan context hint (last feed/diaper/wake) + suggested reason (heuristic) + inline tag buttons. Diagnostic panel di /listen (live prob, max 60s, dump JSON). Detail: [docs/cry-detection.md](docs/cry-detection.md).
+- **PWA orientation `'any'`** (was `'portrait'`): follow user rotate gesture + OS rotation lock. Responsive layouts (sticky modal Simpan, max-w-* breakpoints) finally usable di PWA mode.
 
 ## Active follow-ups
 
 - Edit log on tap recent activity (currently delete + add new)
 - Service worker untuk offline read + PWA auto-update (currently: user force-quit + reopen for new deploy on iOS standalone)
 - Push notifications reminder imunisasi (defer ke browser PWA push API)
+- Web Push notifications cross-device cry alert saat app TIDAK open (~2-3 hari work, requires Supabase Edge Function)
+- Lock screen ongoing notification during `/listen` active (~1 hari work, Notification API persistent)
 - Resend SMTP integration (kalau email reliability worth-it untuk reset password / invite email)
 - Reset password flow (currently: manual via Supabase dashboard)
 - Multi-baby support saat anak ke-2 (flow di /more/babies/new — schema ready, UI defer)
 - Stock allocation re-balance saat ASI feed dihapus (currently consumed_ml tetap terpakai walaupun row dihapus)
-- DBF stopwatch ongoing flow (currently DBF hanya manual log, no Mulai DBF + Stopwatch)
 - Optimistic insert dengan client-generated UUID (current realtime: full re-render via router.refresh, OK untuk volume low)
+- Cry Tier 2 ML classification — defer until ≥50 tagged events accumulate (gate: heuristic accuracy via /listen summary; <70% → consider Path A MFCC+CNN trained on Donate-a-Cry + Nera tagged data)
+- Cry events ke "Aktivitas Terbaru" home — defer until trust earned (≥2-4 weeks, FPR <10%)
