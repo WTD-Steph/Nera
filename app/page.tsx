@@ -12,6 +12,7 @@ import {
 import type { Medication } from "@/app/actions/medications";
 import { LogsRealtime } from "@/components/LogsRealtime";
 import { CryRealtimeBanner } from "@/components/CryRealtimeBanner";
+import { WellnessAlertBanner } from "@/components/WellnessAlertBanner";
 import { SubmitButton } from "@/components/SubmitButton";
 import { OngoingCard } from "@/components/OngoingCard";
 import { StartOngoingButton } from "@/components/StartOngoingButtons";
@@ -845,6 +846,7 @@ export default async function HomePage({
         babyId={baby.id}
         householdId={household.household_id}
       />
+      <WellnessAlertBanner userId={user.id} />
       <header className="flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-rose-300 to-pink-400 text-2xl shadow-sm">
           <span aria-hidden>👶</span>
@@ -2206,6 +2208,15 @@ export default async function HomePage({
             🌙
           </span>
           Sleep Coach
+        </Link>
+        <Link
+          href="/wellness"
+          className="flex flex-col items-center gap-1 rounded-xl border border-gray-200 bg-white px-2 py-3 text-center text-xs font-semibold text-gray-700 hover:bg-gray-50"
+        >
+          <span className="text-lg" aria-hidden>
+            🌿
+          </span>
+          Wellness
         </Link>
         <Link
           href="/listen"
