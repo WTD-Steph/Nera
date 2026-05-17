@@ -53,7 +53,7 @@ export default async function SetupBabyPage({
               required
               autoFocus
               maxLength={50}
-              placeholder="Nera"
+              placeholder="Nama panggilan bayi"
               className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
             />
           </label>
