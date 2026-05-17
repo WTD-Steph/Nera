@@ -197,16 +197,22 @@ export type PromptType =
   | "age-tips"
   | "custom";
 
-const PROMPT_QUESTIONS: Record<PromptType, string> = {
-  growth:
-    "Bagaimana pertumbuhan Nera dibandingkan referensi WHO? Apakah ada concern yang perlu didiskusikan dengan dokter?",
-  "feeding-sleep":
-    "Apakah pola makan dan tidur 7 hari terakhir terlihat sehat untuk usia ini? Apa yang bisa di-improve?",
-  diaper:
-    "Apakah pola pipis dan poop dalam batas normal untuk usia ini? Ada hal yang harus dicermati?",
-  "age-tips":
-    "Apa saran umum, tips parenting, dan yang harus diperhatikan untuk bayi seusia ini?",
-  custom: "",
+const buildPromptQuestion = (
+  type: PromptType,
+  babyName: string,
+): string => {
+  switch (type) {
+    case "growth":
+      return `Bagaimana pertumbuhan ${babyName} dibandingkan referensi WHO? Apakah ada concern yang perlu didiskusikan dengan dokter?`;
+    case "feeding-sleep":
+      return "Apakah pola makan dan tidur 7 hari terakhir terlihat sehat untuk usia ini? Apa yang bisa di-improve?";
+    case "diaper":
+      return "Apakah pola pipis dan poop dalam batas normal untuk usia ini? Ada hal yang harus dicermati?";
+    case "age-tips":
+      return "Apa saran umum, tips parenting, dan yang harus diperhatikan untuk bayi seusia ini?";
+    case "custom":
+      return "";
+  }
 };
 
 export function buildAiContext({
@@ -286,12 +292,13 @@ RINGKASAN 7 HARI TERAKHIR:
 export function buildAiPrompt(
   promptType: PromptType,
   context: string,
+  babyName: string,
   customQuestion = "",
 ): string {
   const question =
     promptType === "custom"
       ? customQuestion.trim() || "Berikan analisis umum dari data ini."
-      : PROMPT_QUESTIONS[promptType];
+      : buildPromptQuestion(promptType, babyName);
 
   return `Saya orangtua bayi yang track tumbuh kembang anak via aplikasi. Saya minta analisis berdasarkan data berikut.
 

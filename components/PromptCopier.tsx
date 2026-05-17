@@ -13,13 +13,19 @@ const PRESETS: { id: PromptType; label: string; emoji: string }[] = [
   { id: "age-tips", label: "Saran usia ini", emoji: "💡" },
 ];
 
-export function PromptCopier({ context }: { context: string }) {
+export function PromptCopier({
+  context,
+  babyName,
+}: {
+  context: string;
+  babyName: string;
+}) {
   const [active, setActive] = useState<PromptType>("growth");
   const [custom, setCustom] = useState("");
   const [copied, setCopied] = useState(false);
   const [, startTransition] = useTransition();
 
-  const prompt = buildAiPrompt(active, context, custom);
+  const prompt = buildAiPrompt(active, context, babyName, custom);
 
   const onCopy = async () => {
     try {
@@ -114,7 +120,7 @@ export function PromptCopier({ context }: { context: string }) {
       <p className="text-[11px] leading-relaxed text-gray-400">
         Tap "Salin prompt" lalu tap "Buka Claude" — paste di chat Claude.ai.
         Bisa juga paste ke ChatGPT, Gemini, atau LLM lain. Prompt sudah
-        include data Nera + petunjuk supaya respons terstruktur.
+        include data {babyName} + petunjuk supaya respons terstruktur.
       </p>
     </div>
   );

@@ -41,7 +41,7 @@ type BatteryLike = {
   removeEventListener: (e: string, cb: () => void) => void;
 };
 
-export function CryListener() {
+export function CryListener({ babyName }: { babyName: string }) {
   const [state, setState] = useState<ExtendedState>("explainer");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [modelProgress, setModelProgress] = useState<number>(0);
@@ -270,7 +270,13 @@ export function CryListener() {
 
   // ----- Render per state -----
   if (state === "explainer" || state === "stopped") {
-    return <ExplainerScreen onStart={handleStart} stopped={state === "stopped"} />;
+    return (
+      <ExplainerScreen
+        onStart={handleStart}
+        stopped={state === "stopped"}
+        babyName={babyName}
+      />
+    );
   }
 
   return (
@@ -297,6 +303,7 @@ export function CryListener() {
         modelSourceLabel={modelSourceLabel}
         cryStartedAtMs={cryStartedAtMs}
         errorMsg={errorMsg}
+        babyName={babyName}
       />
 
       {/* Diagnostic panel — live probability surface untuk threshold tuning */}
@@ -309,6 +316,7 @@ export function CryListener() {
           maxProb60s={maxProb60s}
           sampleCount={sampleCount}
           onDump={handleDump}
+          babyName={babyName}
         />
       )}
 
@@ -341,19 +349,21 @@ export function CryListener() {
 function ExplainerScreen({
   onStart,
   stopped,
+  babyName,
 }: {
   onStart: () => void;
   stopped: boolean;
+  babyName: string;
 }) {
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-5">
         <h2 className="text-base font-bold text-gray-900">
-          🎤 Mendengarkan tangisan Nera
+          🎤 Mendengarkan tangisan {babyName}
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-gray-700">
-          Aktifkan deteksi tangisan untuk auto-log event ke timeline Nera
-          tanpa input manual.
+          Aktifkan deteksi tangisan untuk auto-log event ke timeline {babyName}
+          {" "}tanpa input manual.
         </p>
         <div className="mt-3 rounded-xl bg-white p-3 text-[12px] leading-relaxed text-gray-700">
           <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-rose-600">
@@ -392,11 +402,13 @@ function DiagnosticPanel({
   maxProb60s,
   sampleCount,
   onDump,
+  babyName,
 }: {
   latestProb: number | null;
   maxProb60s: number;
   sampleCount: number;
   onDump: () => void;
+  babyName: string;
 }) {
   // Color-code latest probability against current START threshold (0.4).
   const probColor =
@@ -455,9 +467,9 @@ function DiagnosticPanel({
         </div>
       </div>
       <p className="mt-2 text-[10px] leading-snug text-gray-500">
-        Threshold start: 0.40 (≥ 1.5s sustained). Kalau Nera nangis, observe
-        Latest spike. Saat Nera reliably scores rendah, dump JSON → analyze
-        offline → tune thresholds.ts.
+        Threshold start: 0.40 (≥ 1.5s sustained). Kalau {babyName} nangis,
+        observe Latest spike. Saat {babyName} reliably scores rendah, dump
+        JSON → analyze offline → tune thresholds.ts.
       </p>
     </div>
   );
@@ -469,12 +481,14 @@ function StateDisplay({
   modelSourceLabel,
   cryStartedAtMs,
   errorMsg,
+  babyName,
 }: {
   state: ExtendedState;
   modelProgress: number;
   modelSourceLabel: string;
   cryStartedAtMs: number | null;
   errorMsg: string | null;
+  babyName: string;
 }) {
   if (state === "requesting-permission") {
     return (
@@ -524,7 +538,7 @@ function StateDisplay({
             <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
           </span>
           <span className="font-semibold text-gray-900">
-            Mendengarkan Nera
+            Mendengarkan {babyName}
           </span>
         </div>
         <p className="mt-2 text-xs text-gray-600">
@@ -552,7 +566,7 @@ function StateDisplay({
     const s = elapsedSec % 60;
     return (
       <Card tone="alert" emoji="🚨">
-        <div className="font-bold text-red-700">Nera menangis</div>
+        <div className="font-bold text-red-700">{babyName} menangis</div>
         <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-red-600">
           {m > 0 ? `${m}m ${s}s` : `${s}s`}
         </div>
