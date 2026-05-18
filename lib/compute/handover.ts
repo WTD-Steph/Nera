@@ -57,8 +57,16 @@ export function summarizeHandoverActivity(
     if (l.subtype === "feeding") {
       if (l.amount_ml != null) {
         feedingBottleCount += 1;
-        if (l.bottle_content === "asi") feedingMlAsi += l.amount_ml;
-        else feedingMlSufor += l.amount_ml;
+        // Mix-aware: prefer amount_asi_ml + amount_sufor_ml breakdown.
+        // Tanpa cek ini, sesi mix akan masuk 100% ke Sufor.
+        if (l.amount_asi_ml != null || l.amount_sufor_ml != null) {
+          feedingMlAsi += l.amount_asi_ml ?? 0;
+          feedingMlSufor += l.amount_sufor_ml ?? 0;
+        } else if (l.bottle_content === "asi") {
+          feedingMlAsi += l.amount_ml;
+        } else {
+          feedingMlSufor += l.amount_ml;
+        }
       }
       const lMin = l.duration_l_min ?? 0;
       const rMin = l.duration_r_min ?? 0;

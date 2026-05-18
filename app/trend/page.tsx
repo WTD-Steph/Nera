@@ -155,10 +155,14 @@ export default async function TrendPage() {
       if (!agg) continue;
       if (l.amount_ml != null && l.amount_ml > 0) {
         agg.bottleMl += l.amount_ml;
-        // Bucket bottle ml: ASI vs Sufor. Legacy entries with NULL
-        // bottle_content (pre-migration) treated as Sufor since pre-
-        // migration assumption was formula by default.
-        if (l.bottle_content === "asi") {
+        // Mix-aware bucketing: pakai breakdown amount_asi_ml +
+        // amount_sufor_ml saat tersedia (mix mode + new rows). Fallback ke
+        // bottle_content untuk legacy rows yang belum punya breakdown.
+        // Tanpa cek breakdown, sesi mix akan masuk 100% ke Sufor.
+        if (l.amount_asi_ml != null || l.amount_sufor_ml != null) {
+          agg.asiMl += l.amount_asi_ml ?? 0;
+          agg.suforMl += l.amount_sufor_ml ?? 0;
+        } else if (l.bottle_content === "asi") {
           agg.asiMl += l.amount_ml;
         } else {
           agg.suforMl += l.amount_ml;
@@ -315,34 +319,91 @@ export default async function TrendPage() {
 
   const target = getTargetForAge(baby.dob);
 
-  // === Today's stats for highlights ===
-  const todayKey = dayKey(new Date());
-  const todayAgg = dayIndex.get(todayKey);
-  const todaySleep = logsArray.filter((l) => {
-    if (l.subtype !== "sleep" || !l.end_timestamp) return false;
-    return dayKey(new Date(l.timestamp)) === todayKey;
-  });
-  const sleepDurations = todaySleep.map(
-    (l) =>
-      (new Date(l.end_timestamp!).getTime() -
-        new Date(l.timestamp).getTime()) /
-      60000,
-  );
-  const sleepLongestMin = sleepDurations.length
-    ? Math.max(...sleepDurations)
-    : 0;
-  const sleepCount = todaySleep.length;
+  // === Past-24h rolling stats for highlights ===
+  // Calendar-day "Hari Ini" misleading early in the day (jam 8 pagi → 33%
+  // target wajar tapi banner bilang "jauh dari target"). Rolling 24h always
+  // a valid full-window apple-to-apple comparison vs daily target.
+  const nowMs = Date.now();
+  const windowStartMs = nowMs - 24 * 60 * 60 * 1000;
+  const inWindow = (tsIso: string): boolean => {
+    const t = new Date(tsIso).getTime();
+    return t >= windowStartMs && t <= nowMs;
+  };
 
-  // Today's feedings (after dedup) for highlights count
-  const todayFeedings = feedings.filter(
-    (t) => dayKey(new Date(t)) === todayKey,
-  );
-  const todayFeedingCount = logsArray.filter(
-    (l) =>
-      l.subtype === "feeding" && dayKey(new Date(l.timestamp)) === todayKey,
+  let bottleMl24h = 0;
+  let asiBottleMl24h = 0;
+  let suforMl24h = 0;
+  let peeCount24h = 0;
+  let poopCount24h = 0;
+  let feedingCount24h = 0;
+  let dbfMin24h = 0;
+  let dbfEstAdjustedMl24h = 0;
+  for (const l of logsArray) {
+    if (l.subtype === "feeding" && inWindow(l.timestamp)) {
+      feedingCount24h += 1;
+      if (l.amount_ml != null && l.amount_ml > 0) {
+        bottleMl24h += l.amount_ml;
+        if (l.amount_asi_ml != null || l.amount_sufor_ml != null) {
+          asiBottleMl24h += l.amount_asi_ml ?? 0;
+          suforMl24h += l.amount_sufor_ml ?? 0;
+        } else if (l.bottle_content === "asi") {
+          asiBottleMl24h += l.amount_ml;
+        } else {
+          suforMl24h += l.amount_ml;
+        }
+      }
+      const dbfMin = (l.duration_l_min ?? 0) + (l.duration_r_min ?? 0);
+      if (dbfMin > 0) {
+        dbfMin24h += dbfMin;
+        const est = dbfEstimateMl(dbfMin, logsArray, {
+          fixedMlPerMin: baby.dbf_ml_per_min,
+          pumpingMultiplier: baby.dbf_pumping_multiplier,
+          rowOverride: l.dbf_rate_override,
+        });
+        const factor = effectivenessFactor(
+          (l.effectiveness ?? null) as EffectivenessLevel | null,
+        );
+        dbfEstAdjustedMl24h += Math.round(est.ml * factor);
+      }
+    } else if (l.subtype === "diaper" && inWindow(l.timestamp)) {
+      if (l.has_pee) peeCount24h += 1;
+      if (l.has_poop) poopCount24h += 1;
+    }
+  }
+  void asiBottleMl24h; // available for future split detail; aggregated via milkTotal
+
+  // Sleep cross-window split: overlap of each sleep session with [now-24h, now]
+  let sleepMin24h = 0;
+  let sleepLongest24hMin = 0;
+  let sleepSessions24h = 0;
+  for (const l of logsArray) {
+    if (l.subtype !== "sleep" || !l.end_timestamp) continue;
+    const sMs = new Date(l.timestamp).getTime();
+    const eMs = new Date(l.end_timestamp).getTime();
+    if (eMs <= sMs) continue;
+    const overlap = Math.max(
+      0,
+      Math.min(eMs, nowMs) - Math.max(sMs, windowStartMs),
+    );
+    if (overlap > 0) {
+      sleepMin24h += overlap / 60000;
+      const sessionMin = (eMs - sMs) / 60000;
+      if (sessionMin > sleepLongest24hMin) sleepLongest24hMin = sessionMin;
+      sleepSessions24h += 1;
+    }
+  }
+
+  // Feedings (dedup) in 24h window for session count
+  const feedingSessions24h = feedings.filter(
+    (t) => t >= windowStartMs && t <= nowMs,
   ).length;
 
-  // 7-day milk avg (excluding today, only days with non-zero data)
+  const dbfEst24h = dbfEstimateMl(dbfMin24h, logsArray, {
+    fixedMlPerMin: baby.dbf_ml_per_min,
+    pumpingMultiplier: baby.dbf_pumping_multiplier,
+  });
+
+  // 7-day milk avg (last 7 complete calendar days excluding today)
   const last7 = days.slice(-8, -1).filter((d) => d.milkTotalMl > 0);
   const milk7dAvg =
     last7.length > 0
@@ -354,24 +415,7 @@ export default async function TrendPage() {
       ? sleepDays7.reduce((s, d) => s + d.sleepMin, 0) / sleepDays7.length
       : null;
 
-  // DBF rate used (re-compute once for caption)
-  const todayDbfMin = todayAgg
-    ? todayFeedings.reduce((sum, _t) => sum, 0) // placeholder; we'll compute from logs
-    : 0;
-  // Compute today's DBF minutes from logsArray
-  const dbfMinToday = logsArray
-    .filter((l) => {
-      if (l.subtype !== "feeding") return false;
-      return dayKey(new Date(l.timestamp)) === todayKey;
-    })
-    .reduce(
-      (sum, l) => sum + (l.duration_l_min ?? 0) + (l.duration_r_min ?? 0),
-      0,
-    );
-  const dbfEstToday = dbfEstimateMl(dbfMinToday, logsArray, {
-    fixedMlPerMin: baby.dbf_ml_per_min,
-    pumpingMultiplier: baby.dbf_pumping_multiplier,
-  });
+  const milkTotal24h = bottleMl24h + dbfEstAdjustedMl24h;
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl lg:max-w-3xl">
@@ -386,25 +430,25 @@ export default async function TrendPage() {
       <div className="mt-4">
         <TrendHighlights
           data={{
-            milkTotalMl: todayAgg?.milkTotalMl ?? 0,
+            milkTotalMl: milkTotal24h,
             milkTargetMin: target.milkMlMin,
             milkTargetMax: target.milkMlMax,
-            bottleMl: todayAgg?.bottleMl ?? 0,
-            dbfMin: dbfMinToday,
-            dbfEstimateMl: dbfEstToday.ml,
-            dbfRate: dbfEstToday.mlPerMin,
-            dbfRateSource: dbfEstToday.source,
-            sleepMin: todayAgg?.sleepMin ?? 0,
+            bottleMl: bottleMl24h,
+            dbfMin: dbfMin24h,
+            dbfEstimateMl: dbfEstAdjustedMl24h,
+            dbfRate: dbfEst24h.mlPerMin,
+            dbfRateSource: dbfEst24h.source,
+            sleepMin: Math.round(sleepMin24h),
             sleepTargetHoursMin: target.sleepHoursMin,
             sleepTargetHoursMax: target.sleepHoursMax,
-            sleepLongestMin: Math.round(sleepLongestMin),
-            sleepCount,
-            peeCount: todayAgg?.peeCount ?? 0,
+            sleepLongestMin: Math.round(sleepLongest24hMin),
+            sleepCount: sleepSessions24h,
+            peeCount: peeCount24h,
             peeTargetMin: target.peeMin,
-            poopCount: todayAgg?.poopCount ?? 0,
+            poopCount: poopCount24h,
             poopTargetMin: target.poopMin,
-            feedingCount: todayFeedingCount,
-            feedingSessionCount: todayFeedings.length,
+            feedingCount: feedingCount24h,
+            feedingSessionCount: feedingSessions24h,
             feedingMedianMin,
             milk7dAvg,
             sleep7dAvgMin,
