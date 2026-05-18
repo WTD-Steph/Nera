@@ -37,9 +37,19 @@ export default function SignupPage({
             autoComplete="email"
             inputMode="email"
             defaultValue={prefilledEmail}
+            readOnly={prefilledEmail !== ""}
             placeholder="anda@email.com"
-            className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+            className={`mt-1 w-full rounded-xl border px-3 py-2.5 text-sm outline-none focus:border-rose-400 ${
+              prefilledEmail !== ""
+                ? "border-gray-200 bg-gray-50 text-gray-700"
+                : "border-gray-200"
+            }`}
           />
+          {prefilledEmail !== "" ? (
+            <p className="mt-1 text-[11px] text-gray-500">
+              Email dari undangan — tidak bisa diubah di sini.
+            </p>
+          ) : null}
         </label>
         <label className="block">
           <span className="text-xs font-semibold text-gray-600">

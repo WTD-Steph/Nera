@@ -218,6 +218,53 @@ export type Database = {
           },
         ]
       }
+      handovers: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          ended_by: string | null
+          ended_by_email: string | null
+          household_id: string
+          id: string
+          notes: string | null
+          started_at: string
+          started_by: string
+          started_by_email: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          ended_by?: string | null
+          ended_by_email?: string | null
+          household_id: string
+          id?: string
+          notes?: string | null
+          started_at?: string
+          started_by: string
+          started_by_email: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          ended_by?: string | null
+          ended_by_email?: string | null
+          household_id?: string
+          id?: string
+          notes?: string | null
+          started_at?: string
+          started_by?: string
+          started_by_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handovers_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       household_invitations: {
         Row: {
           accepted_at: string | null
@@ -266,74 +313,27 @@ export type Database = {
         Row: {
           household_id: string
           joined_at: string
+          perinatal_role: string | null
           role: string
           user_id: string
-          perinatal_role: string | null
         }
         Insert: {
           household_id: string
           joined_at?: string
+          perinatal_role?: string | null
           role?: string
           user_id: string
-          perinatal_role?: string | null
         }
         Update: {
           household_id?: string
           joined_at?: string
+          perinatal_role?: string | null
           role?: string
           user_id?: string
-          perinatal_role?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "household_members_household_id_fkey"
-            columns: ["household_id"]
-            isOneToOne: false
-            referencedRelation: "households"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      handovers: {
-        Row: {
-          created_at: string
-          ended_at: string | null
-          ended_by: string | null
-          ended_by_email: string | null
-          household_id: string
-          id: string
-          notes: string | null
-          started_at: string
-          started_by: string
-          started_by_email: string
-        }
-        Insert: {
-          created_at?: string
-          ended_at?: string | null
-          ended_by?: string | null
-          ended_by_email?: string | null
-          household_id: string
-          id?: string
-          notes?: string | null
-          started_at?: string
-          started_by: string
-          started_by_email: string
-        }
-        Update: {
-          created_at?: string
-          ended_at?: string | null
-          ended_by?: string | null
-          ended_by_email?: string | null
-          household_id?: string
-          id?: string
-          notes?: string | null
-          started_at?: string
-          started_by?: string
-          started_by_email?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "handovers_household_id_fkey"
             columns: ["household_id"]
             isOneToOne: false
             referencedRelation: "households"
@@ -415,7 +415,6 @@ export type Database = {
           amount_spilled_ml: number | null
           amount_sufor_ml: number | null
           avg_db_a: number | null
-          max_db_a: number | null
           baby_id: string
           bath_clean_tali_pusat: boolean | null
           bath_pijat_ilu: boolean | null
@@ -433,6 +432,7 @@ export type Database = {
           has_pee: boolean | null
           has_poop: boolean | null
           id: string
+          max_db_a: number | null
           med_dose: string | null
           med_name: string | null
           notes: string | null
@@ -457,7 +457,6 @@ export type Database = {
           amount_spilled_ml?: number | null
           amount_sufor_ml?: number | null
           avg_db_a?: number | null
-          max_db_a?: number | null
           baby_id: string
           bath_clean_tali_pusat?: boolean | null
           bath_pijat_ilu?: boolean | null
@@ -475,6 +474,7 @@ export type Database = {
           has_pee?: boolean | null
           has_poop?: boolean | null
           id?: string
+          max_db_a?: number | null
           med_dose?: string | null
           med_name?: string | null
           notes?: string | null
@@ -499,7 +499,6 @@ export type Database = {
           amount_spilled_ml?: number | null
           amount_sufor_ml?: number | null
           avg_db_a?: number | null
-          max_db_a?: number | null
           baby_id?: string
           bath_clean_tali_pusat?: boolean | null
           bath_pijat_ilu?: boolean | null
@@ -517,6 +516,7 @@ export type Database = {
           has_pee?: boolean | null
           has_poop?: boolean | null
           id?: string
+          max_db_a?: number | null
           med_dose?: string | null
           med_name?: string | null
           notes?: string | null
@@ -581,40 +581,28 @@ export type Database = {
           },
         ]
       }
-      routines: {
+      milestone_progress: {
         Row: {
+          achieved_at: string
           baby_id: string
-          created_at: string
           created_by: string | null
-          display_order: number
-          emoji: string | null
-          id: string
-          name: string
-          needs_duration: boolean
+          milestone_key: string
         }
         Insert: {
+          achieved_at?: string
           baby_id: string
-          created_at?: string
           created_by?: string | null
-          display_order?: number
-          emoji?: string | null
-          id?: string
-          name: string
-          needs_duration?: boolean
+          milestone_key: string
         }
         Update: {
+          achieved_at?: string
           baby_id?: string
-          created_at?: string
           created_by?: string | null
-          display_order?: number
-          emoji?: string | null
-          id?: string
-          name?: string
-          needs_duration?: boolean
+          milestone_key?: string
         }
         Relationships: [
           {
-            foreignKeyName: "routines_baby_id_fkey"
+            foreignKeyName: "milestone_progress_baby_id_fkey"
             columns: ["baby_id"]
             isOneToOne: false
             referencedRelation: "babies"
@@ -670,28 +658,40 @@ export type Database = {
           },
         ]
       }
-      milestone_progress: {
+      routines: {
         Row: {
-          achieved_at: string
           baby_id: string
+          created_at: string
           created_by: string | null
-          milestone_key: string
+          display_order: number
+          emoji: string | null
+          id: string
+          name: string
+          needs_duration: boolean
         }
         Insert: {
-          achieved_at?: string
           baby_id: string
+          created_at?: string
           created_by?: string | null
-          milestone_key: string
+          display_order?: number
+          emoji?: string | null
+          id?: string
+          name: string
+          needs_duration?: boolean
         }
         Update: {
-          achieved_at?: string
           baby_id?: string
+          created_at?: string
           created_by?: string | null
-          milestone_key?: string
+          display_order?: number
+          emoji?: string | null
+          id?: string
+          name?: string
+          needs_duration?: boolean
         }
         Relationships: [
           {
-            foreignKeyName: "milestone_progress_baby_id_fkey"
+            foreignKeyName: "routines_baby_id_fkey"
             columns: ["baby_id"]
             isOneToOne: false
             referencedRelation: "babies"
@@ -699,153 +699,169 @@ export type Database = {
           },
         ]
       }
-      wellness_entries: {
+      wellness_access_log: {
         Row: {
+          accessed_at: string
+          accessor_user_id: string
+          fields_returned: string
           id: string
-          user_id: string
-          household_id: string
-          subject_role: string
-          entry_type: string
-          entry_date: string
-          responses: Json
-          total_score: number | null
-          epds_q10_positive: boolean | null
-          crisis_acknowledged_at: string | null
-          created_at: string
-          updated_at: string
+          share_level_at_access: string
+          target_user_id: string
         }
         Insert: {
+          accessed_at?: string
+          accessor_user_id: string
+          fields_returned: string
           id?: string
-          user_id: string
-          household_id: string
-          subject_role: string
-          entry_type: string
-          entry_date: string
-          responses: Json
-          total_score?: number | null
-          epds_q10_positive?: boolean | null
-          crisis_acknowledged_at?: string | null
-          created_at?: string
-          updated_at?: string
+          share_level_at_access: string
+          target_user_id: string
         }
         Update: {
+          accessed_at?: string
+          accessor_user_id?: string
+          fields_returned?: string
           id?: string
-          user_id?: string
-          household_id?: string
-          subject_role?: string
-          entry_type?: string
-          entry_date?: string
-          responses?: Json
-          total_score?: number | null
-          epds_q10_positive?: boolean | null
-          crisis_acknowledged_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      wellness_shares: {
-        Row: {
-          id: string
-          owner_user_id: string
-          shared_with_user_id: string
-          share_level: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          owner_user_id: string
-          shared_with_user_id: string
-          share_level?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          owner_user_id?: string
-          shared_with_user_id?: string
-          share_level?: string
-          created_at?: string
-          updated_at?: string
+          share_level_at_access?: string
+          target_user_id?: string
         }
         Relationships: []
       }
       wellness_alert_preferences: {
         Row: {
-          user_id: string
           alert_partner_on_high_score: boolean
           alert_partner_on_q10_positive: boolean
           updated_at: string
-        }
-        Insert: {
           user_id: string
-          alert_partner_on_high_score?: boolean
-          alert_partner_on_q10_positive?: boolean
-          updated_at?: string
-        }
-        Update: {
-          user_id?: string
-          alert_partner_on_high_score?: boolean
-          alert_partner_on_q10_positive?: boolean
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      wellness_access_log: {
-        Row: {
-          id: string
-          accessor_user_id: string
-          target_user_id: string
-          share_level_at_access: string
-          fields_returned: string
-          accessed_at: string
         }
         Insert: {
-          id?: string
-          accessor_user_id: string
-          target_user_id: string
-          share_level_at_access: string
-          fields_returned: string
-          accessed_at?: string
+          alert_partner_on_high_score?: boolean
+          alert_partner_on_q10_positive?: boolean
+          updated_at?: string
+          user_id: string
         }
         Update: {
-          id?: string
-          accessor_user_id?: string
-          target_user_id?: string
-          share_level_at_access?: string
-          fields_returned?: string
-          accessed_at?: string
+          alert_partner_on_high_score?: boolean
+          alert_partner_on_q10_positive?: boolean
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
       wellness_alerts: {
         Row: {
+          acknowledged_at: string | null
+          alert_kind: string
+          created_at: string
           id: string
+          source_entry_id: string | null
           source_user_id: string
           target_user_id: string
-          source_entry_id: string | null
-          alert_kind: string
-          acknowledged_at: string | null
-          created_at: string
         }
         Insert: {
+          acknowledged_at?: string | null
+          alert_kind: string
+          created_at?: string
           id?: string
+          source_entry_id?: string | null
           source_user_id: string
           target_user_id: string
-          source_entry_id?: string | null
-          alert_kind: string
-          acknowledged_at?: string | null
-          created_at?: string
         }
         Update: {
+          acknowledged_at?: string | null
+          alert_kind?: string
+          created_at?: string
           id?: string
+          source_entry_id?: string | null
           source_user_id?: string
           target_user_id?: string
-          source_entry_id?: string | null
-          alert_kind?: string
-          acknowledged_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellness_alerts_source_entry_id_fkey"
+            columns: ["source_entry_id"]
+            isOneToOne: false
+            referencedRelation: "wellness_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wellness_entries: {
+        Row: {
+          created_at: string
+          crisis_acknowledged_at: string | null
+          entry_date: string
+          entry_type: string
+          epds_q10_positive: boolean | null
+          household_id: string
+          id: string
+          responses: Json
+          subject_role: string
+          total_score: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
           created_at?: string
+          crisis_acknowledged_at?: string | null
+          entry_date: string
+          entry_type: string
+          epds_q10_positive?: boolean | null
+          household_id: string
+          id?: string
+          responses: Json
+          subject_role: string
+          total_score?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          crisis_acknowledged_at?: string | null
+          entry_date?: string
+          entry_type?: string
+          epds_q10_positive?: boolean | null
+          household_id?: string
+          id?: string
+          responses?: Json
+          subject_role?: string
+          total_score?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellness_entries_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wellness_shares: {
+        Row: {
+          created_at: string
+          id: string
+          owner_user_id: string
+          share_level: string
+          shared_with_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_user_id: string
+          share_level?: string
+          shared_with_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_user_id?: string
+          share_level?: string
+          shared_with_user_id?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -861,6 +877,29 @@ export type Database = {
       create_household_with_owner: {
         Args: { household_name: string }
         Returns: string
+      }
+      get_invitation_preview: {
+        Args: { p_token: string }
+        Returns: {
+          accepted_at: string
+          expires_at: string
+          household_name: string
+          invited_email: string
+          role: string
+        }[]
+      }
+      get_partner_wellness: {
+        Args: { p_target_user_id: string }
+        Returns: {
+          entry_date: string
+          entry_id: string
+          entry_type: string
+          full_responses: Json
+          full_total_score: number
+          mood: number
+          score_band: string
+          subject_role: string
+        }[]
       }
       list_household_members: {
         Args: { h_id: string }
