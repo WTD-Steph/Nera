@@ -22,10 +22,21 @@ export default async function InvitePage({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    // Tidak login — arahkan ke signup. Kita tidak bisa lookup invitation.invited_email
-    // di sini (RLS blokir untuk anonymous), jadi user harus daftar email yang
-    // sama dengan yang diundang manual.
-    redirect(`/signup?next=${encodeURIComponent(`/invite/${token}`)}`);
+    // Tidak login — lookup invited_email via SECURITY DEFINER RPC supaya
+    // /signup bisa prefill. Token sendiri adalah capability (anyone yang
+    // punya = entitled tau email).
+    const { data: preview } = await supabase
+      .rpc("get_invitation_preview", { p_token: token })
+      .maybeSingle();
+    const previewRow = preview as
+      | { invited_email: string | null }
+      | null;
+    const prefillEmail = previewRow?.invited_email ?? "";
+    const params = new URLSearchParams({
+      next: `/invite/${token}`,
+      ...(prefillEmail ? { email: prefillEmail } : {}),
+    });
+    redirect(`/signup?${params.toString()}`);
   }
 
   // Lookup invitation. RLS allows kalau invited_email = auth.email ATAU
