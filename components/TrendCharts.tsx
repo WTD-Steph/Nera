@@ -424,7 +424,7 @@ export function TrendCharts({
         title="🍼 Interval Feeding"
         subtitle={
           feedingMedianMin != null
-            ? `Median ${formatHour(feedingMedianMin)} antar feeding`
+            ? `Median ${formatHour(feedingMedianMin)} antar sesi (feeding <1 jam digabung)`
             : "Belum cukup data"
         }
         unit="×"
@@ -448,9 +448,10 @@ export function TrendCharts({
           </BarChart>
         </ResponsiveContainer>
         <p className="mt-2 text-[11px] text-gray-500">
-          Newborn umumnya feeding tiap 2–4 jam (10–14× sehari). Interval
-          memendek = baby tumbuh, lebih sering minum. Memanjang = mulai
-          stretch interval saat siap.
+          Sesi feeding dalam jeda &lt;1 jam digabung jadi 1 sesi (cluster
+          feeding / fragmented log). Newborn umumnya feeding tiap 2–4 jam
+          (10–14× sehari). Interval memendek = baby tumbuh, lebih sering
+          minum. Memanjang = mulai stretch interval saat siap.
         </p>
       </ChartCard>
     </div>
