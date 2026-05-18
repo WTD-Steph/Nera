@@ -1,8 +1,10 @@
 // Server component (no client hooks needed). Renders narrative bullet
-// insights summarizing today's data with status indicators.
+// insights summarizing the past-24h rolling window with status indicators.
+// Past-24h (not calendar day) avoids the "jam 8 pagi → banner says jauh
+// dari target padahal masih awal hari" misleading.
 
 export type HighlightsData = {
-  // Today
+  // Past 24h rolling
   milkTotalMl: number;
   milkTargetMin: number;
   milkTargetMax: number;
@@ -65,7 +67,7 @@ function buildBullets(d: HighlightsData): { tone: Tone; text: string }[] {
           : "jauh dari target";
     bullets.push({
       tone,
-      text: `🍼 Susu hari ini ${d.milkTotalMl} ml (${d.bottleMl} botol + ≈${d.dbfEstimateMl} DBF) dari target ${d.milkTargetMin}–${d.milkTargetMax} ml — ${status}`,
+      text: `🍼 Susu 24 jam terakhir ${d.milkTotalMl} ml (${d.bottleMl} botol + ≈${d.dbfEstimateMl} DBF) dari target harian ${d.milkTargetMin}–${d.milkTargetMax} ml — ${status}`,
     });
   }
 
@@ -80,7 +82,7 @@ function buildBullets(d: HighlightsData): { tone: Tone; text: string }[] {
       pct >= 1 ? "cukup" : pct >= 0.6 ? "kurang sedikit" : "kurang banyak";
     bullets.push({
       tone,
-      text: `😴 Tidur ${fmtH(d.sleepMin)} dari target ${d.sleepTargetHoursMin}–${d.sleepTargetHoursMax} jam (${d.sleepCount} sesi${longest}) — ${status}`,
+      text: `😴 Tidur 24 jam terakhir ${fmtH(d.sleepMin)} dari target harian ${d.sleepTargetHoursMin}–${d.sleepTargetHoursMax} jam (${d.sleepCount} sesi${longest}) — ${status}`,
     });
   }
 
@@ -148,9 +150,9 @@ function buildBullets(d: HighlightsData): { tone: Tone; text: string }[] {
     const pct = Math.round((Math.abs(delta) / d.milk7dAvg) * 100);
     bullets.push({
       tone: "info",
-      text: `${sign} Susu hari ini ${pct}% ${
+      text: `${sign} Susu 24 jam terakhir ${pct}% ${
         delta > 0 ? "lebih banyak" : delta < 0 ? "lebih sedikit" : "sama"
-      } dari rata-rata 7 hari (${Math.round(d.milk7dAvg)} ml)`,
+      } dari rata-rata 7 hari sebelumnya (${Math.round(d.milk7dAvg)} ml)`,
     });
   }
 
@@ -163,7 +165,7 @@ export function TrendHighlights({ data }: { data: HighlightsData }) {
   return (
     <div className="space-y-2">
       <h2 className="px-1 text-sm font-semibold text-gray-700">
-        Highlights Hari Ini
+        Highlights 24 Jam Terakhir
       </h2>
       <div className="space-y-2">
         {bullets.map((b, i) => (
