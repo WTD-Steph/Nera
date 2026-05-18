@@ -148,6 +148,14 @@ export default async function TrendPage() {
     dayBoundaryMs.set(key, { start: startMs, end: endMs });
   }
 
+  // Cluster gap threshold: sessions within 2h dianggap satu sesi
+  // (mis. pumping bouts dengan jeda istirahat sebentar = realistis 1 sesi
+  // bukan 2). Clustered per calendar day — cross-midnight tetap dipisah
+  // mengikuti per-day chart bucketing.
+  const CLUSTER_GAP_MS = 120 * 60_000;
+  const lastPumpClusterEndByDay = new Map<string, number>();
+  const lastDbfClusterEndByDay = new Map<string, number>();
+
   for (const l of logsArray) {
     const key = dayKey(new Date(l.timestamp));
     const agg = dayIndex.get(key);
@@ -170,7 +178,18 @@ export default async function TrendPage() {
       }
       const dbfMin = (l.duration_l_min ?? 0) + (l.duration_r_min ?? 0);
       if (dbfMin > 0) {
-        agg.dbfSessions += 1;
+        // DBF cluster dedup: gap end-to-start <2h → same cluster
+        const sessionStartMs = new Date(l.timestamp).getTime();
+        const sessionEndMs = sessionStartMs + dbfMin * 60_000;
+        const prevEnd = lastDbfClusterEndByDay.get(key);
+        if (prevEnd === undefined || sessionStartMs - prevEnd >= CLUSTER_GAP_MS) {
+          agg.dbfSessions += 1;
+        }
+        lastDbfClusterEndByDay.set(
+          key,
+          Math.max(prevEnd ?? sessionEndMs, sessionEndMs),
+        );
+
         const est = dbfEstimateMl(dbfMin, logsArray, {
           fixedMlPerMin: baby.dbf_ml_per_min,
           pumpingMultiplier: baby.dbf_pumping_multiplier,
@@ -192,7 +211,19 @@ export default async function TrendPage() {
       agg.pumpMlL += lMl;
       agg.pumpMlR += rMl;
       agg.pumpMl += lMl + rMl;
-      agg.pumpSessions += 1;
+      // Pumping cluster dedup: gap end-to-start <2h → same cluster
+      const sessionStartMs = new Date(l.timestamp).getTime();
+      const sessionEndMs = l.end_timestamp
+        ? new Date(l.end_timestamp).getTime()
+        : sessionStartMs;
+      const prevEnd = lastPumpClusterEndByDay.get(key);
+      if (prevEnd === undefined || sessionStartMs - prevEnd >= CLUSTER_GAP_MS) {
+        agg.pumpSessions += 1;
+      }
+      lastPumpClusterEndByDay.set(
+        key,
+        Math.max(prevEnd ?? sessionEndMs, sessionEndMs),
+      );
     } else if (l.subtype === "diaper") {
       if (!agg) continue;
       if (l.has_pee) agg.peeCount += 1;
