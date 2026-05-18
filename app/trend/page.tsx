@@ -133,6 +133,8 @@ export default async function TrendPage() {
       pumpMl: 0,
       pumpMlL: 0,
       pumpMlR: 0,
+      pumpSessions: 0,
+      dbfSessions: 0,
       sleepMin: 0,
       peeCount: 0,
       poopCount: 0,
@@ -164,6 +166,7 @@ export default async function TrendPage() {
       }
       const dbfMin = (l.duration_l_min ?? 0) + (l.duration_r_min ?? 0);
       if (dbfMin > 0) {
+        agg.dbfSessions += 1;
         const est = dbfEstimateMl(dbfMin, logsArray, {
           fixedMlPerMin: baby.dbf_ml_per_min,
           pumpingMultiplier: baby.dbf_pumping_multiplier,
@@ -185,6 +188,7 @@ export default async function TrendPage() {
       agg.pumpMlL += lMl;
       agg.pumpMlR += rMl;
       agg.pumpMl += lMl + rMl;
+      agg.pumpSessions += 1;
     } else if (l.subtype === "diaper") {
       if (!agg) continue;
       if (l.has_pee) agg.peeCount += 1;
