@@ -278,7 +278,7 @@ export function TrendCharts({
 
       <ChartCard
         title="🧪 Sesi Pumping · avg per sesi"
-        subtitle="Bar = jumlah sesi · garis = rata-rata output per sesi"
+        subtitle="Sesi dengan jeda <2 jam digabung jadi 1 cluster"
         unit="× / ml"
         anchorId="pumping-sessions"
       >
@@ -342,7 +342,7 @@ export function TrendCharts({
 
       <ChartCard
         title="🤱 Frekuensi DBF / hari"
-        subtitle="Jumlah sesi direct breastfeeding"
+        subtitle="Sesi DBF dengan jeda <2 jam digabung jadi 1 cluster"
         unit="×"
         anchorId="dbf-freq"
       >
