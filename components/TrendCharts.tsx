@@ -27,6 +27,10 @@ export type DailyAgg = {
   pumpMl: number;
   pumpMlL: number;
   pumpMlR: number;
+  /** Jumlah sesi pumping (count of pumping logs) per hari. */
+  pumpSessions: number;
+  /** Jumlah sesi DBF (feeding logs dengan duration_l/r > 0) per hari. */
+  dbfSessions: number;
   sleepMin: number;
   peeCount: number;
   poopCount: number;
@@ -250,6 +254,113 @@ export function TrendCharts({
             { color: "#fbbf24", label: "Kanan" },
           ]}
         />
+      </ChartCard>
+
+      <ChartCard
+        title="💧 Total Pumping / hari"
+        subtitle="Output ASI gabungan (L + R)"
+        unit="ml"
+        anchorId="pumping-total"
+      >
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={daily} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+            <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
+            <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} />
+            <Tooltip
+              contentStyle={{ fontSize: 12, borderRadius: 8 }}
+              formatter={(v) => [`${v} ml`, "Total pumping"]}
+            />
+            <Bar dataKey="pumpMl" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartCard>
+
+      <ChartCard
+        title="🧪 Sesi Pumping · avg per sesi"
+        subtitle="Bar = jumlah sesi · garis = rata-rata output per sesi"
+        unit="× / ml"
+        anchorId="pumping-sessions"
+      >
+        <ResponsiveContainer width="100%" height={200}>
+          <ComposedChart
+            data={daily.map((d) => ({
+              ...d,
+              pumpAvgPerSession:
+                d.pumpSessions > 0
+                  ? Math.round(d.pumpMl / d.pumpSessions)
+                  : 0,
+            }))}
+            margin={{ top: 5, right: 8, left: -10, bottom: 5 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+            <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
+            <YAxis
+              yAxisId="count"
+              orientation="left"
+              tick={{ fontSize: 10, fill: "#9ca3af" }}
+              allowDecimals={false}
+            />
+            <YAxis
+              yAxisId="avg"
+              orientation="right"
+              tick={{ fontSize: 10, fill: "#9ca3af" }}
+            />
+            <Tooltip
+              contentStyle={{ fontSize: 12, borderRadius: 8 }}
+              formatter={(v, name) => {
+                if (name === "pumpSessions") return [`${v}×`, "Sesi"];
+                if (name === "pumpAvgPerSession")
+                  return [`${v} ml`, "Avg / sesi"];
+                return [String(v), String(name)];
+              }}
+            />
+            <Bar
+              yAxisId="count"
+              dataKey="pumpSessions"
+              fill="#fbbf24"
+              radius={[4, 4, 0, 0]}
+            />
+            <Line
+              yAxisId="avg"
+              type="monotone"
+              dataKey="pumpAvgPerSession"
+              stroke="#b45309"
+              strokeWidth={2}
+              dot={{ r: 3, fill: "#b45309" }}
+              isAnimationActive={false}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+        <Legend
+          items={[
+            { color: "#fbbf24", label: "Jumlah sesi (kiri)" },
+            { color: "#b45309", label: "Avg ml/sesi (kanan)", style: "line" },
+          ]}
+        />
+      </ChartCard>
+
+      <ChartCard
+        title="🤱 Frekuensi DBF / hari"
+        subtitle="Jumlah sesi direct breastfeeding"
+        unit="×"
+        anchorId="dbf-freq"
+      >
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={daily} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+            <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
+            <YAxis
+              tick={{ fontSize: 10, fill: "#9ca3af" }}
+              allowDecimals={false}
+            />
+            <Tooltip
+              contentStyle={{ fontSize: 12, borderRadius: 8 }}
+              formatter={(v) => [`${v}×`, "Sesi DBF"]}
+            />
+            <Bar dataKey="dbfSessions" fill={ROSE} radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
       </ChartCard>
 
       <ChartCard
