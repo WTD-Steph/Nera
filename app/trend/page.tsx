@@ -300,10 +300,12 @@ export default async function TrendPage() {
 
   // === Feeding interval histogram ===
   // Cluster-feeding dedup: feedings within CLUSTER_DEDUP_MIN of each other
-  // count as one session (e.g. ASI bottle + sufor top-up at same time).
-  // Without this, the "<1 jam" bucket gets inflated by data-entry artifacts
-  // and the median collapses unrealistically low.
-  const CLUSTER_DEDUP_MIN = 5;
+  // count as one session. 60 min: covers both data-entry artifacts (ASI
+  // bottle + sufor top-up logged separately) and tight cluster-feeding
+  // bouts (real feed-rest-feed within an hour). Tanpa ini, histogram
+  // bucket "<1 jam" dominant + median collapses unrealistically rendah.
+  // AAP newborn guideline: 10–14× sehari → interval typical 1.7–2.4 jam.
+  const CLUSTER_DEDUP_MIN = 60;
   const feedingsRaw = logsArray
     .filter((l) => l.subtype === "feeding")
     .map((l) => new Date(l.timestamp).getTime())
