@@ -82,6 +82,33 @@ export default async function TrendPage() {
 
   const logsArray: LogRow[] = (logs ?? []) as LogRow[];
 
+  // === Historical weight lookup for dynamic milk target ===
+  // Sebelumnya milkTarget computed pakai baby.birth_weight_kg konstan,
+  // jadi line target statis sepanjang 14 hari walaupun bayi tumbuh.
+  // Sekarang ambil growth_measurements untuk lookup berat per hari:
+  // pakai measurement terakhir <= chart day, fallback ke birth weight.
+  const { data: growthRows } = await supabase
+    .from("growth_measurements")
+    .select("measured_at, weight_kg")
+    .eq("baby_id", baby.id)
+    .order("measured_at", { ascending: true });
+  const growthSamples: Array<{ ts: number; weightKg: number }> = (
+    growthRows ?? []
+  ).map((g) => ({
+    ts: new Date(g.measured_at).getTime(),
+    weightKg: Number(g.weight_kg),
+  }));
+  const birthWeightKg = baby.birth_weight_kg ? Number(baby.birth_weight_kg) : null;
+  function weightAt(timestampMs: number): number | null {
+    // Find last measurement <= timestampMs. growthSamples sorted ascending.
+    let best: number | null = birthWeightKg;
+    for (const s of growthSamples) {
+      if (s.ts <= timestampMs && s.weightKg > 0) best = s.weightKg;
+      else if (s.ts > timestampMs) break;
+    }
+    return best;
+  }
+
   // === Per-day target lookup based on baby's age at each date ===
   // Age changes day by day across the 14-day window, so target ranges
   // shift accordingly. For dates before birth → target = null.
@@ -110,12 +137,9 @@ export default async function TrendPage() {
     // Baby's age (in days) at this date
     const ageDays = Math.floor((startMs - dobMs) / 86400000);
     const target = getTargetByAgeDays(ageDays);
-    // For milk target, use weight-aware calc when birth_weight_kg known.
-    // For the trend view we use birth_weight_kg as fallback (per-day weight
-    // would need historical growth data — overkill for v1).
-    const weightKg = baby.birth_weight_kg
-      ? Number(baby.birth_weight_kg)
-      : null;
+    // Per-day weight: lookup most recent growth measurement <= today,
+    // fallback ke birth weight. Bikin target line naik seiring bayi tumbuh.
+    const weightKg = weightAt(startMs);
     const milkTarget =
       target != null && weightKg != null && weightKg > 0
         ? computeMilkTarget(target, weightKg)

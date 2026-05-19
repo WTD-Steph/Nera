@@ -6,6 +6,7 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
+  LabelList,
   Line,
   ReferenceLine,
   ResponsiveContainer,
@@ -110,8 +111,8 @@ export function TrendCharts({
         unit="ml"
         anchorId="susu"
       >
-        <ResponsiveContainer width="100%" height={200}>
-          <ComposedChart data={daily} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
+        <ResponsiveContainer width="100%" height={220}>
+          <ComposedChart data={daily} margin={{ top: 18, right: 8, left: -10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
             <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
             <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} />
@@ -132,7 +133,17 @@ export function TrendCharts({
               }}
             />
             <Bar dataKey="suforMl" stackId="m" fill={AMBER} />
-            <Bar dataKey="asiMl" stackId="m" fill={ROSE} />
+            <Bar dataKey="asiMl" stackId="m" fill={ROSE}>
+              <LabelList
+                dataKey="milkTotalMl"
+                position="top"
+                style={{ fontSize: 9, fill: "#374151", fontWeight: 600 }}
+                formatter={(v) => {
+                  const n = typeof v === "number" ? v : Number(v ?? 0);
+                  return n > 0 ? String(n) : "";
+                }}
+              />
+            </Bar>
             <Line
               type="stepAfter"
               dataKey="milkTargetMin"
