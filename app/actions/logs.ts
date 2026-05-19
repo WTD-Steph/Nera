@@ -8,6 +8,7 @@ import { getCurrentBaby } from "@/lib/household/baby";
 import { dbfEstimateMl } from "@/lib/compute/dbf-estimate";
 import type { LogRow } from "@/lib/compute/stats";
 import { asiSpilledMl } from "@/lib/compute/spillage";
+import { parseDecimal } from "@/lib/utils/parse";
 
 const SUBTYPES = [
   "feeding",
@@ -45,10 +46,7 @@ function computeEndIso(
 }
 
 function num(formData: FormData, key: string): number | null {
-  const raw = String(formData.get(key) ?? "").trim();
-  if (raw === "") return null;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : null;
+  return parseDecimal(formData.get(key) as string | null);
 }
 
 function str(formData: FormData, key: string): string | null {

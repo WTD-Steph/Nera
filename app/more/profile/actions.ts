@@ -4,27 +4,26 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBaby } from "@/lib/household/baby";
+import { parseDecimal } from "@/lib/utils/parse";
 
 export async function updateBabyAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const gender = String(formData.get("gender") ?? "");
   const dob = String(formData.get("dob") ?? "");
-  const birthWeight = parseFloat(String(formData.get("birth_weight_kg") ?? ""));
-  const birthHeight = parseFloat(String(formData.get("birth_height_cm") ?? ""));
+  const birthWeight = parseDecimal(formData.get("birth_weight_kg") as string | null) ?? NaN;
+  const birthHeight = parseDecimal(formData.get("birth_height_cm") as string | null) ?? NaN;
   // DBF estimate mode picker: 'auto' | 'multiplier' | 'fixed'. Only the
   // value matching the chosen mode is persisted; others are nulled so
   // priority chain in dbfEstimateMl resolves cleanly.
   const dbfMode = String(formData.get("dbf_estimate_mode") ?? "auto");
-  const dbfFixedRaw = String(formData.get("dbf_ml_per_min") ?? "").trim();
-  const dbfMultRaw = String(
-    formData.get("dbf_pumping_multiplier") ?? "",
-  ).trim();
   const dbfFixed =
-    dbfMode === "fixed" && dbfFixedRaw !== "" ? parseFloat(dbfFixedRaw) : null;
+    dbfMode === "fixed"
+      ? parseDecimal(formData.get("dbf_ml_per_min") as string | null)
+      : null;
   const dbfMult =
-    dbfMode === "multiplier" && dbfMultRaw !== ""
-      ? parseFloat(dbfMultRaw)
+    dbfMode === "multiplier"
+      ? parseDecimal(formData.get("dbf_pumping_multiplier") as string | null)
       : null;
 
   if (!id) redirect("/more/profile");

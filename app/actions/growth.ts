@@ -5,12 +5,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser } from "@/lib/auth/cached";
 import { getCurrentBaby } from "@/lib/household/baby";
+import { parseDecimal } from "@/lib/utils/parse";
 
 function num(formData: FormData, key: string): number | null {
-  const raw = String(formData.get(key) ?? "").trim();
-  if (raw === "") return null;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : null;
+  return parseDecimal(formData.get(key) as string | null);
 }
 
 function isoOrNull(formData: FormData, key: string): string | null {
