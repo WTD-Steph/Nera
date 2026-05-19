@@ -150,6 +150,7 @@ export default async function TrendPage() {
       date: key,
       short: shortLabel(d.toISOString()),
       suforMl: 0,
+      asiBottleMl: 0,
       asiMl: 0,
       bottleMl: 0,
       dbfEstimateMl: 0,
@@ -160,6 +161,10 @@ export default async function TrendPage() {
       pumpSessions: 0,
       dbfSessions: 0,
       sleepMin: 0,
+      sleepMinNyenyak: 0,
+      sleepMinGelisah: 0,
+      sleepMinSeringBangun: 0,
+      sleepMinUnknown: 0,
       peeCount: 0,
       poopCount: 0,
       milkTargetMin: milkTarget ? milkTarget.min : null,
@@ -191,10 +196,14 @@ export default async function TrendPage() {
         // amount_sufor_ml saat tersedia (mix mode + new rows). Fallback ke
         // bottle_content untuk legacy rows yang belum punya breakdown.
         // Tanpa cek breakdown, sesi mix akan masuk 100% ke Sufor.
+        // asiBottleMl di-track terpisah supaya chart bisa stack DBF
+        // sebagai warna sendiri (asiMl = asiBottle + dbfEstimate).
         if (l.amount_asi_ml != null || l.amount_sufor_ml != null) {
+          agg.asiBottleMl += l.amount_asi_ml ?? 0;
           agg.asiMl += l.amount_asi_ml ?? 0;
           agg.suforMl += l.amount_sufor_ml ?? 0;
         } else if (l.bottle_content === "asi") {
+          agg.asiBottleMl += l.amount_ml;
           agg.asiMl += l.amount_ml;
         } else {
           agg.suforMl += l.amount_ml;
@@ -256,9 +265,11 @@ export default async function TrendPage() {
       // Cross-day split: distribute minutes to each day's bucket based on
       // overlap with [dayStart, dayEnd]. Sleep that crosses midnight gets
       // its actual time-on-each-day counted, not lumped to the start day.
+      // Bucket per sleep_quality supaya chart bisa stack quality breakdown.
       const startMs = new Date(l.timestamp).getTime();
       const endMs = new Date(l.end_timestamp).getTime();
       if (endMs <= startMs) continue;
+      const quality = l.sleep_quality ?? null;
       for (const d of days) {
         const b = dayBoundaryMs.get(d.date);
         if (!b) continue;
@@ -266,7 +277,14 @@ export default async function TrendPage() {
           0,
           Math.min(endMs, b.end) - Math.max(startMs, b.start),
         );
-        if (overlap > 0) d.sleepMin += overlap / 60000;
+        if (overlap > 0) {
+          const min = overlap / 60000;
+          d.sleepMin += min;
+          if (quality === "nyenyak") d.sleepMinNyenyak += min;
+          else if (quality === "gelisah") d.sleepMinGelisah += min;
+          else if (quality === "sering_bangun") d.sleepMinSeringBangun += min;
+          else d.sleepMinUnknown += min;
+        }
       }
     }
   }
@@ -275,6 +293,7 @@ export default async function TrendPage() {
   for (const d of days) {
     d.bottleMl = Math.round(d.bottleMl);
     d.suforMl = Math.round(d.suforMl);
+    d.asiBottleMl = Math.round(d.asiBottleMl);
     d.asiMl = Math.round(d.asiMl);
     d.pumpMlL = Math.round(d.pumpMlL);
     d.pumpMlR = Math.round(d.pumpMlR);
@@ -282,6 +301,10 @@ export default async function TrendPage() {
     d.milkTotalMl = d.bottleMl + d.dbfEstimateMl;
     d.pumpMl = Math.round(d.pumpMl);
     d.sleepMin = Math.round(d.sleepMin);
+    d.sleepMinNyenyak = Math.round(d.sleepMinNyenyak);
+    d.sleepMinGelisah = Math.round(d.sleepMinGelisah);
+    d.sleepMinSeringBangun = Math.round(d.sleepMinSeringBangun);
+    d.sleepMinUnknown = Math.round(d.sleepMinUnknown);
   }
 
   // === Sleep heatmap: 14 days × 24 hours, minutes per hour bucket ===

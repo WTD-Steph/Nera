@@ -20,7 +20,11 @@ export type DailyAgg = {
   short: string;
   /** Sufor (formula) bottle ml. */
   suforMl: number;
-  /** ASI total: bottle ASI + DBF estimate (semua breastmilk). */
+  /** ASI bottle ml only (NOT including DBF estimate). Separated from DBF
+   * supaya bisa di-stack berbeda warna di chart Susu. */
+  asiBottleMl: number;
+  /** ASI total: bottle ASI + DBF estimate (semua breastmilk). Dipertahankan
+   * untuk backward compat + total label di chart. */
   asiMl: number;
   bottleMl: number;
   dbfEstimateMl: number;
@@ -33,6 +37,11 @@ export type DailyAgg = {
   /** Jumlah sesi DBF (feeding logs dengan duration_l/r > 0) per hari. */
   dbfSessions: number;
   sleepMin: number;
+  /** Sleep min per quality bucket. Sesi tanpa quality tracked → null. */
+  sleepMinNyenyak: number;
+  sleepMinGelisah: number;
+  sleepMinSeringBangun: number;
+  sleepMinUnknown: number;
   peeCount: number;
   poopCount: number;
   /** Per-day target milk range — varies as baby ages over 14 days. */
@@ -97,10 +106,14 @@ export function TrendCharts({
     );
   }
 
-  // Sleep in hours for nicer y-axis
+  // Sleep in hours for nicer y-axis + per-quality breakdown for stack
   const sleepHoursData = daily.map((d) => ({
     ...d,
     sleepHours: +(d.sleepMin / 60).toFixed(1),
+    sleepHoursNyenyak: +(d.sleepMinNyenyak / 60).toFixed(1),
+    sleepHoursGelisah: +(d.sleepMinGelisah / 60).toFixed(1),
+    sleepHoursSeringBangun: +(d.sleepMinSeringBangun / 60).toFixed(1),
+    sleepHoursUnknown: +(d.sleepMinUnknown / 60).toFixed(1),
   }));
 
   return (
@@ -122,18 +135,21 @@ export function TrendCharts({
                 const label =
                   name === "suforMl"
                     ? "Sufor"
-                    : name === "asiMl"
-                      ? "ASI (botol + DBF)"
-                      : name === "milkTargetMin"
-                        ? "Target min"
-                        : name === "milkTargetMax"
-                          ? "Target max"
-                          : String(name);
+                    : name === "asiBottleMl"
+                      ? "ASI botol"
+                      : name === "dbfEstimateMl"
+                        ? "DBF (estimasi)"
+                        : name === "milkTargetMin"
+                          ? "Target min"
+                          : name === "milkTargetMax"
+                            ? "Target max"
+                            : String(name);
                 return [`${v} ml`, label];
               }}
             />
             <Bar dataKey="suforMl" stackId="m" fill={AMBER} />
-            <Bar dataKey="asiMl" stackId="m" fill={ROSE}>
+            <Bar dataKey="asiBottleMl" stackId="m" fill={ROSE} />
+            <Bar dataKey="dbfEstimateMl" stackId="m" fill={ROSE_LIGHT}>
               <LabelList
                 dataKey="milkTotalMl"
                 position="top"
@@ -171,8 +187,9 @@ export function TrendCharts({
         </ResponsiveContainer>
         <Legend
           items={[
-            { color: ROSE, label: "ASI (botol + DBF)" },
             { color: AMBER, label: "Sufor" },
+            { color: ROSE, label: "ASI botol" },
+            { color: ROSE_LIGHT, label: "DBF (estimasi)" },
             { color: EMERALD, label: "Target min/max (per usia)", style: "line" },
           ]}
         />
@@ -180,7 +197,7 @@ export function TrendCharts({
 
       <ChartCard
         title="😴 Tidur / hari"
-        subtitle="Target naik seiring usia · cross-day di-split"
+        subtitle="Stack by quality · cross-day di-split · target naik seiring usia"
         unit="jam"
         anchorId="tidur"
       >
@@ -196,17 +213,26 @@ export function TrendCharts({
               contentStyle={{ fontSize: 12, borderRadius: 8 }}
               formatter={(v, name) => {
                 const label =
-                  name === "sleepHours"
-                    ? "Tidur"
-                    : name === "sleepHoursMin"
-                      ? "Target min"
-                      : name === "sleepHoursMax"
-                        ? "Target max"
-                        : String(name);
+                  name === "sleepHoursNyenyak"
+                    ? "Nyenyak"
+                    : name === "sleepHoursGelisah"
+                      ? "Gelisah"
+                      : name === "sleepHoursSeringBangun"
+                        ? "Sering bangun"
+                        : name === "sleepHoursUnknown"
+                          ? "Tidak dicatat"
+                          : name === "sleepHoursMin"
+                            ? "Target min"
+                            : name === "sleepHoursMax"
+                              ? "Target max"
+                              : String(name);
                 return [`${v} jam`, label];
               }}
             />
-            <Bar dataKey="sleepHours" fill={SKY} radius={[4, 4, 0, 0]} />
+            <Bar dataKey="sleepHoursNyenyak" stackId="s" fill={EMERALD} />
+            <Bar dataKey="sleepHoursGelisah" stackId="s" fill={AMBER} />
+            <Bar dataKey="sleepHoursSeringBangun" stackId="s" fill="#ef4444" />
+            <Bar dataKey="sleepHoursUnknown" stackId="s" fill="#9ca3af" />
             <Line
               type="stepAfter"
               dataKey="sleepHoursMin"
@@ -230,6 +256,14 @@ export function TrendCharts({
             />
           </ComposedChart>
         </ResponsiveContainer>
+        <Legend
+          items={[
+            { color: EMERALD, label: "Nyenyak" },
+            { color: AMBER, label: "Gelisah" },
+            { color: "#ef4444", label: "Sering bangun" },
+            { color: "#9ca3af", label: "Tidak dicatat" },
+          ]}
+        />
       </ChartCard>
 
       <ChartCard
