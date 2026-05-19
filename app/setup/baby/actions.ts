@@ -3,13 +3,14 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHousehold } from "@/lib/household/current";
+import { parseDecimal } from "@/lib/utils/parse";
 
 export async function createBabyAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const gender = String(formData.get("gender") ?? "");
   const dob = String(formData.get("dob") ?? "");
-  const birthWeight = parseFloat(String(formData.get("birth_weight_kg") ?? ""));
-  const birthHeight = parseFloat(String(formData.get("birth_height_cm") ?? ""));
+  const birthWeight = parseDecimal(formData.get("birth_weight_kg") as string | null) ?? NaN;
+  const birthHeight = parseDecimal(formData.get("birth_height_cm") as string | null) ?? NaN;
 
   if (!name) {
     redirect(`/setup/baby?error=${encodeURIComponent("Nama bayi harus diisi.")}`);
