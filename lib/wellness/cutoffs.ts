@@ -1,19 +1,41 @@
 // EPDS score band cutoffs — role-aware.
 //
-// Maternal (Indonesian validation per Hutauruk 2012):
-//   0-9: low — no indication
-//   10-12: mid — possible mild depression, repeat in 2 weeks
-//   ≥13: high — probable depression, clinical assessment indicated
+// === MATERNAL ===
+// Hybrid threshold structure:
+//   0-9:  low   — clearly negative
+//   10-12: mid  — "possible mild depression", repeat skrining in 2 weeks
+//   ≥13:  high — "probable major depression", clinical assessment indicated
 //
-// Paternal (per Mughal et al. Heliyon 2022 meta-analysis + applying
-// two-points-lower rule to Indonesian maternal cutoff 12/13):
-//   0-9: low
+// Provenance:
+// - Lower bound 10 = international Cox 1987 convention for "possible
+//   depression" screening positive. NOT from Indonesian validation.
+// - Upper bound 13 = Hutauruk 2012 Indonesian-validated cutoff for
+//   "probable major depression" (sens 92%, spec 86% on Indonesian
+//   postpartum sample). Hutauruk specifically validated ONE threshold
+//   (≥13); the 10-12 "mid" band is appended from international guidance
+//   to surface borderline cases for repeat skrining.
+//
+// === PATERNAL ===
+// Threshold structure:
+//   0-9:  low
 //   10-11: mid
-//   ≥12: high
+//   ≥12:  high
 //
-// Note: paternal cutoff 5/6 (Matthey 2001) NOT used — that derived from
-// Australian sample with maternal 9/10. Applied to Indonesian maternal
-// 12/13, two-points-lower correctly gives 10/12.
+// Provenance:
+// - No Indonesian paternal EPDS validation exists. Cutoff derived from
+//   Mughal et al. Heliyon 2022 meta-analysis (7 studies, 2393 fathers)
+//   which surveyed published paternal cutoffs ranging 5/6 to 10/11 with
+//   no single canonical recommendation.
+// - Current ≥12 chosen as CONSERVATIVE option:
+//   * Strict "-2 from maternal probable (13)" would give ≥11 — more
+//     sensitive but more false alarms.
+//   * Current ≥12 is "-1 from maternal" — fewer false alarms (higher
+//     specificity), but may miss some borderline fathers.
+// - Trade-off accept: prefer false negatives over false alarms given:
+//   (a) no Indonesian paternal validation to anchor sensitivity claim;
+//   (b) crisis pathway (Q10>0) is orthogonal — still catches acute risk.
+// - Matthey 2001 cutoff 5/6 NOT used: derived from Australian sample
+//   with maternal 9/10, doesn't translate directly to Indonesian 12/13.
 
 export type Role = "mother" | "father";
 export type Band = "low" | "mid" | "high";
