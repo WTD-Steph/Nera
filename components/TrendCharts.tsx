@@ -36,6 +36,9 @@ export type DailyAgg = {
   pumpSessions: number;
   /** Jumlah sesi DBF (feeding logs dengan duration_l/r > 0) per hari. */
   dbfSessions: number;
+  /** Jumlah sesi feeding total per hari, dengan cluster-dedup 60 min
+   * (feeding <1 jam dianggap satu sesi). Mencakup bottle + DBF. */
+  feedingSessions: number;
   sleepMin: number;
   /** Sleep min per quality bucket. Sesi tanpa quality tracked → null. */
   sleepMinNyenyak: number;
@@ -299,6 +302,42 @@ export function TrendCharts({
             { color: "#fbbf24", label: "Kanan" },
           ]}
         />
+      </ChartCard>
+
+      <ChartCard
+        title="🍼 Sesi Feeding / hari"
+        subtitle="Feeding dalam jeda <1 jam digabung jadi 1 sesi (cluster-feeding aware)"
+        unit="×"
+        anchorId="feeding-sessions"
+      >
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={daily} margin={{ top: 18, right: 8, left: -10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+            <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
+            <YAxis
+              tick={{ fontSize: 10, fill: "#9ca3af" }}
+              allowDecimals={false}
+            />
+            <Tooltip
+              contentStyle={{ fontSize: 12, borderRadius: 8 }}
+              formatter={(v) => [`${v}× sesi`, "Feeding"]}
+            />
+            <Bar dataKey="feedingSessions" fill={ROSE} radius={[4, 4, 0, 0]}>
+              <LabelList
+                dataKey="feedingSessions"
+                position="top"
+                style={{ fontSize: 9, fill: "#374151", fontWeight: 600 }}
+                formatter={(v) => {
+                  const n = typeof v === "number" ? v : Number(v ?? 0);
+                  return n > 0 ? String(n) : "";
+                }}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+        <p className="mt-2 text-[11px] text-gray-500">
+          AAP guideline newborn: 8–12× sehari per cluster (interval 2–4 jam).
+        </p>
       </ChartCard>
 
       <ChartCard

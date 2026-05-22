@@ -160,6 +160,7 @@ export default async function TrendPage() {
       pumpMlR: 0,
       pumpSessions: 0,
       dbfSessions: 0,
+      feedingSessions: 0,
       sleepMin: 0,
       sleepMinNyenyak: 0,
       sleepMinGelisah: 0,
@@ -363,6 +364,12 @@ export default async function TrendPage() {
     if (last === undefined || (t - last) / 60000 >= CLUSTER_DEDUP_MIN) {
       feedings.push(t);
     }
+  }
+  // Bucket clustered feeding timestamps per day → feedingSessions count
+  for (const t of feedings) {
+    const key = dayKey(new Date(t));
+    const agg = dayIndex.get(key);
+    if (agg) agg.feedingSessions += 1;
   }
   const intervals: number[] = [];
   for (let i = 1; i < feedings.length; i++) {
