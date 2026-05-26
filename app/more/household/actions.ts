@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentHousehold } from "@/lib/household/current";
 import { createInvitation, type InviteRole } from "@/lib/household/invite";
+import { ACTIVE_HOUSEHOLD_COOKIE } from "@/lib/household/current";
 
 export async function inviteMemberAction(formData: FormData) {
   const email = String(formData.get("email") ?? "");
@@ -88,6 +90,61 @@ export async function removeMemberAction(formData: FormData) {
   redirect("/more/household");
 }
 
+/**
+ * Switch active household. Sets cookie + revalidates app-wide so all
+ * pages re-render dengan household yang dipilih.
+ *
+ * Verifies user is member of the target household sebelum set cookie —
+ * mencegah user "set" cookie ke household sembarangan (defense in depth;
+ * RLS juga blokir tapi cleaner kalau invalid cookie tidak persisted).
+ */
+export async function setActiveHouseholdAction(formData: FormData) {
+  const householdId = String(formData.get("household_id") ?? "");
+  if (!householdId) {
+    redirect(
+      `/more/household?error=${encodeURIComponent("Household ID tidak valid.")}`,
+    );
+  }
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  // Verify membership before setting cookie
+  const { data: membership } = await supabase
+    .from("household_members")
+    .select("household_id")
+    .eq("user_id", user.id)
+    .eq("household_id", householdId)
+    .maybeSingle();
+  if (!membership) {
+    redirect(
+      `/more/household?error=${encodeURIComponent("Anda bukan member household tersebut.")}`,
+    );
+  }
+
+  cookies().set(ACTIVE_HOUSEHOLD_COOKIE, householdId, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 90, // 90 days
+  });
+
+  revalidatePath("/", "layout");
+  redirect("/");
+}
+
+/**
+ * Clear active household selection. App falls back ke oldest joined.
+ */
+export async function clearActiveHouseholdAction() {
+  cookies().delete(ACTIVE_HOUSEHOLD_COOKIE);
+  revalidatePath("/", "layout");
+  redirect("/more/household");
+}
+
 export async function leaveHouseholdAction(formData: FormData) {
   const householdId = String(formData.get("household_id") ?? "");
   if (!householdId) {
@@ -114,6 +171,13 @@ export async function leaveHouseholdAction(formData: FormData) {
     );
   }
 
-  // Setelah leave, user mungkin tidak punya household lagi → /setup
+  // Kalau active household cookie pointing ke yang baru di-leave, clear
+  // supaya next request fall back ke oldest yang masih remaining.
+  const cookieStore = cookies();
+  if (cookieStore.get(ACTIVE_HOUSEHOLD_COOKIE)?.value === householdId) {
+    cookieStore.delete(ACTIVE_HOUSEHOLD_COOKIE);
+  }
+
+  revalidatePath("/", "layout");
   redirect("/");
 }

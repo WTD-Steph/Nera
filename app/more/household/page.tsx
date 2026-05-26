@@ -9,6 +9,7 @@ import {
   revokeInvitationAction,
   removeMemberAction,
   leaveHouseholdAction,
+  setActiveHouseholdAction,
 } from "./actions";
 
 type SearchParams = {
@@ -35,6 +36,15 @@ export default async function HouseholdPage({
   const { data: members } = await supabase.rpc("list_household_members", {
     h_id: current.household_id,
   });
+
+  // List all households user is member of, untuk household switcher UI.
+  // household_members RLS = self-only SELECT → returns own rows.
+  // households RLS = visible kalau user adalah member → JOIN works.
+  const { data: myHouseholds } = await supabase
+    .from("household_members")
+    .select("household_id, role, joined_at, households(name)")
+    .eq("user_id", user.id)
+    .order("joined_at", { ascending: true });
 
   // Pending invitations (RLS: owner sees all, non-owner sees own)
   const { data: invitations } = await supabase
@@ -91,6 +101,67 @@ export default async function HouseholdPage({
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
           {error}
         </p>
+      ) : null}
+
+      {/* Household switcher — visible kalau user member di >1 household */}
+      {myHouseholds && myHouseholds.length > 1 ? (
+        <section className="mt-5">
+          <h2 className="mb-2 px-1 text-sm font-semibold text-gray-700">
+            Switch keluarga ({myHouseholds.length})
+          </h2>
+          <p className="mb-2 px-1 text-[11px] text-gray-500">
+            Anda member di beberapa keluarga. Pilih yang aktif — semua data
+            (logs, wellness, trend, dll) akan ikut household terpilih.
+          </p>
+          <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+            {myHouseholds.map((m) => {
+              const hname =
+                (m.households as { name: string } | null)?.name ??
+                `Household ${m.household_id.slice(0, 8)}`;
+              const isActive = m.household_id === current.household_id;
+              return (
+                <div
+                  key={m.household_id}
+                  className={`flex items-center justify-between border-b border-gray-50 px-4 py-3 last:border-b-0 ${
+                    isActive ? "bg-rose-50/40" : ""
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-gray-800">
+                      {isActive ? "● " : "○ "}
+                      {hname}
+                    </div>
+                    <div className="text-[11px] text-gray-400">
+                      {m.role === "owner" ? "Owner" : "Member"} · bergabung{" "}
+                      {new Date(m.joined_at).toLocaleDateString("id-ID", {
+                        timeZone: "Asia/Jakarta",
+                      })}
+                    </div>
+                  </div>
+                  {isActive ? (
+                    <span className="text-[11px] font-semibold text-rose-600">
+                      Aktif
+                    </span>
+                  ) : (
+                    <form action={setActiveHouseholdAction}>
+                      <input
+                        type="hidden"
+                        name="household_id"
+                        value={m.household_id}
+                      />
+                      <SubmitButton
+                        pendingText="…"
+                        className="rounded-xl bg-rose-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-rose-600"
+                      >
+                        Aktifkan
+                      </SubmitButton>
+                    </form>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
       ) : null}
 
       {/* Members */}
