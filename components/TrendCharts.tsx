@@ -28,6 +28,9 @@ export type DailyAgg = {
   asiMl: number;
   bottleMl: number;
   dbfEstimateMl: number;
+  /** DBF estimate per sisi, di-split proportional to duration_l/r. */
+  dbfEstimateMlL: number;
+  dbfEstimateMlR: number;
   milkTotalMl: number;
   pumpMl: number;
   pumpMlL: number;
@@ -101,6 +104,7 @@ export function TrendCharts({
   feedingIntervals: FeedingIntervalBucket[];
   feedingMedianMin: number | null;
 }) {
+  void SKY;
   if (daily.length === 0) {
     return (
       <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center text-sm text-gray-400 shadow-sm">
@@ -119,426 +123,507 @@ export function TrendCharts({
     sleepHoursUnknown: +(d.sleepMinUnknown / 60).toFixed(1),
   }));
 
-  return (
-    <div className="space-y-4">
-      <ChartCard
-        title="🍼 Susu / hari"
-        subtitle="Target naik seiring usia bayi"
-        unit="ml"
-        anchorId="susu"
-      >
-        <ResponsiveContainer width="100%" height={220}>
-          <ComposedChart data={daily} margin={{ top: 18, right: 8, left: -10, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              formatter={(v, name) => {
-                const label =
-                  name === "suforMl"
-                    ? "Sufor"
-                    : name === "asiBottleMl"
-                      ? "ASI botol"
-                      : name === "dbfEstimateMl"
-                        ? "DBF (estimasi)"
-                        : name === "milkTargetMin"
+  // ─── Chart elements as variables, declared in order of usage ────────
+
+  const chartSusu = (
+    <ChartCard
+      title="🍼 Susu / hari"
+      subtitle="Total intake = Sufor + ASI botol + DBF (estimasi). Target line naik per umur + berat."
+      unit="ml"
+      anchorId="susu"
+    >
+      <ResponsiveContainer width="100%" height={220}>
+        <ComposedChart data={daily} margin={{ top: 18, right: 8, left: -10, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
+          <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            formatter={(v, name) => {
+              const label =
+                name === "suforMl"
+                  ? "Sufor"
+                  : name === "asiBottleMl"
+                    ? "ASI botol"
+                    : name === "dbfEstimateMl"
+                      ? "DBF (estimasi)"
+                      : name === "milkTargetMin"
+                        ? "Target min"
+                        : name === "milkTargetMax"
+                          ? "Target max"
+                          : String(name);
+              return [`${v} ml`, label];
+            }}
+          />
+          <Bar dataKey="suforMl" stackId="m" fill={AMBER} />
+          <Bar dataKey="asiBottleMl" stackId="m" fill={ROSE} />
+          <Bar dataKey="dbfEstimateMl" stackId="m" fill={ROSE_LIGHT}>
+            <LabelList
+              dataKey="milkTotalMl"
+              position="top"
+              style={{ fontSize: 9, fill: "#374151", fontWeight: 600 }}
+              formatter={(v) => {
+                const n = typeof v === "number" ? v : Number(v ?? 0);
+                return n > 0 ? String(n) : "";
+              }}
+            />
+          </Bar>
+          <Line
+            type="stepAfter"
+            dataKey="milkTargetMin"
+            stroke={EMERALD}
+            strokeDasharray="4 3"
+            strokeWidth={1.5}
+            dot={false}
+            activeDot={false}
+            connectNulls
+            isAnimationActive={false}
+          />
+          <Line
+            type="stepAfter"
+            dataKey="milkTargetMax"
+            stroke={EMERALD}
+            strokeDasharray="4 3"
+            strokeWidth={1.5}
+            strokeOpacity={0.5}
+            dot={false}
+            activeDot={false}
+            connectNulls
+            isAnimationActive={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+      <Legend
+        items={[
+          { color: AMBER, label: "Sufor" },
+          { color: ROSE, label: "ASI botol" },
+          { color: ROSE_LIGHT, label: "DBF (estimasi)" },
+          { color: EMERALD, label: "Target min/max (per usia)", style: "line" },
+        ]}
+      />
+    </ChartCard>
+  );
+
+  const chartSesiFeeding = (
+    <ChartCard
+      title="🔢 Sesi Feeding / hari"
+      subtitle="Bottle + DBF. Feeding dalam jeda <1 jam digabung jadi 1 sesi."
+      unit="×"
+      anchorId="feeding-sessions"
+    >
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={daily} margin={{ top: 18, right: 8, left: -10, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
+          <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} allowDecimals={false} />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            formatter={(v) => [`${v}× sesi`, "Feeding"]}
+          />
+          <Bar dataKey="feedingSessions" fill={ROSE} radius={[4, 4, 0, 0]}>
+            <LabelList
+              dataKey="feedingSessions"
+              position="top"
+              style={{ fontSize: 9, fill: "#374151", fontWeight: 600 }}
+              formatter={(v) => {
+                const n = typeof v === "number" ? v : Number(v ?? 0);
+                return n > 0 ? String(n) : "";
+              }}
+            />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+      <p className="mt-2 text-[11px] text-gray-500">
+        AAP guideline newborn: 8–12× sehari.
+      </p>
+    </ChartCard>
+  );
+
+  const chartIntervalFeeding = (
+    <ChartCard
+      title="⏱ Distribusi Interval Antar Feeding"
+      subtitle={
+        feedingMedianMin != null
+          ? `Median ${formatHour(feedingMedianMin)} antar sesi (sesudah cluster <1 jam)`
+          : "Belum cukup data"
+      }
+      unit="×"
+      anchorId="feeding-interval"
+    >
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={feedingIntervals} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9ca3af" }} />
+          <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} allowDecimals={false} />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            formatter={(v) => [`${v}× feeding`, "Jumlah"]}
+          />
+          <Bar dataKey="count" fill={ROSE} radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+      <p className="mt-2 text-[11px] text-gray-500">
+        Interval ideal newborn 2–4 jam. Memendek = growth spurt / cluster.
+        Memanjang = mulai stretch.
+      </p>
+    </ChartCard>
+  );
+
+  const chartDbfFreq = (
+    <ChartCard
+      title="🤱 Frekuensi DBF / hari"
+      subtitle="Sesi DBF saja (subset dari Sesi Feeding). Cluster jeda <2 jam."
+      unit="×"
+      anchorId="dbf-freq"
+    >
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={daily} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
+          <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} allowDecimals={false} />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            formatter={(v) => [`${v}×`, "Sesi DBF"]}
+          />
+          <Bar dataKey="dbfSessions" fill={ROSE} radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartCard>
+  );
+
+  const chartAsiPerSisi = (
+    <ChartCard
+      title="💧 Output ASI per sisi"
+      subtitle="Pumping + DBF (estimasi) split kiri vs kanan — total ASI per hari"
+      unit="ml"
+      anchorId="asi-per-sisi"
+    >
+      <ResponsiveContainer width="100%" height={240}>
+        <BarChart
+          data={daily.map((d) => ({
+            ...d,
+            totalAsi:
+              d.pumpMlL + d.dbfEstimateMlL + d.pumpMlR + d.dbfEstimateMlR,
+          }))}
+          margin={{ top: 18, right: 8, left: -10, bottom: 5 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
+          <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            formatter={(v, name) => {
+              const label =
+                name === "pumpMlL"
+                  ? "Pumping kiri"
+                  : name === "dbfEstimateMlL"
+                    ? "DBF kiri (est)"
+                    : name === "pumpMlR"
+                      ? "Pumping kanan"
+                      : name === "dbfEstimateMlR"
+                        ? "DBF kanan (est)"
+                        : String(name);
+              return [`${v} ml`, label];
+            }}
+          />
+          <Bar dataKey="pumpMlL" stackId="asi" fill="#f59e0b" />
+          <Bar dataKey="dbfEstimateMlL" stackId="asi" fill="#fcd34d" />
+          <Bar dataKey="pumpMlR" stackId="asi" fill="#f43f5e" />
+          <Bar dataKey="dbfEstimateMlR" stackId="asi" fill="#fda4af">
+            <LabelList
+              dataKey="totalAsi"
+              position="top"
+              style={{ fontSize: 9, fill: "#374151", fontWeight: 600 }}
+              formatter={(v) => {
+                const n = typeof v === "number" ? v : Number(v ?? 0);
+                return n > 0 ? String(n) : "";
+              }}
+            />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+      <Legend
+        items={[
+          { color: "#f59e0b", label: "Pumping kiri" },
+          { color: "#fcd34d", label: "DBF kiri (est)" },
+          { color: "#f43f5e", label: "Pumping kanan" },
+          { color: "#fda4af", label: "DBF kanan (est)" },
+        ]}
+      />
+      <p className="mt-2 text-[11px] text-gray-500">
+        DBF estimasi pakai rate priority chain (per-row override → profile →
+        pumping avg → default 4 ml/min) × effectiveness factor (efektif/sedang/
+        kurang_efektif = 1.0/0.8/0.6).
+      </p>
+    </ChartCard>
+  );
+
+  const chartSesiPumping = (
+    <ChartCard
+      title="🧪 Sesi Pumping · avg per sesi"
+      subtitle="Jumlah sesi (bar) + avg ml/sesi (garis). Cluster jeda <2 jam."
+      unit="× / ml"
+      anchorId="pumping-sessions"
+    >
+      <ResponsiveContainer width="100%" height={200}>
+        <ComposedChart
+          data={daily.map((d) => ({
+            ...d,
+            pumpAvgPerSession:
+              d.pumpSessions > 0 ? Math.round(d.pumpMl / d.pumpSessions) : 0,
+          }))}
+          margin={{ top: 5, right: 8, left: -10, bottom: 5 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
+          <YAxis
+            yAxisId="count"
+            orientation="left"
+            tick={{ fontSize: 10, fill: "#9ca3af" }}
+            allowDecimals={false}
+          />
+          <YAxis
+            yAxisId="avg"
+            orientation="right"
+            tick={{ fontSize: 10, fill: "#9ca3af" }}
+          />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            formatter={(v, name) => {
+              if (name === "pumpSessions") return [`${v}×`, "Sesi"];
+              if (name === "pumpAvgPerSession") return [`${v} ml`, "Avg / sesi"];
+              return [String(v), String(name)];
+            }}
+          />
+          <Bar
+            yAxisId="count"
+            dataKey="pumpSessions"
+            fill="#fbbf24"
+            radius={[4, 4, 0, 0]}
+          />
+          <Line
+            yAxisId="avg"
+            type="monotone"
+            dataKey="pumpAvgPerSession"
+            stroke="#b45309"
+            strokeWidth={2}
+            dot={{ r: 3, fill: "#b45309" }}
+            isAnimationActive={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+      <Legend
+        items={[
+          { color: "#fbbf24", label: "Jumlah sesi (kiri)" },
+          { color: "#b45309", label: "Avg ml/sesi (kanan)", style: "line" },
+        ]}
+      />
+    </ChartCard>
+  );
+
+  const chartDiaper = (
+    <ChartCard
+      title="🧷 Diaper / hari"
+      subtitle={`Pipis target ${targets.peeMin}+, BAB ${targets.poopMin}–${targets.poopMax}`}
+      unit="×"
+      anchorId="diaper"
+    >
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={daily} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
+          <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} allowDecimals={false} />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            formatter={(v, name) => {
+              const label = name === "peeCount" ? "Pipis" : "BAB";
+              return [`${v}×`, label];
+            }}
+          />
+          <ReferenceLine
+            y={targets.peeMin}
+            stroke={EMERALD}
+            strokeDasharray="3 3"
+            strokeOpacity={0.5}
+            label={{
+              value: `min ${targets.peeMin}`,
+              fill: EMERALD,
+              fontSize: 9,
+              position: "right",
+            }}
+          />
+          <Bar dataKey="peeCount" fill="#fbbf24" radius={[4, 4, 0, 0]}>
+            {daily.map((_, i) => (
+              <Cell key={i} fill="#fbbf24" />
+            ))}
+          </Bar>
+          <Bar dataKey="poopCount" fill="#a16207" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+      <Legend
+        items={[
+          { color: "#fbbf24", label: "💛 Pipis" },
+          { color: "#a16207", label: "💩 BAB" },
+        ]}
+      />
+    </ChartCard>
+  );
+
+  const chartTidur = (
+    <ChartCard
+      title="😴 Tidur / hari"
+      subtitle="Stack by quality · cross-day di-split · target naik seiring usia"
+      unit="jam"
+      anchorId="tidur"
+    >
+      <ResponsiveContainer width="100%" height={200}>
+        <ComposedChart data={sleepHoursData} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
+          <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            formatter={(v, name) => {
+              const label =
+                name === "sleepHoursNyenyak"
+                  ? "Nyenyak"
+                  : name === "sleepHoursGelisah"
+                    ? "Gelisah"
+                    : name === "sleepHoursSeringBangun"
+                      ? "Sering bangun"
+                      : name === "sleepHoursUnknown"
+                        ? "Tidak dicatat"
+                        : name === "sleepHoursMin"
                           ? "Target min"
-                          : name === "milkTargetMax"
+                          : name === "sleepHoursMax"
                             ? "Target max"
                             : String(name);
-                return [`${v} ml`, label];
-              }}
-            />
-            <Bar dataKey="suforMl" stackId="m" fill={AMBER} />
-            <Bar dataKey="asiBottleMl" stackId="m" fill={ROSE} />
-            <Bar dataKey="dbfEstimateMl" stackId="m" fill={ROSE_LIGHT}>
-              <LabelList
-                dataKey="milkTotalMl"
-                position="top"
-                style={{ fontSize: 9, fill: "#374151", fontWeight: 600 }}
-                formatter={(v) => {
-                  const n = typeof v === "number" ? v : Number(v ?? 0);
-                  return n > 0 ? String(n) : "";
-                }}
-              />
-            </Bar>
-            <Line
-              type="stepAfter"
-              dataKey="milkTargetMin"
-              stroke={EMERALD}
-              strokeDasharray="4 3"
-              strokeWidth={1.5}
-              dot={false}
-              activeDot={false}
-              connectNulls
-              isAnimationActive={false}
-            />
-            <Line
-              type="stepAfter"
-              dataKey="milkTargetMax"
-              stroke={EMERALD}
-              strokeDasharray="4 3"
-              strokeWidth={1.5}
-              strokeOpacity={0.5}
-              dot={false}
-              activeDot={false}
-              connectNulls
-              isAnimationActive={false}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-        <Legend
-          items={[
-            { color: AMBER, label: "Sufor" },
-            { color: ROSE, label: "ASI botol" },
-            { color: ROSE_LIGHT, label: "DBF (estimasi)" },
-            { color: EMERALD, label: "Target min/max (per usia)", style: "line" },
-          ]}
-        />
-      </ChartCard>
+              return [`${v} jam`, label];
+            }}
+          />
+          <Bar dataKey="sleepHoursNyenyak" stackId="s" fill={EMERALD} />
+          <Bar dataKey="sleepHoursGelisah" stackId="s" fill={AMBER} />
+          <Bar dataKey="sleepHoursSeringBangun" stackId="s" fill="#ef4444" />
+          <Bar dataKey="sleepHoursUnknown" stackId="s" fill="#9ca3af" />
+          <Line
+            type="stepAfter"
+            dataKey="sleepHoursMin"
+            stroke={EMERALD}
+            strokeDasharray="4 3"
+            strokeWidth={1.5}
+            dot={false}
+            connectNulls
+            isAnimationActive={false}
+          />
+          <Line
+            type="stepAfter"
+            dataKey="sleepHoursMax"
+            stroke={EMERALD}
+            strokeDasharray="4 3"
+            strokeWidth={1.5}
+            strokeOpacity={0.5}
+            dot={false}
+            connectNulls
+            isAnimationActive={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+      <Legend
+        items={[
+          { color: EMERALD, label: "Nyenyak" },
+          { color: AMBER, label: "Gelisah" },
+          { color: "#ef4444", label: "Sering bangun" },
+          { color: "#9ca3af", label: "Tidak dicatat" },
+        ]}
+      />
+    </ChartCard>
+  );
 
-      <ChartCard
-        title="😴 Tidur / hari"
-        subtitle="Stack by quality · cross-day di-split · target naik seiring usia"
-        unit="jam"
-        anchorId="tidur"
-      >
-        <ResponsiveContainer width="100%" height={200}>
-          <ComposedChart
-            data={sleepHoursData}
-            margin={{ top: 5, right: 8, left: -10, bottom: 5 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              formatter={(v, name) => {
-                const label =
-                  name === "sleepHoursNyenyak"
-                    ? "Nyenyak"
-                    : name === "sleepHoursGelisah"
-                      ? "Gelisah"
-                      : name === "sleepHoursSeringBangun"
-                        ? "Sering bangun"
-                        : name === "sleepHoursUnknown"
-                          ? "Tidak dicatat"
-                          : name === "sleepHoursMin"
-                            ? "Target min"
-                            : name === "sleepHoursMax"
-                              ? "Target max"
-                              : String(name);
-                return [`${v} jam`, label];
-              }}
-            />
-            <Bar dataKey="sleepHoursNyenyak" stackId="s" fill={EMERALD} />
-            <Bar dataKey="sleepHoursGelisah" stackId="s" fill={AMBER} />
-            <Bar dataKey="sleepHoursSeringBangun" stackId="s" fill="#ef4444" />
-            <Bar dataKey="sleepHoursUnknown" stackId="s" fill="#9ca3af" />
-            <Line
-              type="stepAfter"
-              dataKey="sleepHoursMin"
-              stroke={EMERALD}
-              strokeDasharray="4 3"
-              strokeWidth={1.5}
-              dot={false}
-              connectNulls
-              isAnimationActive={false}
-            />
-            <Line
-              type="stepAfter"
-              dataKey="sleepHoursMax"
-              stroke={EMERALD}
-              strokeDasharray="4 3"
-              strokeWidth={1.5}
-              strokeOpacity={0.5}
-              dot={false}
-              connectNulls
-              isAnimationActive={false}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-        <Legend
-          items={[
-            { color: EMERALD, label: "Nyenyak" },
-            { color: AMBER, label: "Gelisah" },
-            { color: "#ef4444", label: "Sering bangun" },
-            { color: "#9ca3af", label: "Tidak dicatat" },
-          ]}
-        />
-      </ChartCard>
+  const chartSleepHeatmap = (
+    <ChartCard
+      title="🗓 Pola Tidur · heatmap 14 hari"
+      subtitle="Menit tidur per jam (lebih gelap = lebih lama)"
+      unit="jam"
+      anchorId="sleep-heatmap"
+    >
+      <SleepHeatmap rows={sleepHeatmap} />
+    </ChartCard>
+  );
 
-      <ChartCard
-        title="💧 Pumping / hari"
-        subtitle="Stacked Kiri (bawah) + Kanan (atas)"
-        unit="ml"
-        anchorId="pumping"
-      >
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={daily} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              formatter={(v, name) => {
-                const label =
-                  name === "pumpMlL"
-                    ? "Kiri"
-                    : name === "pumpMlR"
-                      ? "Kanan"
-                      : String(name);
-                return [`${v} ml`, label];
-              }}
-            />
-            <Bar dataKey="pumpMlL" stackId="p" fill="#f59e0b" />
-            <Bar dataKey="pumpMlR" stackId="p" fill="#fbbf24" />
-          </BarChart>
-        </ResponsiveContainer>
-        <Legend
-          items={[
-            { color: "#f59e0b", label: "Kiri" },
-            { color: "#fbbf24", label: "Kanan" },
-          ]}
-        />
-      </ChartCard>
+  // ─── Restructured layout dengan section heading ─────────────────────
 
-      <ChartCard
-        title="🍼 Sesi Feeding / hari"
-        subtitle="Feeding dalam jeda <1 jam digabung jadi 1 sesi (cluster-feeding aware)"
-        unit="×"
-        anchorId="feeding-sessions"
+  return (
+    <div className="space-y-6">
+      <Section
+        title="Intake — Yang masuk"
+        emoji="🍼"
+        intro="Total ml dikonsumsi + pola frequency. Cek apakah cukup minum."
       >
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={daily} margin={{ top: 18, right: 8, left: -10, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <YAxis
-              tick={{ fontSize: 10, fill: "#9ca3af" }}
-              allowDecimals={false}
-            />
-            <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              formatter={(v) => [`${v}× sesi`, "Feeding"]}
-            />
-            <Bar dataKey="feedingSessions" fill={ROSE} radius={[4, 4, 0, 0]}>
-              <LabelList
-                dataKey="feedingSessions"
-                position="top"
-                style={{ fontSize: 9, fill: "#374151", fontWeight: 600 }}
-                formatter={(v) => {
-                  const n = typeof v === "number" ? v : Number(v ?? 0);
-                  return n > 0 ? String(n) : "";
-                }}
-              />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-        <p className="mt-2 text-[11px] text-gray-500">
-          AAP guideline newborn: 8–12× sehari per cluster (interval 2–4 jam).
-        </p>
-      </ChartCard>
+        {chartSusu}
+        {chartSesiFeeding}
+        {chartIntervalFeeding}
+        {chartDbfFreq}
+      </Section>
 
-      <ChartCard
-        title="💧 Total Pumping / hari"
-        subtitle="Output ASI gabungan (L + R)"
-        unit="ml"
-        anchorId="pumping-total"
+      <Section
+        title="Produksi ASI"
+        emoji="💧"
+        intro="Output ASI ibu (pumping + DBF estimasi). Cek konsistensi + balance L/R."
       >
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={daily} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              formatter={(v) => [`${v} ml`, "Total pumping"]}
-            />
-            <Bar dataKey="pumpMl" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </ChartCard>
+        {chartAsiPerSisi}
+        {chartSesiPumping}
+      </Section>
 
-      <ChartCard
-        title="🧪 Sesi Pumping · avg per sesi"
-        subtitle="Sesi dengan jeda <2 jam digabung jadi 1 cluster"
-        unit="× / ml"
-        anchorId="pumping-sessions"
+      <Section
+        title="Output — Diaper"
+        emoji="🧷"
+        intro="Pipis + BAB. Indikator hidrasi & pencernaan."
       >
-        <ResponsiveContainer width="100%" height={200}>
-          <ComposedChart
-            data={daily.map((d) => ({
-              ...d,
-              pumpAvgPerSession:
-                d.pumpSessions > 0
-                  ? Math.round(d.pumpMl / d.pumpSessions)
-                  : 0,
-            }))}
-            margin={{ top: 5, right: 8, left: -10, bottom: 5 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <YAxis
-              yAxisId="count"
-              orientation="left"
-              tick={{ fontSize: 10, fill: "#9ca3af" }}
-              allowDecimals={false}
-            />
-            <YAxis
-              yAxisId="avg"
-              orientation="right"
-              tick={{ fontSize: 10, fill: "#9ca3af" }}
-            />
-            <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              formatter={(v, name) => {
-                if (name === "pumpSessions") return [`${v}×`, "Sesi"];
-                if (name === "pumpAvgPerSession")
-                  return [`${v} ml`, "Avg / sesi"];
-                return [String(v), String(name)];
-              }}
-            />
-            <Bar
-              yAxisId="count"
-              dataKey="pumpSessions"
-              fill="#fbbf24"
-              radius={[4, 4, 0, 0]}
-            />
-            <Line
-              yAxisId="avg"
-              type="monotone"
-              dataKey="pumpAvgPerSession"
-              stroke="#b45309"
-              strokeWidth={2}
-              dot={{ r: 3, fill: "#b45309" }}
-              isAnimationActive={false}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-        <Legend
-          items={[
-            { color: "#fbbf24", label: "Jumlah sesi (kiri)" },
-            { color: "#b45309", label: "Avg ml/sesi (kanan)", style: "line" },
-          ]}
-        />
-      </ChartCard>
+        {chartDiaper}
+      </Section>
 
-      <ChartCard
-        title="🤱 Frekuensi DBF / hari"
-        subtitle="Sesi DBF dengan jeda <2 jam digabung jadi 1 cluster"
-        unit="×"
-        anchorId="dbf-freq"
+      <Section
+        title="Istirahat — Tidur"
+        emoji="😴"
+        intro="Quality breakdown + heatmap distribusi jam tidur."
       >
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={daily} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <YAxis
-              tick={{ fontSize: 10, fill: "#9ca3af" }}
-              allowDecimals={false}
-            />
-            <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              formatter={(v) => [`${v}×`, "Sesi DBF"]}
-            />
-            <Bar dataKey="dbfSessions" fill={ROSE} radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </ChartCard>
-
-      <ChartCard
-        title="🧷 Diaper / hari"
-        subtitle={`Pipis target ${targets.peeMin}+, BAB ${targets.poopMin}–${targets.poopMax}`}
-        unit="×"
-        anchorId="diaper"
-      >
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={daily} margin={{ top: 5, right: 8, left: -10, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="short" tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <YAxis
-              tick={{ fontSize: 10, fill: "#9ca3af" }}
-              allowDecimals={false}
-            />
-            <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              formatter={(v, name) => {
-                const label = name === "peeCount" ? "Pipis" : "BAB";
-                return [`${v}×`, label];
-              }}
-            />
-            <ReferenceLine
-              y={targets.peeMin}
-              stroke={EMERALD}
-              strokeDasharray="3 3"
-              strokeOpacity={0.5}
-              label={{
-                value: `min ${targets.peeMin}`,
-                fill: EMERALD,
-                fontSize: 9,
-                position: "right",
-              }}
-            />
-            <Bar dataKey="peeCount" fill="#fbbf24" radius={[4, 4, 0, 0]}>
-              {daily.map((_, i) => (
-                <Cell key={i} fill="#fbbf24" />
-              ))}
-            </Bar>
-            <Bar dataKey="poopCount" fill="#a16207" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-        <Legend
-          items={[
-            { color: "#fbbf24", label: "💛 Pipis" },
-            { color: "#a16207", label: "💩 BAB" },
-          ]}
-        />
-      </ChartCard>
-
-      <ChartCard
-        title="😴 Pola Tidur · 14 hari"
-        subtitle="Heatmap menit tidur per jam (lebih gelap = lebih lama)"
-        unit="jam"
-      >
-        <SleepHeatmap rows={sleepHeatmap} />
-      </ChartCard>
-
-      <ChartCard
-        title="🍼 Interval Feeding"
-        subtitle={
-          feedingMedianMin != null
-            ? `Median ${formatHour(feedingMedianMin)} antar sesi (feeding <1 jam digabung)`
-            : "Belum cukup data"
-        }
-        unit="×"
-      >
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart
-            data={feedingIntervals}
-            margin={{ top: 5, right: 8, left: -10, bottom: 5 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <YAxis
-              tick={{ fontSize: 10, fill: "#9ca3af" }}
-              allowDecimals={false}
-            />
-            <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              formatter={(v) => [`${v}× feeding`, "Jumlah"]}
-            />
-            <Bar dataKey="count" fill={ROSE} radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-        <p className="mt-2 text-[11px] text-gray-500">
-          Sesi feeding dalam jeda &lt;1 jam digabung jadi 1 sesi (cluster
-          feeding / fragmented log). Newborn umumnya feeding tiap 2–4 jam
-          (10–14× sehari). Interval memendek = baby tumbuh, lebih sering
-          minum. Memanjang = mulai stretch interval saat siap.
-        </p>
-      </ChartCard>
+        {chartTidur}
+        {chartSleepHeatmap}
+      </Section>
     </div>
+  );
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+function Section({
+  title,
+  emoji,
+  intro,
+  children,
+}: {
+  title: string;
+  emoji: string;
+  intro?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="px-1">
+        <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+          <span aria-hidden className="text-base">
+            {emoji}
+          </span>
+          {title}
+        </h2>
+        {intro ? (
+          <p className="mt-0.5 pl-6 text-[11px] leading-snug text-gray-400">
+            {intro}
+          </p>
+        ) : null}
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
   );
 }
 
