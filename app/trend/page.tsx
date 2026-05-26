@@ -154,6 +154,8 @@ export default async function TrendPage() {
       asiMl: 0,
       bottleMl: 0,
       dbfEstimateMl: 0,
+      dbfEstimateMlL: 0,
+      dbfEstimateMlR: 0,
       milkTotalMl: 0,
       pumpMl: 0,
       pumpMlL: 0,
@@ -234,9 +236,18 @@ export default async function TrendPage() {
         const factor = effectivenessFactor(
           (l.effectiveness ?? null) as EffectivenessLevel | null,
         );
-        const adjustedMl = Math.round(est.ml * factor);
-        agg.dbfEstimateMl += adjustedMl;
-        agg.asiMl += adjustedMl;
+        const adjustedMl = est.ml * factor;
+        // Split per side proportional to duration. Round at the end so
+        // sum still equals total adjustedMl (avoid drift from per-side rounding).
+        const lMin = l.duration_l_min ?? 0;
+        const rMin = l.duration_r_min ?? 0;
+        const lShare = dbfMin > 0 ? lMin / dbfMin : 0;
+        const adjustedL = adjustedMl * lShare;
+        const adjustedR = adjustedMl - adjustedL;
+        agg.dbfEstimateMl += Math.round(adjustedMl);
+        agg.dbfEstimateMlL += adjustedL;
+        agg.dbfEstimateMlR += adjustedR;
+        agg.asiMl += Math.round(adjustedMl);
       }
     } else if (l.subtype === "pumping") {
       if (!agg) continue;
@@ -299,6 +310,8 @@ export default async function TrendPage() {
     d.pumpMlL = Math.round(d.pumpMlL);
     d.pumpMlR = Math.round(d.pumpMlR);
     d.dbfEstimateMl = Math.round(d.dbfEstimateMl);
+    d.dbfEstimateMlL = Math.round(d.dbfEstimateMlL);
+    d.dbfEstimateMlR = Math.round(d.dbfEstimateMlR);
     d.milkTotalMl = d.bottleMl + d.dbfEstimateMl;
     d.pumpMl = Math.round(d.pumpMl);
     d.sleepMin = Math.round(d.sleepMin);
