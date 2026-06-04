@@ -86,7 +86,7 @@ export default async function ListenPage({
         </div>
       ) : null}
 
-      <CryListener />
+      <CryListener babyName={baby.name} />
 
       {accuracy !== null ? (
         <section className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2 text-[11px] text-gray-600">
@@ -127,8 +127,8 @@ export default async function ListenPage({
         </h2>
         <ul className="mt-1 space-y-1 pl-4">
           <li>
-            · Letakkan HP ~30cm-2m dari Nera (nursery / crib). Volume mic
-            standard cukup.
+            · Letakkan HP ~30cm-2m dari {baby.name} (nursery / crib). Volume
+            mic standard cukup.
           </li>
           <li>
             · Wake Lock aktif — layar tidak tidur. Bisa charge sambil

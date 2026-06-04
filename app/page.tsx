@@ -844,6 +844,7 @@ export default async function HomePage({
       <LogsRealtime babyId={baby.id} householdId={household.household_id} />
       <CryRealtimeBanner
         babyId={baby.id}
+        babyName={baby.name}
         householdId={household.household_id}
       />
       <WellnessAlertBanner userId={user.id} />
