@@ -136,6 +136,50 @@ export type Database = {
           },
         ]
       }
+      dbf_rate_periods: {
+        Row: {
+          baby_id: string
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          id: string
+          ml_per_min: number | null
+          mode: string
+          multiplier: number | null
+          notes: string | null
+        }
+        Insert: {
+          baby_id: string
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          id?: string
+          ml_per_min?: number | null
+          mode: string
+          multiplier?: number | null
+          notes?: string | null
+        }
+        Update: {
+          baby_id?: string
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          id?: string
+          ml_per_min?: number | null
+          mode?: string
+          multiplier?: number | null
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dbf_rate_periods_baby_id_fkey"
+            columns: ["baby_id"]
+            isOneToOne: false
+            referencedRelation: "babies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_milestones: {
         Row: {
           achieved_at: string

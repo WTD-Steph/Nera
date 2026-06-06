@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 type Mode = "auto" | "multiplier" | "fixed";
@@ -21,8 +22,16 @@ export function DbfEstimateFieldset({
 
   return (
     <div className="rounded-xl border border-gray-100 bg-gray-50/40 p-3">
-      <div className="text-xs font-semibold text-gray-700">
-        Estimasi DBF (opsional)
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="text-xs font-semibold text-gray-700">
+          Estimasi DBF (opsional)
+        </div>
+        <Link
+          href="/more/dbf-rate-history"
+          className="text-[10px] font-medium text-rose-600 hover:underline"
+        >
+          Riwayat rate →
+        </Link>
       </div>
       <p className="mt-1 text-[11px] leading-snug text-gray-500">
         Cara hitung ml dari menit DBF. Default: auto pakai pumping
