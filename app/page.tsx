@@ -741,8 +741,9 @@ export default async function HomePage({
       tone: minsSince >= 480 ? ("urgent" as const) : ("warning" as const),
     };
   })();
-  // Pumping reminder: 3j sejak last pumping selesai. Lactation
-  // recommendation: pump every 2-3h supaya supply maintained.
+  // Pumping reminder: 3j sejak last "breast emptying event" (pump OR DBF).
+  // Lactation rationale: DBF juga emptying + stimulates supply — kalau baru
+  // DBF, ibu nggak perlu pump segera. Reminder pakai max(lastPump, lastDbf).
   const lastPumpEnded = (() => {
     const completed = logsArray.filter(
       (l) => l.subtype === "pumping" && l.end_timestamp != null,
@@ -753,15 +754,37 @@ export default async function HomePage({
       return t > latest ? t : latest;
     }, 0);
   })();
+  const lastDbfEnded = (() => {
+    const completed = logsArray.filter(
+      (l) =>
+        l.subtype === "feeding" &&
+        l.end_timestamp != null &&
+        (l.duration_l_min ?? 0) + (l.duration_r_min ?? 0) > 0,
+    );
+    if (completed.length === 0) return null;
+    return completed.reduce((latest, l) => {
+      const t = new Date(l.end_timestamp!).getTime();
+      return t > latest ? t : latest;
+    }, 0);
+  })();
   const pumpingReminder = (() => {
-    if (lastPumpEnded == null) return null;
-    if (ongoingSubtypes.has("pumping")) return null;
-    const minsSince = (Date.now() - lastPumpEnded) / 60000;
+    const lastBreastEmpty = Math.max(
+      lastPumpEnded ?? -1,
+      lastDbfEnded ?? -1,
+    );
+    if (lastBreastEmpty < 0) return null;
+    // Skip kalau ongoing pumping atau DBF (subtype "dbf" maps from feeding
+    // dengan duration > 0 di ongoingSubtypes set).
+    if (ongoingSubtypes.has("pumping") || ongoingSubtypes.has("dbf"))
+      return null;
+    const minsSince = (Date.now() - lastBreastEmpty) / 60000;
     if (minsSince < 180) return null;
     const hours = Math.floor(minsSince / 60);
     const mins = Math.round(minsSince % 60);
+    const sourceLabel =
+      (lastDbfEnded ?? 0) > (lastPumpEnded ?? 0) ? "DBF" : "pump";
     return {
-      text: `Sudah ${hours}j ${mins}m sejak pump terakhir — supply maintain tiap 2-3j`,
+      text: `Sudah ${hours}j ${mins}m sejak ${sourceLabel} terakhir — supply maintain tiap 2-3j`,
       tone: minsSince >= 270 ? ("urgent" as const) : ("warning" as const),
     };
   })();
@@ -890,84 +913,11 @@ export default async function HomePage({
         </Link>
       </header>
 
-      {activeHandover ? (
-        // Unified banner — always shows the recap regardless of which user
-        // is logged in. iPad use case: shared device, partner returns and
-        // taps banner directly (no need to switch login). Title + button
-        // use sleeper's name (or "kamu" for self) so context is clear.
-        (() => {
-          const sleeperName = handoverByMe
-            ? "kamu"
-            : (handoverPartnerName ?? "Partner");
-          const buttonName = handoverByMe
-            ? "Saya"
-            : (handoverPartnerName ?? "Partner");
-          return (
-            <section className="flash-in mt-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
-              <div className="flex items-start gap-2">
-                <span className="text-xl" aria-hidden>
-                  🌙
-                </span>
-                <div className="flex-1">
-                  <div className="text-sm font-bold text-indigo-900">
-                    Yang terjadi sejak {sleeperName} tidur
-                  </div>
-                  <div className="text-[11px] text-indigo-700/80">
-                    Tidur sejak {fmtTime(activeHandover.started_at)} ·{" "}
-                    {fmtDuration(handoverDurationMins)}
-                  </div>
-                  {handoverSummary && handoverSummary.bullets.length > 0 ? (
-                    <div className="mt-2 space-y-0.5 text-[12px] text-indigo-900">
-                      {handoverSummary.bullets.map((b, i) => (
-                        <div key={i}>· {b}</div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="mt-2 text-[12px] italic text-indigo-700/80">
-                      Belum ada catatan.
-                    </div>
-                  )}
-                  {handoverSummary && handoverSummary.recent.length > 0 ? (
-                    <details className="mt-2 text-[11px]">
-                      <summary className="cursor-pointer text-indigo-700/80 hover:text-indigo-900">
-                        Lihat detail ({handoverSummary.total})
-                      </summary>
-                      <div className="mt-1 space-y-0.5 text-indigo-800/90">
-                        {handoverSummary.recent.map((r, i) => (
-                          <div key={i}>
-                            <span className="font-medium text-indigo-700">
-                              {r.time}
-                            </span>{" "}
-                            · {r.text}
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                  ) : null}
-                  <form action={endHandoverAction} className="mt-3">
-                    <input type="hidden" name="id" value={activeHandover.id} />
-                    <input type="hidden" name="return_to" value="/" />
-                    <SubmitButton
-                      pendingText="…"
-                      className="w-full rounded-xl bg-indigo-500 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-600"
-                    >
-                      ✓ {buttonName} sudah bangun
-                    </SubmitButton>
-                  </form>
-                </div>
-              </div>
-            </section>
-          );
-        })()
-      ) : null}
+      {/* Handover UI removed — parent sleep schedule fitur di-park
+          (data/actions kept untuk potential future restore). */}
       {welcomeMsg ? (
         <div className="mt-3 rounded-2xl border border-rose-100 bg-rose-50 p-3 text-sm text-rose-800">
           {welcomeMsg}
-        </div>
-      ) : null}
-      {searchParams.handover === "ended" ? (
-        <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-800">
-          ✓ Sudah ditandai bangun.
         </div>
       ) : null}
       {logerror ? (
@@ -1465,39 +1415,7 @@ export default async function HomePage({
             </div>
           )}
         </div>
-        {!activeHandover ? (
-          <div
-            className={`mt-2 grid gap-2 ${householdPartner ? "grid-cols-2" : "grid-cols-1"}`}
-          >
-            <form action={startHandoverAction}>
-              <input type="hidden" name="return_to" value="/" />
-              <SubmitButton
-                pendingText="…"
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white py-2 text-xs font-semibold text-indigo-600 shadow-sm hover:bg-indigo-50"
-              >
-                <span aria-hidden>🌙</span>
-                Saya tidur dulu
-              </SubmitButton>
-            </form>
-            {householdPartner ? (
-              <form action={startHandoverAction}>
-                <input type="hidden" name="return_to" value="/" />
-                <input
-                  type="hidden"
-                  name="sleeper_id"
-                  value={householdPartner.user_id}
-                />
-                <SubmitButton
-                  pendingText="…"
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white py-2 text-xs font-semibold text-indigo-600 shadow-sm hover:bg-indigo-50"
-                >
-                  <span aria-hidden>🌙</span>
-                  {partnerDisplayName} tidur dulu
-                </SubmitButton>
-              </form>
-            ) : null}
-          </div>
-        ) : null}
+        {/* "Saya / partner tidur dulu" buttons removed — feature di-park. */}
       </section>
 
       <section className="mt-5">

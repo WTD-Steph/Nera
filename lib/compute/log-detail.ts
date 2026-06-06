@@ -171,10 +171,16 @@ export function logDetail(
     const effSuffix = l.effectiveness
       ? ` · ${EFFECTIVENESS_EMOJIS[l.effectiveness as EffectivenessLevel]}`
       : "";
-    if (!lFmt && !rFmt) return `🤱 (kosong)${effSuffix}`;
-    if (!lFmt) return `🤱 R ${rFmt}${effSuffix}`;
-    if (!rFmt) return `🤱 L ${lFmt}${effSuffix}`;
-    return `🤱 L ${lFmt} | R ${rFmt}${effSuffix}`;
+    const tubeSuffix = l.dbf_tube_content === "asi"
+      ? " · 🪡 selang ASI"
+      : l.dbf_tube_content === "sufor"
+        ? " · 🪡 selang Sufor"
+        : "";
+    const tail = `${effSuffix}${tubeSuffix}`;
+    if (!lFmt && !rFmt) return `🤱 (kosong)${tail}`;
+    if (!lFmt) return `🤱 R ${rFmt}${tail}`;
+    if (!rFmt) return `🤱 L ${lFmt}${tail}`;
+    return `🤱 L ${lFmt} | R ${rFmt}${tail}`;
   }
 
   if (l.subtype === "pumping") {
