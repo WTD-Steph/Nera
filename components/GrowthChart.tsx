@@ -9,7 +9,11 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { type WhoPoint } from "@/lib/constants/who-percentiles";
+import {
+  type WhoPoint,
+  interpolateWho,
+  estimatePercentile,
+} from "@/lib/constants/who-percentiles";
 
 export type DataPoint = {
   m: number;
@@ -22,11 +26,20 @@ export function GrowthChart({
   unit,
   refData,
   userPoints,
+  currentValue,
+  currentAgeMonths,
+  babyName,
 }: {
   title: string;
   unit: string;
   refData: WhoPoint[];
   userPoints: DataPoint[];
+  /** Latest measurement value untuk panel percentile reference. */
+  currentValue?: number;
+  /** Age (bulan) saat measurement terakhir. */
+  currentAgeMonths?: number;
+  /** Untuk label di panel ("Nera di P5"). */
+  babyName?: string;
 }) {
   // Merge ref + user data; keep separate keys so each line draws independently.
   const chartData = [
@@ -118,6 +131,88 @@ export function GrowthChart({
           />
         </LineChart>
       </ResponsiveContainer>
+      {currentValue != null && currentAgeMonths != null ? (
+        <PercentilePanel
+          refData={refData}
+          unit={unit}
+          ageMonths={currentAgeMonths}
+          value={currentValue}
+          babyName={babyName}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function PercentilePanel({
+  refData,
+  unit,
+  ageMonths,
+  value,
+  babyName,
+}: {
+  refData: WhoPoint[];
+  unit: string;
+  ageMonths: number;
+  value: number;
+  babyName?: string;
+}) {
+  const ref = interpolateWho(refData, ageMonths);
+  const est = estimatePercentile(value, ref);
+  const fmt = (v: number) => v.toFixed(1);
+  // Highlight band yang Nera ada di dalamnya
+  const band = est.band;
+  const rows: { label: string; value: number; key: string }[] = [
+    { label: "P3", value: ref.p3, key: "p3" },
+    { label: "P15", value: ref.p15, key: "p15" },
+    { label: "P50 (median)", value: ref.p50, key: "p50" },
+    { label: "P85", value: ref.p85, key: "p85" },
+    { label: "P97", value: ref.p97, key: "p97" },
+  ];
+  const inBand = (key: string): boolean => {
+    if (band === "<P3" || band === ">P97") return false;
+    if (band === "P3–P15") return key === "p3" || key === "p15";
+    if (band === "P15–P50") return key === "p15" || key === "p50";
+    if (band === "P50–P85") return key === "p50" || key === "p85";
+    if (band === "P85–P97") return key === "p85" || key === "p97";
+    return false;
+  };
+  const subjectLabel = babyName ?? "Bayi";
+  return (
+    <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50/40 p-3">
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+        Referensi di usia {ageMonths.toFixed(1)} bln
+      </div>
+      <div className="mt-2 space-y-1 text-[12px]">
+        {rows.map((r) => (
+          <div
+            key={r.key}
+            className={`flex items-center justify-between rounded-md px-2 py-0.5 ${
+              inBand(r.key) ? "bg-rose-100/60 font-semibold text-rose-700" : "text-gray-600"
+            }`}
+          >
+            <span>{r.label}</span>
+            <span className="tabular-nums">
+              {fmt(r.value)} {unit}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1.5 text-[12px]">
+        <span className="font-semibold text-rose-700">{subjectLabel}: </span>
+        <span className="font-semibold text-gray-900">
+          {fmt(value)} {unit}
+        </span>{" "}
+        <span className="text-gray-600">
+          → {band}
+          {est.pct != null ? ` (≈ P${est.pct.toFixed(0)})` : ""}
+        </span>
+      </div>
+      <p className="mt-1.5 text-[10px] leading-snug text-gray-400">
+        WHO standard linear-interpolated antara monthly anchors. Estimasi
+        percentile pakai linear interpolation di band tertentu — bukan
+        LMS z-score. Untuk evaluasi medis konsultasi dokter anak.
+      </p>
     </div>
   );
 }

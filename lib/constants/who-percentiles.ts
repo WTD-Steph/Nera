@@ -85,3 +85,66 @@ export const WHO_H_BOY: WhoPoint[] = [
 export function ageInMonths(dob: string, atMs: number = Date.now()): number {
   return (atMs - new Date(dob).getTime()) / (1000 * 86400 * 30.44);
 }
+
+/**
+ * Linear interpolation between adjacent WHO monthly anchors. Returns the
+ * 5 percentile values (p3, p15, p50, p85, p97) at given fractional age.
+ * Clamps to first/last row at extremes.
+ */
+export function interpolateWho(
+  ref: WhoPoint[],
+  ageMonths: number,
+): WhoPoint {
+  if (ref.length === 0) {
+    return { m: ageMonths, p3: 0, p15: 0, p50: 0, p85: 0, p97: 0 };
+  }
+  const first = ref[0]!;
+  const last = ref[ref.length - 1]!;
+  if (ageMonths <= first.m) return first;
+  if (ageMonths >= last.m) return last;
+  for (let i = 0; i < ref.length - 1; i++) {
+    const a = ref[i]!;
+    const b = ref[i + 1]!;
+    if (a.m <= ageMonths && ageMonths <= b.m) {
+      const f = (ageMonths - a.m) / (b.m - a.m);
+      return {
+        m: ageMonths,
+        p3: a.p3 + f * (b.p3 - a.p3),
+        p15: a.p15 + f * (b.p15 - a.p15),
+        p50: a.p50 + f * (b.p50 - a.p50),
+        p85: a.p85 + f * (b.p85 - a.p85),
+        p97: a.p97 + f * (b.p97 - a.p97),
+      };
+    }
+  }
+  return last;
+}
+
+/**
+ * Estimate percentile by linear interpolation between published bands.
+ * NOTE: Not as accurate as LMS-based z-score conversion — purely
+ * visual approximation. Below P3 / above P97 → null estimate (out-of-band).
+ */
+export function estimatePercentile(
+  value: number,
+  ref: WhoPoint,
+): { band: string; pct: number | null } {
+  if (value < ref.p3) return { band: "<P3", pct: null };
+  if (value < ref.p15) {
+    const f = (value - ref.p3) / (ref.p15 - ref.p3);
+    return { band: "P3–P15", pct: 3 + f * (15 - 3) };
+  }
+  if (value < ref.p50) {
+    const f = (value - ref.p15) / (ref.p50 - ref.p15);
+    return { band: "P15–P50", pct: 15 + f * (50 - 15) };
+  }
+  if (value < ref.p85) {
+    const f = (value - ref.p50) / (ref.p85 - ref.p50);
+    return { band: "P50–P85", pct: 50 + f * (85 - 50) };
+  }
+  if (value < ref.p97) {
+    const f = (value - ref.p85) / (ref.p97 - ref.p85);
+    return { band: "P85–P97", pct: 85 + f * (97 - 85) };
+  }
+  return { band: ">P97", pct: null };
+}

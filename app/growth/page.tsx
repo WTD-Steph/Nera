@@ -149,12 +149,18 @@ export default async function GrowthPage({
           unit="kg"
           refData={refW}
           userPoints={userWeightPoints}
+          currentValue={latest.weight}
+          currentAgeMonths={latestAge}
+          babyName={baby.name}
         />
         <GrowthChart
           title="Panjang Badan"
           unit="cm"
           refData={refH}
           userPoints={userHeightPoints}
+          currentValue={latest.height}
+          currentAgeMonths={latestAge}
+          babyName={baby.name}
         />
       </section>
 
