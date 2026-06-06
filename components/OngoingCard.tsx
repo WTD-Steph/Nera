@@ -1458,9 +1458,43 @@ function DbfEffectivenessStep({
   onCancel: () => void;
 }) {
   const [endOffset, setEndOffset] = useState(0);
+  // SNS (tube feeder): tube taped near nipple supaya baby dapat tambahan
+  // susu sambil tetap latch. Default tidak pakai. Kalau pakai, content
+  // ASI (expressed) atau Sufor.
+  const [tubeContent, setTubeContent] = useState<"" | "asi" | "sufor">("");
   return (
     <div className="space-y-2 rounded-xl border border-rose-100 bg-rose-50/40 p-3">
       <EndOffsetSelect value={endOffset} onChange={setEndOffset} />
+      <div className="rounded-lg border border-rose-100 bg-white/60 p-2">
+        <p className="text-center text-[11px] font-semibold text-rose-700">
+          Pakai selang (SNS) sambil DBF?
+        </p>
+        <p className="mt-0.5 text-center text-[10px] leading-snug text-gray-500">
+          Selang taped ke nipple supaya tambahan susu masuk
+        </p>
+        <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+          {(
+            [
+              { value: "", label: "Tidak" },
+              { value: "asi", label: "ASIP" },
+              { value: "sufor", label: "Sufor" },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.value || "no-tube"}
+              type="button"
+              onClick={() => setTubeContent(opt.value)}
+              className={`rounded-lg border py-1.5 text-xs font-semibold transition-colors ${
+                tubeContent === opt.value
+                  ? "border-rose-400 bg-rose-100 text-rose-700"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-rose-200"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <p className="text-center text-[11px] font-semibold text-rose-700">
         Bagaimana efektivitas DBF?
       </p>
@@ -1496,6 +1530,7 @@ function DbfEffectivenessStep({
           <input type="hidden" name="return_to" value="/" />
           <input type="hidden" name="effectiveness" value={opt.value} />
           <input type="hidden" name="end_offset_min" value={endOffset} />
+          <input type="hidden" name="dbf_tube_content" value={tubeContent} />
           <SubmitButton
             pendingText="…"
             className="flex w-full flex-col items-center rounded-xl border border-rose-200 bg-white py-2 px-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 active:scale-[0.98]"

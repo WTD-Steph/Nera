@@ -178,6 +178,11 @@ export async function createLogAction(formData: FormData) {
       ) {
         payload.effectiveness = effRaw;
       }
+      // SNS tube content (asi / sufor / NULL). Same semantics.
+      const tubeRaw = String(formData.get("dbf_tube_content") ?? "").trim();
+      if (tubeRaw === "asi" || tubeRaw === "sufor") {
+        payload.dbf_tube_content = tubeRaw;
+      }
       // Per-row rate snapshot. Forward-only behavior: if user provides
       // explicit override, use it; else snapshot the current Profile-
       // derived rate so future Profile changes don't retroactively alter
@@ -721,10 +726,18 @@ export async function endOngoingDbfAction(formData: FormData) {
       ? effectivenessRaw
       : null;
 
+  // SNS tube content (asi / sufor / NULL). Empty/skip → NULL = no tube.
+  const tubeContentRaw = String(formData.get("dbf_tube_content") ?? "").trim();
+  const dbfTubeContent =
+    tubeContentRaw === "asi" || tubeContentRaw === "sufor"
+      ? tubeContentRaw
+      : null;
+
   const updates: Record<string, unknown> = {
     end_timestamp: now,
     paused_at: null,
     effectiveness,
+    dbf_tube_content: dbfTubeContent,
   };
   if (existing.start_l_at && !existing.end_l_at) updates.end_l_at = now;
   if (existing.start_r_at && !existing.end_r_at) updates.end_r_at = now;
@@ -1318,6 +1331,13 @@ export async function updateLogAction(formData: FormData) {
         if (Number.isFinite(rate) && rate > 0 && rate <= 30) {
           payload.dbf_rate_override = rate;
         }
+      }
+      // SNS tube content — same shape.
+      const tubeRaw = String(formData.get("dbf_tube_content") ?? "").trim();
+      if (tubeRaw === "asi" || tubeRaw === "sufor") {
+        payload.dbf_tube_content = tubeRaw;
+      } else {
+        payload.dbf_tube_content = null;
       }
     }
   } else if (subtype === "pumping") {

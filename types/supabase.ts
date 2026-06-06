@@ -423,6 +423,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           dbf_rate_override: number | null
+          dbf_tube_content: string | null
           duration_l_min: number | null
           duration_r_min: number | null
           effectiveness: string | null
@@ -465,6 +466,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           dbf_rate_override?: number | null
+          dbf_tube_content?: string | null
           duration_l_min?: number | null
           duration_r_min?: number | null
           effectiveness?: string | null
@@ -507,6 +509,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           dbf_rate_override?: number | null
+          dbf_tube_content?: string | null
           duration_l_min?: number | null
           duration_r_min?: number | null
           effectiveness?: string | null

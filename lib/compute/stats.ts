@@ -34,6 +34,7 @@ export type LogRow = {
   max_db_a: number | null;
   effectiveness: "efektif" | "sedang" | "kurang_efektif" | null;
   dbf_rate_override: number | null;
+  dbf_tube_content: "asi" | "sufor" | null;
   bath_pijat_ilu: boolean | null;
   bath_clean_tali_pusat: boolean | null;
   notes: string | null;
