@@ -74,6 +74,18 @@ export async function updateBabyAction(formData: FormData) {
   }
 
   const supabase = createClient();
+
+  // Detect DBF settings change vs previous state — kalau berubah, insert
+  // period row for audit trail di /more/dbf-rate-history.
+  const { data: prev } = await supabase
+    .from("babies")
+    .select("dbf_ml_per_min, dbf_pumping_multiplier")
+    .eq("id", id)
+    .maybeSingle();
+  const prevFixed = prev?.dbf_ml_per_min != null ? Number(prev.dbf_ml_per_min) : null;
+  const prevMult = prev?.dbf_pumping_multiplier != null ? Number(prev.dbf_pumping_multiplier) : null;
+  const dbfChanged = prevFixed !== dbfFixed || prevMult !== dbfMult;
+
   const { error } = await supabase
     .from("babies")
     .update({
@@ -91,7 +103,28 @@ export async function updateBabyAction(formData: FormData) {
     redirect(`/more/profile?error=${encodeURIComponent("Gagal simpan.")}`);
   }
 
+  // Auto-create period kalau DBF settings berubah. Forward-only: past
+  // DBF rows tetap pakai snapshot dbf_rate_override yang ada — period
+  // purely informational + audit trail.
+  if (dbfChanged) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from("dbf_rate_periods").insert({
+        baby_id: id,
+        effective_from: new Date().toISOString(),
+        mode: dbfMode === "fixed" || dbfMode === "multiplier" ? dbfMode : "auto",
+        ml_per_min: dbfFixed,
+        multiplier: dbfMult,
+        notes: null,
+        created_by: user.id,
+      });
+    }
+  }
+
   revalidatePath("/more/profile");
+  revalidatePath("/more/dbf-rate-history");
   revalidatePath("/");
   redirect("/more/profile?saved=1");
 }
