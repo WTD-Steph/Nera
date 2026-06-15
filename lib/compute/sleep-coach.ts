@@ -92,12 +92,13 @@ export function analyzeSleep(
   logs: LogRow[],
   babyDob: string,
   windowDays: number = 7,
+  wakeOverride: { minMin: number; maxMin: number } | null = null,
 ): SleepCoachReport {
   const ageDays = Math.max(
     0,
     Math.floor((Date.now() - new Date(babyDob).getTime()) / 86400000),
   );
-  const wakeWindow = getWakeWindow(babyDob);
+  const wakeWindow = getWakeWindow(babyDob, wakeOverride);
   const target = getTargetForAge(babyDob);
   const startMs = windowStartMs(windowDays);
 

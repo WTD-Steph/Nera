@@ -169,6 +169,47 @@ export default async function ProfilePage({
           multiplierDefault={baby.dbf_pumping_multiplier}
         />
 
+        <div className="rounded-xl border border-gray-100 bg-gray-50/40 p-3">
+          <div className="text-xs font-semibold text-gray-700">
+            Wake window override (opsional)
+          </div>
+          <p className="mt-1 text-[11px] leading-snug text-gray-500">
+            Kalau diisi, override age-bucket default (Weissbluth). Kosongkan
+            keduanya untuk pakai default per usia. Range typical newborn 35–90
+            menit, 1–2 bln 60–90, 2–3 bln 75–90.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-xs text-gray-600">Min (menit)</span>
+              <input
+                type="number"
+                name="wake_window_min_min"
+                min="5"
+                max="600"
+                step="5"
+                inputMode="numeric"
+                placeholder="Misal 60"
+                defaultValue={baby.wake_window_min_min ?? ""}
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs text-gray-600">Max (menit)</span>
+              <input
+                type="number"
+                name="wake_window_max_min"
+                min="5"
+                max="600"
+                step="5"
+                inputMode="numeric"
+                placeholder="Misal 75"
+                defaultValue={baby.wake_window_max_min ?? ""}
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+              />
+            </label>
+          </div>
+        </div>
+
         <SubmitButton
           pendingText="Menyimpan…"
           className="w-full rounded-xl bg-rose-500 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-600 active:bg-rose-700"

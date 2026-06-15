@@ -60,7 +60,44 @@ export const WAKE_WINDOWS: WakeWindow[] = [
   { ageDaysMin: 365, ageDaysMax: 99999, minMin: 210, maxMin: 270, label: "12+ bln" },
 ];
 
-export function getWakeWindow(dobIso: string): WakeWindow {
+/** Per-baby override fields. Both required atau both null. */
+export type WakeWindowOverride = {
+  minMin: number;
+  maxMin: number;
+};
+
+/** Extract override from a baby record (or null kalau columns belum diset). */
+export function babyWakeOverride(baby: {
+  wake_window_min_min: number | null;
+  wake_window_max_min: number | null;
+}): WakeWindowOverride | null {
+  if (
+    baby.wake_window_min_min != null &&
+    baby.wake_window_max_min != null &&
+    baby.wake_window_min_min > 0 &&
+    baby.wake_window_max_min >= baby.wake_window_min_min
+  ) {
+    return {
+      minMin: baby.wake_window_min_min,
+      maxMin: baby.wake_window_max_min,
+    };
+  }
+  return null;
+}
+
+export function getWakeWindow(
+  dobIso: string,
+  override?: WakeWindowOverride | null,
+): WakeWindow {
+  if (override && override.minMin > 0 && override.maxMin >= override.minMin) {
+    return {
+      ageDaysMin: 0,
+      ageDaysMax: 99999,
+      minMin: override.minMin,
+      maxMin: override.maxMin,
+      label: "Custom",
+    };
+  }
   const days = Math.max(
     0,
     Math.floor((Date.now() - new Date(dobIso).getTime()) / 86400000),

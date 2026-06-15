@@ -30,7 +30,7 @@ import {
   endHandoverAction,
 } from "@/app/actions/handover";
 import { summarizeHandoverActivity } from "@/lib/compute/handover";
-import { assessWake, getWakeWindow } from "@/lib/constants/wake-window";
+import { assessWake, getWakeWindow, babyWakeOverride } from "@/lib/constants/wake-window";
 import { getCurrentRegression } from "@/lib/constants/sleep-regressions";
 import { computeCryCauses } from "@/lib/compute/cry-diagnostic";
 import { logDetail } from "@/lib/compute/log-detail";
@@ -579,14 +579,14 @@ export default async function HomePage({
         (Date.now() - new Date(last.sleep.end_timestamp).getTime()) / 60000,
       ),
     );
-    const window = getWakeWindow(baby.dob);
+    const window = getWakeWindow(baby.dob, babyWakeOverride(baby));
     return assessWake(awakeMin, window);
   })();
   // Sleep regression — banner saat in-window OR upcoming dalam 14 hari
   const sleepRegression = getCurrentRegression(baby.dob);
   // Realtime sleep coach advice — compact pill di top, full detail di
   // /sleep-coach page.
-  const realtimeAdvice = computeRealtimeAdvice(logsArray, baby.dob);
+  const realtimeAdvice = computeRealtimeAdvice(logsArray, baby.dob, babyWakeOverride(baby));
   // Cry diagnostic — rank kemungkinan penyebab nangis dari log terbaru
   const lastTemp =
     logsArray.find((l) => l.subtype === "temp") ?? null;

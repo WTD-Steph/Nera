@@ -30,6 +30,8 @@ export type Database = {
           id: string
           name: string
           updated_at: string
+          wake_window_max_min: number | null
+          wake_window_min_min: number | null
         }
         Insert: {
           birth_height_cm: number
@@ -43,6 +45,8 @@ export type Database = {
           id?: string
           name: string
           updated_at?: string
+          wake_window_max_min?: number | null
+          wake_window_min_min?: number | null
         }
         Update: {
           birth_height_cm?: number
@@ -56,6 +60,8 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string
+          wake_window_max_min?: number | null
+          wake_window_min_min?: number | null
         }
         Relationships: [
           {

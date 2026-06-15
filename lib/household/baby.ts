@@ -14,6 +14,9 @@ export type CurrentBaby = {
   dbf_ml_per_min: number | null;
   /** Multiplier applied to auto pumping rate. NULL = not used. */
   dbf_pumping_multiplier: number | null;
+  /** Wake window override (menit). NULL = pakai age-bucket default. */
+  wake_window_min_min: number | null;
+  wake_window_max_min: number | null;
 };
 
 /**
@@ -29,7 +32,7 @@ export const getCurrentBaby = cache(async (): Promise<CurrentBaby | null> => {
   const { data, error } = await supabase
     .from("babies")
     .select(
-      "id, name, gender, dob, birth_weight_kg, birth_height_cm, household_id, dbf_ml_per_min, dbf_pumping_multiplier",
+      "id, name, gender, dob, birth_weight_kg, birth_height_cm, household_id, dbf_ml_per_min, dbf_pumping_multiplier, wake_window_min_min, wake_window_max_min",
     )
     .eq("household_id", household.household_id)
     .order("created_at", { ascending: true })

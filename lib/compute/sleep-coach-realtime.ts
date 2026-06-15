@@ -61,13 +61,14 @@ function hungerThresholdMin(ageDays: number): number {
 export function computeRealtimeAdvice(
   logs: LogRow[],
   babyDob: string,
+  wakeOverride: { minMin: number; maxMin: number } | null = null,
 ): RealtimeAdvice {
   const ageDays = Math.max(
     0,
     Math.floor((Date.now() - new Date(babyDob).getTime()) / 86400000),
   );
   const now = Date.now();
-  const wakeWindow = getWakeWindow(babyDob);
+  const wakeWindow = getWakeWindow(babyDob, wakeOverride);
   const currentHour = jakartaHour();
   const isNight = isNightHour(currentHour);
 

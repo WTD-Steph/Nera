@@ -9,6 +9,7 @@ import {
   computeRealtimeAdvice,
   type RealtimeAdvice,
 } from "@/lib/compute/sleep-coach-realtime";
+import { babyWakeOverride } from "@/lib/constants/wake-window";
 
 const LEVEL_STYLE: Record<
   CoachLevel,
@@ -56,8 +57,9 @@ export default async function SleepCoachPage() {
     .gte("timestamp", since)
     .order("timestamp", { ascending: true });
   const logsArray = (logs ?? []) as LogRow[];
-  const report = analyzeSleep(logsArray, baby.dob, 7);
-  const realtime = computeRealtimeAdvice(logsArray, baby.dob);
+  const wakeOverride = babyWakeOverride(baby);
+  const report = analyzeSleep(logsArray, baby.dob, 7, wakeOverride);
+  const realtime = computeRealtimeAdvice(logsArray, baby.dob, wakeOverride);
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 py-6 md:max-w-2xl">
