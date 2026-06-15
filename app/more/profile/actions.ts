@@ -26,6 +26,30 @@ export async function updateBabyAction(formData: FormData) {
       ? parseDecimal(formData.get("dbf_pumping_multiplier") as string | null)
       : null;
 
+  // Wake window override (optional). Both kosong = NULL (pakai age-bucket).
+  const wakeMinRaw = String(formData.get("wake_window_min_min") ?? "").trim();
+  const wakeMaxRaw = String(formData.get("wake_window_max_min") ?? "").trim();
+  let wakeMin: number | null = null;
+  let wakeMax: number | null = null;
+  if (wakeMinRaw !== "" || wakeMaxRaw !== "") {
+    const minN = Number(wakeMinRaw);
+    const maxN = Number(wakeMaxRaw);
+    if (
+      !Number.isFinite(minN) ||
+      !Number.isFinite(maxN) ||
+      minN <= 0 ||
+      maxN <= 0 ||
+      minN > maxN ||
+      maxN > 600
+    ) {
+      redirect(
+        `/more/profile?error=${encodeURIComponent("Wake window: min ≤ max, range 1-600 menit, atau kosongkan keduanya.")}`,
+      );
+    }
+    wakeMin = Math.round(minN);
+    wakeMax = Math.round(maxN);
+  }
+
   if (!id) redirect("/more/profile");
   if (!name) {
     redirect(`/more/profile?error=${encodeURIComponent("Nama harus diisi.")}`);
@@ -96,6 +120,8 @@ export async function updateBabyAction(formData: FormData) {
       birth_height_cm: birthHeight,
       dbf_ml_per_min: dbfFixed,
       dbf_pumping_multiplier: dbfMult,
+      wake_window_min_min: wakeMin,
+      wake_window_max_min: wakeMax,
     } as never)
     .eq("id", id);
 
