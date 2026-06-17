@@ -1460,8 +1460,20 @@ function DbfEffectivenessStep({
   const [endOffset, setEndOffset] = useState(0);
   // SNS (tube feeder): tube taped near nipple supaya baby dapat tambahan
   // susu sambil tetap latch. Default tidak pakai. Kalau pakai, content
-  // ASI (expressed) atau Sufor.
-  const [tubeContent, setTubeContent] = useState<"" | "asi" | "sufor">("");
+  // ASIP (expressed) / Sufor / Mix. Untuk Mix tanya ml masing-masing.
+  // Tube content > 0 ml auto-create separate bottle feed log saat submit.
+  const [tubeContent, setTubeContent] = useState<"" | "asi" | "sufor" | "mix">("");
+  const [tubeAsiMl, setTubeAsiMl] = useState<number>(0);
+  const [tubeSuforMl, setTubeSuforMl] = useState<number>(0);
+
+  const askingTube = tubeContent !== "";
+  const tubeMlForSubmit = (() => {
+    if (tubeContent === "asi") return tubeAsiMl;
+    if (tubeContent === "sufor") return tubeSuforMl;
+    if (tubeContent === "mix") return tubeAsiMl + tubeSuforMl;
+    return 0;
+  })();
+
   return (
     <div className="space-y-2 rounded-xl border border-rose-100 bg-rose-50/40 p-3">
       <EndOffsetSelect value={endOffset} onChange={setEndOffset} />
@@ -1470,20 +1482,29 @@ function DbfEffectivenessStep({
           Pakai selang (SNS) sambil DBF?
         </p>
         <p className="mt-0.5 text-center text-[10px] leading-snug text-gray-500">
-          Selang taped ke nipple supaya tambahan susu masuk
+          Auto-catat feed botol terpisah sesuai isi selang
         </p>
-        <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+        <div className="mt-1.5 grid grid-cols-4 gap-1.5">
           {(
             [
               { value: "", label: "Tidak" },
               { value: "asi", label: "ASIP" },
               { value: "sufor", label: "Sufor" },
+              { value: "mix", label: "Mix" },
             ] as const
           ).map((opt) => (
             <button
               key={opt.value || "no-tube"}
               type="button"
-              onClick={() => setTubeContent(opt.value)}
+              onClick={() => {
+                setTubeContent(opt.value);
+                if (opt.value === "") {
+                  setTubeAsiMl(0);
+                  setTubeSuforMl(0);
+                }
+                if (opt.value === "asi") setTubeSuforMl(0);
+                if (opt.value === "sufor") setTubeAsiMl(0);
+              }}
               className={`rounded-lg border py-1.5 text-xs font-semibold transition-colors ${
                 tubeContent === opt.value
                   ? "border-rose-400 bg-rose-100 text-rose-700"
@@ -1494,6 +1515,51 @@ function DbfEffectivenessStep({
             </button>
           ))}
         </div>
+        {askingTube ? (
+          <div className="mt-2 space-y-2">
+            {(tubeContent === "asi" || tubeContent === "mix") ? (
+              <label className="block">
+                <span className="text-[11px] font-medium text-gray-600">
+                  ASIP ml
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={300}
+                  step={1}
+                  value={tubeAsiMl || ""}
+                  onChange={(e) => setTubeAsiMl(Number(e.target.value) || 0)}
+                  placeholder="0"
+                  className="mt-0.5 w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-base font-semibold tabular-nums text-rose-700 outline-none focus:border-rose-400"
+                />
+              </label>
+            ) : null}
+            {(tubeContent === "sufor" || tubeContent === "mix") ? (
+              <label className="block">
+                <span className="text-[11px] font-medium text-gray-600">
+                  Sufor ml
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={300}
+                  step={1}
+                  value={tubeSuforMl || ""}
+                  onChange={(e) => setTubeSuforMl(Number(e.target.value) || 0)}
+                  placeholder="0"
+                  className="mt-0.5 w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-base font-semibold tabular-nums text-amber-700 outline-none focus:border-rose-400"
+                />
+              </label>
+            ) : null}
+            {tubeMlForSubmit === 0 ? (
+              <p className="text-[10px] italic text-gray-500">
+                Isi ml di atas — kalau 0, hanya catat tube content tanpa amount.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       <p className="text-center text-[11px] font-semibold text-rose-700">
         Bagaimana efektivitas DBF?
@@ -1531,6 +1597,8 @@ function DbfEffectivenessStep({
           <input type="hidden" name="effectiveness" value={opt.value} />
           <input type="hidden" name="end_offset_min" value={endOffset} />
           <input type="hidden" name="dbf_tube_content" value={tubeContent} />
+          <input type="hidden" name="dbf_tube_asi_ml" value={tubeAsiMl} />
+          <input type="hidden" name="dbf_tube_sufor_ml" value={tubeSuforMl} />
           <SubmitButton
             pendingText="…"
             className="flex w-full flex-col items-center rounded-xl border border-rose-200 bg-white py-2 px-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 active:scale-[0.98]"

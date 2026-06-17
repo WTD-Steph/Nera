@@ -180,7 +180,7 @@ export async function createLogAction(formData: FormData) {
       }
       // SNS tube content (asi / sufor / NULL). Same semantics.
       const tubeRaw = String(formData.get("dbf_tube_content") ?? "").trim();
-      if (tubeRaw === "asi" || tubeRaw === "sufor") {
+      if (tubeRaw === "asi" || tubeRaw === "sufor" || tubeRaw === "mix") {
         payload.dbf_tube_content = tubeRaw;
       }
       // Per-row rate snapshot. Forward-only behavior: if user provides
@@ -726,12 +726,23 @@ export async function endOngoingDbfAction(formData: FormData) {
       ? effectivenessRaw
       : null;
 
-  // SNS tube content (asi / sufor / NULL). Empty/skip → NULL = no tube.
+  // SNS tube content (asi / sufor / mix / NULL). Empty/skip → NULL.
   const tubeContentRaw = String(formData.get("dbf_tube_content") ?? "").trim();
   const dbfTubeContent =
-    tubeContentRaw === "asi" || tubeContentRaw === "sufor"
+    tubeContentRaw === "asi" ||
+    tubeContentRaw === "sufor" ||
+    tubeContentRaw === "mix"
       ? tubeContentRaw
       : null;
+  // Tube ml inputs — for separate bottle log creation di bawah.
+  const tubeAsiMl = Math.max(
+    0,
+    Math.round(Number(formData.get("dbf_tube_asi_ml") ?? 0) || 0),
+  );
+  const tubeSuforMl = Math.max(
+    0,
+    Math.round(Number(formData.get("dbf_tube_sufor_ml") ?? 0) || 0),
+  );
 
   const updates: Record<string, unknown> = {
     end_timestamp: now,
@@ -797,13 +808,47 @@ export async function endOngoingDbfAction(formData: FormData) {
     );
   }
 
+  // Auto-create bottle feed log untuk tube feeder content + amount.
+  // Bottle feed pakai timestamp = DBF end (now) sehingga muncul tepat
+  // setelah DBF di timeline. Bottle_content + amount_ml/amount_asi_ml/
+  // amount_sufor_ml sesuai pilihan user; consumed_ml auto-flow ke stock
+  // ASI kalau ASI portion ada.
+  if (dbfTubeContent && (tubeAsiMl > 0 || tubeSuforMl > 0)) {
+    const baby2 = await getCurrentBaby();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (baby2 && user) {
+      const totalMl = tubeAsiMl + tubeSuforMl;
+      const tubePayload: Record<string, unknown> = {
+        baby_id: baby2.id,
+        subtype: "feeding",
+        timestamp: now,
+        end_timestamp: now,
+        amount_ml: totalMl,
+        bottle_content: dbfTubeContent,
+        notes: "via tube feeder (SNS) — auto-catat dari DBF",
+        created_by: user.id,
+        started_with_stopwatch: false,
+      };
+      if (dbfTubeContent === "asi") {
+        tubePayload.amount_asi_ml = tubeAsiMl;
+      } else if (dbfTubeContent === "sufor") {
+        tubePayload.amount_sufor_ml = tubeSuforMl;
+      } else if (dbfTubeContent === "mix") {
+        tubePayload.amount_asi_ml = tubeAsiMl;
+        tubePayload.amount_sufor_ml = tubeSuforMl;
+      }
+      await supabase.from("logs").insert(tubePayload as never);
+    }
+  }
+
   revalidatePath("/");
   revalidatePath("/history");
 
-  // Top-up recommendation: if effective ml < per-feed expected by ≥15ml
-  // and ≥20%, redirect with ?topup=X param so home page can show the
-  // suggestion banner. Conservative — most newborns don't need top-up
-  // routinely, only on poor effectiveness or short sessions.
+  // Redirect with dbf_id supaya tampungan banner masih bisa surface kalau
+  // applicable. Top-up suggestion removed per user request — dbf_dur param
+  // kept dipassed but bukan untuk top-up lagi.
   redirect(
     `${returnTo}?logsaved=feeding&dbf_id=${id}&dbf_dur=${durLMin + durRMin}`,
   );
@@ -1334,7 +1379,7 @@ export async function updateLogAction(formData: FormData) {
       }
       // SNS tube content — same shape.
       const tubeRaw = String(formData.get("dbf_tube_content") ?? "").trim();
-      if (tubeRaw === "asi" || tubeRaw === "sufor") {
+      if (tubeRaw === "asi" || tubeRaw === "sufor" || tubeRaw === "mix") {
         payload.dbf_tube_content = tubeRaw;
       } else {
         payload.dbf_tube_content = null;
