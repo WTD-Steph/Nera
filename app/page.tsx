@@ -67,12 +67,6 @@ import {
   computeMilkTarget,
 } from "@/lib/constants/daily-targets";
 import { dbfEstimateMl } from "@/lib/compute/dbf-estimate";
-import {
-  EFFECTIVENESS_EMOJIS,
-  EFFECTIVENESS_LABELS,
-  suggestTopUp,
-  type EffectivenessLevel,
-} from "@/lib/compute/dbf-effectiveness";
 
 type SearchParams = {
   welcome?: string;
@@ -93,8 +87,6 @@ type SearchParams = {
   handover?: string;
   /** "1" = user dismissed tampungan banner; keep dbf_id so other banners stay. */
   tampungan_skip?: string;
-  /** "1" = user dismissed top-up suggestion; keep dbf_id so other banners stay. */
-  topup_skip?: string;
 };
 
 function parseJakartaDate(s: string | undefined): number | null {
@@ -609,62 +601,7 @@ export default async function HomePage({
     ageDays,
   });
 
-  // Top-up suggestion after DBF Selesai. dbf_id + dbf_dur passed via
-  // redirect from endOngoingDbfAction. Looks up effectiveness from the
-  // row, computes suggestion using dbf-effectiveness research model.
-  const topUpSuggestion = (() => {
-    const dbfId = searchParams.dbf_id;
-    const dbfDur = Number(searchParams.dbf_dur ?? 0);
-    if (!dbfId || !Number.isFinite(dbfDur) || dbfDur <= 0) return null;
-    if (searchParams.topup_skip === "1") return null;
-    const dbfRow = logsArray.find((l) => l.id === dbfId);
-    if (!dbfRow || dbfRow.subtype !== "feeding") return null;
-    const effectiveness = (dbfRow.effectiveness ??
-      null) as EffectivenessLevel | null;
-    return suggestTopUp({
-      durationMins: dbfDur,
-      baseRate: dbfEst.mlPerMin,
-      effectiveness,
-      milkTargetMin: milkTarget.min,
-      target,
-    });
-  })();
-  // When DBF was sufficient (no top-up suggested) but user just ended
-  // a session, surface an "OK, no top-up needed" info banner so they
-  // don't wonder "kok ngga ada saran ya?".
-  const topUpInfo = (() => {
-    if (topUpSuggestion) return null;
-    const dbfId = searchParams.dbf_id;
-    const dbfDur = Number(searchParams.dbf_dur ?? 0);
-    if (!dbfId || !Number.isFinite(dbfDur) || dbfDur <= 0) return null;
-    if (searchParams.topup_skip === "1") return null;
-    const dbfRow = logsArray.find((l) => l.id === dbfId);
-    if (!dbfRow || dbfRow.subtype !== "feeding") return null;
-    const eff = (dbfRow.effectiveness ?? null) as EffectivenessLevel | null;
-    const factor = eff
-      ? eff === "efektif"
-        ? 1.0
-        : eff === "sedang"
-          ? 0.8
-          : 0.6
-      : 1.0;
-    const effectiveMl = Math.round(dbfDur * dbfEst.mlPerMin * factor);
-    const feedsPerDay =
-      target.ageDaysMax <= 30
-        ? 10
-        : target.ageDaysMax <= 90
-          ? 7
-          : target.ageDaysMax <= 180
-            ? 6
-            : 5;
-    const expectedPerFeed = Math.round(milkTarget.min / feedsPerDay);
-    return { effectiveMl, expectedPerFeed };
-  })();
-  const dbfRowEffectiveness = (() => {
-    if (!searchParams.dbf_id) return null;
-    const row = logsArray.find((l) => l.id === searchParams.dbf_id);
-    return (row?.effectiveness ?? null) as EffectivenessLevel | null;
-  })();
+  // Top-up suggestion removed per user request.
   // Tampungan (Haakaa) prompt: only show when DBF was single-side (the
   // OTHER side is the one that may have dripped into a collector cup).
   // Both-sides DBF can't have a tampungan (no free side), nor can sessions
@@ -1113,74 +1050,7 @@ export default async function HomePage({
           );
         })()
       ) : null}
-      {topUpSuggestion ? (
-        <div className="flash-in mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-          <div className="flex items-start gap-2">
-            <span aria-hidden className="text-xl">
-              💡
-            </span>
-            <div className="flex-1 text-sm text-amber-900">
-              <div className="font-semibold">
-                Saran top-up ≈{topUpSuggestion.recommendMl} ml
-              </div>
-              <div className="mt-0.5 text-[12px] leading-snug text-amber-800/90">
-                DBF{" "}
-                {dbfRowEffectiveness
-                  ? `${EFFECTIVENESS_EMOJIS[dbfRowEffectiveness]} ${EFFECTIVENESS_LABELS[dbfRowEffectiveness]}`
-                  : "estimasi"}{" "}
-                ≈{topUpSuggestion.effectiveMl} ml @ {dbfEst.mlPerMin.toFixed(1)} ml/m
-                {" "}dari target per feed {topUpSuggestion.expectedPerFeed} ml.
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <LogModalTrigger
-                  subtype="feeding"
-                  asiBatches={asiBatchOptions}
-                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-sm hover:bg-amber-100"
-                >
-                  🍼 Catat botol top-up
-                </LogModalTrigger>
-                <Link
-                  href={postDbfHref({ topup_skip: "1" })}
-                  className="inline-flex items-center rounded-full px-3 py-1.5 text-xs text-amber-700/70 hover:text-amber-900"
-                >
-                  Skip
-                </Link>
-              </div>
-              <p className="mt-2 text-[10px] leading-snug text-amber-700/70">
-                Saran berbasis WHO/AAP/IDAI per-kg/hari × usia ÷ feeds/hari.
-                Bukan instruksi medis — ikuti panduan DSA.
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : topUpInfo ? (
-        <div className="flash-in mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 shadow-sm">
-          <div className="flex items-start gap-2">
-            <span aria-hidden className="text-lg">
-              ✓
-            </span>
-            <div className="flex-1 text-sm text-emerald-900">
-              <div className="font-semibold">Tidak perlu top-up</div>
-              <div className="mt-0.5 text-[11px] leading-snug text-emerald-800/90">
-                DBF{" "}
-                {dbfRowEffectiveness
-                  ? `${EFFECTIVENESS_EMOJIS[dbfRowEffectiveness]} ${EFFECTIVENESS_LABELS[dbfRowEffectiveness]}`
-                  : "estimasi"}{" "}
-                ≈{topUpInfo.effectiveMl} ml — sudah dekat target per feed
-                ≈{topUpInfo.expectedPerFeed} ml.
-              </div>
-              <div className="mt-1.5">
-                <Link
-                  href={postDbfHref({ topup_skip: "1" })}
-                  className="text-[11px] text-emerald-700/70 hover:text-emerald-900"
-                >
-                  Tutup
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/* Top-up suggestion banner removed per user request. */}
 
       {tampunganSide ? (
         <form
