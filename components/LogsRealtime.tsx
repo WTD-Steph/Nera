@@ -15,9 +15,13 @@ import { createClient } from "@/lib/supabase/client";
  *    visible), force router.refresh() to pull fresh data immediately.
  *    Also catches "browser tab refocus" use case across desktop.
  *
- * 3. Online/online + interval poll fallback — when the realtime channel
- *    silently fails (cell network flap, websocket blocked), a 30-second
- *    poll while the page is visible keeps data within ~30s of accurate.
+ * 3. Online + gated interval poll fallback — when the realtime channel
+ *    silently fails (cell network flap, websocket blocked), a 5-minute
+ *    poll runs ONLY while the channel is unhealthy and the page is
+ *    visible. While realtime is connected (the normal case) the poll never
+ *    fires, so an idle/kiosk tab costs zero server invocations. On
+ *    reconnect we refresh once to catch up on events missed during the
+ *    outage (postgres_changes does not replay).
  *
  * RLS-aware: realtime + Supabase queries both respect row policies.
  */
@@ -58,7 +62,28 @@ export function LogsRealtime({
         },
       );
     }
-    channel.subscribe();
+    // Track realtime health so the fallback poll only runs when the
+    // websocket is actually down — NOT on a fixed timer. A fixed 30s poll
+    // calling router.refresh() re-renders the whole dynamic dashboard RSC
+    // on the server (a Vercel function invocation + a middleware auth
+    // round-trip) every 30s on every open tab — including the Mode Jam
+    // kiosk left running 24/7 — which dominated the Vercel/Supabase bill.
+    let channelHealthy = false;
+    let everSubscribed = false;
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        // Reconnect after a drop: postgres_changes does NOT replay events
+        // missed while offline, so pull once to catch up. Skip the very
+        // first subscribe (the page already rendered fresh on the server).
+        if (everSubscribed) router.refresh();
+        everSubscribed = true;
+        channelHealthy = true;
+      } else {
+        // CHANNEL_ERROR / TIMED_OUT / CLOSED → realtime is down; let the
+        // fallback poll below take over until it recovers.
+        channelHealthy = false;
+      }
+    });
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -69,13 +94,15 @@ export function LogsRealtime({
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("online", onOnline);
 
-    // Polling fallback: every 30s while tab visible. Cheap (server
-    // returns from cache or revalidates fast) and bounds staleness.
+    // Fallback poll: only when realtime is down AND the tab is visible.
+    // While the channel is healthy (the normal case) this never fires, so
+    // an idle open tab costs nothing. 5-minute interval bounds staleness
+    // during an outage without hammering the server.
     const pollId = setInterval(() => {
-      if (document.visibilityState === "visible") {
+      if (!channelHealthy && document.visibilityState === "visible") {
         router.refresh();
       }
-    }, 30_000);
+    }, 5 * 60_000);
 
     return () => {
       void supabase.removeChannel(channel);
