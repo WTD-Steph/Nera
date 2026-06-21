@@ -10,6 +10,7 @@ import {
   TAGGABLE_REASONS,
   type Reason,
 } from "@/lib/cry-detection/reason-heuristics";
+import { babyWakeOverride } from "@/lib/constants/wake-window";
 import { computeCryContext } from "@/lib/compute/cry-context";
 import type { LogRow } from "@/lib/compute/stats";
 
@@ -75,7 +76,7 @@ export async function createCryStartedAction(
     0,
     Math.floor((startedAtMs - new Date(baby.dob).getTime()) / 86400000),
   );
-  const suggestion = suggestReason(context, ageDays);
+  const suggestion = suggestReason(context, ageDays, babyWakeOverride(baby));
 
   const { data, error } = await supabase
     .from("cry_events")

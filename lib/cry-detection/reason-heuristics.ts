@@ -78,12 +78,15 @@ function diaperWarningMin(ageDays: number): number {
 export function suggestReason(
   context: CryContextHint,
   ageDays: number,
+  wakeOverride: { minMin: number; maxMin: number } | null = null,
 ): ReasonSuggestion {
   const expectedFeed = expectedFeedIntervalMin(ageDays);
   const diaperWarn = diaperWarningMin(ageDays);
   // Wake window dari babies.dob lookup pattern; pass ageDays directly
   // here via reconstruction (heuristic engine consumes pure values).
-  const wakeWindow = getWakeWindowByAge(ageDays);
+  // Respect the per-baby override so the "tired" suggestion matches the
+  // wake-window card (which is override-aware) instead of the age default.
+  const wakeWindow = getWakeWindowByAge(ageDays, wakeOverride);
 
   // Rule 1: woke during sleep
   if (context.isCurrentlySleeping) {
@@ -174,9 +177,12 @@ function formatMin(min: number): string {
 }
 
 // Helper: lookup wake window by age (numeric), bypass dobIso conversion.
-function getWakeWindowByAge(ageDays: number) {
+function getWakeWindowByAge(
+  ageDays: number,
+  override: { minMin: number; maxMin: number } | null = null,
+) {
   const fauxDob = new Date(Date.now() - ageDays * 86400000).toISOString();
-  return getWakeWindow(fauxDob);
+  return getWakeWindow(fauxDob, override);
 }
 
 // Display helpers untuk UI consistency.

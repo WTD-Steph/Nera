@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { LiveClock, LiveDate } from "@/components/LiveClock";
 import { startOngoingLogAction } from "@/app/actions/logs";
 import { SubmitButton } from "@/components/SubmitButton";
+import { timeSince } from "@/lib/compute/format";
+import { useNow } from "@/lib/time/use-now";
+import { computeReminders, type ReminderInputs } from "@/lib/compute/reminders";
 
 export type IdleClockStats = {
   milkTotalMl: number;
@@ -37,24 +40,42 @@ function pct(value: number, target: number): number {
 }
 
 export function IdleClockMode({
-  sinceFeeding,
-  sinceDiaper,
-  sinceSleep,
-  reminder,
-  reminders,
+  feedingIso,
+  diaperIso,
+  sleepEndIso,
+  sleepOngoing,
+  reminderInputs,
+  initialNowMs,
   stats,
   ongoingSubtypes,
   onClose,
 }: {
-  sinceFeeding?: string | null;
-  sinceDiaper?: string | null;
-  sinceSleep?: string | null;
-  reminder: IdleClockReminder | null;
-  reminders?: IdleClockReminder[];
+  feedingIso?: string | null;
+  diaperIso?: string | null;
+  sleepEndIso?: string | null;
+  sleepOngoing?: boolean;
+  reminderInputs: ReminderInputs;
+  initialNowMs: number;
   stats: IdleClockStats;
   ongoingSubtypes: string[];
   onClose: () => void;
 }) {
+  // Live clock: the kiosk is left open for hours, so every elapsed value
+  // recomputes on the client instead of freezing at the server snapshot.
+  const now = useNow(30_000, initialNowMs);
+  const sinceFeeding = feedingIso ? timeSince(feedingIso, now) : null;
+  const sinceDiaper = diaperIso ? timeSince(diaperIso, now) : null;
+  const sinceSleep = sleepOngoing
+    ? "sedang berjalan"
+    : sleepEndIso
+      ? timeSince(sleepEndIso, now)
+      : null;
+  const rem = computeReminders(reminderInputs, now);
+  const reminders: IdleClockReminder[] = [];
+  if (rem.feeding) reminders.push({ ...rem.feeding, emoji: "🍼" });
+  if (rem.diaper) reminders.push({ ...rem.diaper, emoji: "🧷" });
+  if (rem.pumping) reminders.push({ ...rem.pumping, emoji: "💧" });
+
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -130,18 +151,10 @@ export function IdleClockMode({
         />
 
         {(() => {
-          // Combine legacy single + new array, dedupe by text
-          const all: IdleClockReminder[] = [
-            ...(reminder ? [reminder] : []),
-            ...(reminders ?? []),
-          ];
-          const uniq = Array.from(
-            new Map(all.map((r) => [r.text, r])).values(),
-          );
-          if (uniq.length === 0) return null;
+          if (reminders.length === 0) return null;
           return (
             <div className="flex w-full max-w-2xl flex-col items-center gap-1.5">
-              {uniq.map((r, i) => (
+              {reminders.map((r, i) => (
                 <div
                   key={i}
                   className={`flash-in flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold ${
@@ -400,20 +413,22 @@ function ShortcutForm({
 }
 
 export function IdleClockToggle({
-  sinceFeeding,
-  sinceDiaper,
-  sinceSleep,
-  reminder,
-  reminders,
+  feedingIso,
+  diaperIso,
+  sleepEndIso,
+  sleepOngoing,
+  reminderInputs,
+  initialNowMs,
   stats,
   ongoingSubtypes,
   variant = "full",
 }: {
-  sinceFeeding?: string | null;
-  sinceDiaper?: string | null;
-  sinceSleep?: string | null;
-  reminder: IdleClockReminder | null;
-  reminders?: IdleClockReminder[];
+  feedingIso?: string | null;
+  diaperIso?: string | null;
+  sleepEndIso?: string | null;
+  sleepOngoing?: boolean;
+  reminderInputs: ReminderInputs;
+  initialNowMs: number;
   stats: IdleClockStats;
   ongoingSubtypes: string[];
   /** "full" = wide button row; "icon" = circular icon for header. */
@@ -444,11 +459,12 @@ export function IdleClockToggle({
       </button>
       {open ? (
         <IdleClockMode
-          sinceFeeding={sinceFeeding}
-          sinceDiaper={sinceDiaper}
-          sinceSleep={sinceSleep}
-          reminder={reminder}
-          reminders={reminders}
+          feedingIso={feedingIso}
+          diaperIso={diaperIso}
+          sleepEndIso={sleepEndIso}
+          sleepOngoing={sleepOngoing}
+          reminderInputs={reminderInputs}
+          initialNowMs={initialNowMs}
           stats={stats}
           ongoingSubtypes={ongoingSubtypes}
           onClose={() => setOpen(false)}
