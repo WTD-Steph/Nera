@@ -88,6 +88,7 @@ export function babyWakeOverride(baby: {
 export function getWakeWindow(
   dobIso: string,
   override?: WakeWindowOverride | null,
+  now: number = Date.now(),
 ): WakeWindow {
   if (override && override.minMin > 0 && override.maxMin >= override.minMin) {
     return {
@@ -100,7 +101,7 @@ export function getWakeWindow(
   }
   const days = Math.max(
     0,
-    Math.floor((Date.now() - new Date(dobIso).getTime()) / 86400000),
+    Math.floor((now - new Date(dobIso).getTime()) / 86400000),
   );
   for (const w of WAKE_WINDOWS) {
     if (days >= w.ageDaysMin && days < w.ageDaysMax) return w;
@@ -120,8 +121,26 @@ export type WakeAssessment = {
   tone: "ok" | "warn" | "alert";
 };
 
+/** Minutes awake since a sleep ended (clamped ≥ 0). Single source of truth
+ *  for the home wake card, the realtime sleep coach, and Mode Jam. */
+export function awakeMinutesSince(
+  sleepEndIso: string,
+  now: number = Date.now(),
+): number {
+  return Math.max(
+    0,
+    Math.round((now - new Date(sleepEndIso).getTime()) / 60000),
+  );
+}
+
 export function assessWake(awakeMin: number, window: WakeWindow): WakeAssessment {
   const { minMin, maxMin } = window;
+  // Lead-in before the max where we say "wrap up". For normal buckets
+  // (span ≥ 15) this is the historical 10 min. For narrow/single-point
+  // overrides (e.g. 60/60) clamp it so the "ideal" band stays reachable —
+  // otherwise `ideal` requires awakeMin ≥ minMin AND ≤ maxMin-10, which is
+  // impossible when maxMin-10 < minMin and the green state never shows.
+  const wrapLead = Math.min(10, Math.max(0, maxMin - minMin));
   let status: WakeStatus;
   let statusLabel: string;
   let tone: "ok" | "warn" | "alert";
@@ -133,7 +152,7 @@ export function assessWake(awakeMin: number, window: WakeWindow): WakeAssessment
     status = "approaching";
     statusLabel = "Mendekati window tidur";
     tone = "ok";
-  } else if (awakeMin <= maxMin - 10) {
+  } else if (awakeMin <= maxMin - wrapLead) {
     status = "ideal";
     statusLabel = "Window tidur — saat yang baik untuk settle";
     tone = "ok";

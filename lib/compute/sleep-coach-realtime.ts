@@ -14,7 +14,7 @@
 // 'details' so caregiver gets full context.
 
 import type { LogRow } from "@/lib/compute/stats";
-import { getWakeWindow } from "@/lib/constants/wake-window";
+import { getWakeWindow, awakeMinutesSince } from "@/lib/constants/wake-window";
 import { fmtDuration } from "@/lib/compute/format";
 
 export type RealtimeAction = "settle" | "wake" | "wait" | "check";
@@ -62,14 +62,14 @@ export function computeRealtimeAdvice(
   logs: LogRow[],
   babyDob: string,
   wakeOverride: { minMin: number; maxMin: number } | null = null,
+  now: number = Date.now(),
 ): RealtimeAdvice {
   const ageDays = Math.max(
     0,
-    Math.floor((Date.now() - new Date(babyDob).getTime()) / 86400000),
+    Math.floor((now - new Date(babyDob).getTime()) / 86400000),
   );
-  const now = Date.now();
-  const wakeWindow = getWakeWindow(babyDob, wakeOverride);
-  const currentHour = jakartaHour();
+  const wakeWindow = getWakeWindow(babyDob, wakeOverride, now);
+  const currentHour = jakartaHour(new Date(now));
   const isNight = isNightHour(currentHour);
 
   // Sort logs desc for quick lookups
@@ -178,8 +178,7 @@ export function computeRealtimeAdvice(
 
   // === AWAKE CASE ===
   if (lastSleepEnded?.end_timestamp) {
-    const wakeStart = new Date(lastSleepEnded.end_timestamp).getTime();
-    const awakeMin = Math.round((now - wakeStart) / 60000);
+    const awakeMin = awakeMinutesSince(lastSleepEnded.end_timestamp, now);
     details.push(`Sudah ${fmtDuration(awakeMin)} bangun`);
     details.push(
       `Wake window ${wakeWindow.minMin}–${wakeWindow.maxMin}m (usia ${wakeWindow.label})`,

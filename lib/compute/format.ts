@@ -60,8 +60,8 @@ export function fmtSleepRange(
   return `${startStr} → ${endStr} · ${fmtDuration(mins)}`;
 }
 
-export function timeSince(ts: string | Date): string {
-  const diff = Date.now() - new Date(ts).getTime();
+export function timeSince(ts: string | Date, now: number = Date.now()): string {
+  const diff = now - new Date(ts).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return "baru saja";
   if (mins < 60) return `${mins}m lalu`;

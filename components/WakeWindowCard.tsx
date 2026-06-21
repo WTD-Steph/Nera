@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { WakeAssessment } from "@/lib/constants/wake-window";
+import {
+  assessWake,
+  awakeMinutesSince,
+  type WakeAssessment,
+  type WakeWindow,
+} from "@/lib/constants/wake-window";
+import { useNow } from "@/lib/time/use-now";
 
 const TONE_BG: Record<WakeAssessment["tone"], string> = {
   ok: "border-emerald-100 bg-emerald-50/40 text-emerald-800",
@@ -15,25 +21,38 @@ const TONE_BAR: Record<WakeAssessment["tone"], string> = {
   alert: "bg-red-400",
 };
 
-/** Light-mode inline card with optional dark-mode trigger. */
-export function WakeWindowCard({ assessment }: { assessment: WakeAssessment }) {
+/**
+ * Live wake-window card. Recomputes awake-minutes from the last sleep-end
+ * anchor on a client clock (useNow), so it ticks every 30s WITHOUT a server
+ * re-render. `initialNowMs` = server render clock keeps first paint
+ * hydration-safe. Previously this took a precomputed `assessment` and froze
+ * between server renders (the "stalled" bug).
+ */
+export function WakeWindowCard({
+  anchorIso,
+  window: win,
+  initialNowMs,
+}: {
+  anchorIso: string;
+  window: WakeWindow;
+  initialNowMs: number;
+}) {
   const [dark, setDark] = useState(false);
-  const pct = Math.min(
-    100,
-    Math.round((assessment.awakeMin / assessment.window.maxMin) * 100),
-  );
+  const now = useNow(30_000, initialNowMs);
+  const awakeMin = awakeMinutesSince(anchorIso, now);
+  const assessment = assessWake(awakeMin, win);
+  const pct = Math.min(100, Math.round((awakeMin / win.maxMin) * 100));
 
   return (
     <>
       <div className={`mt-3 rounded-2xl border px-3 py-2.5 shadow-sm ${TONE_BG[assessment.tone]}`}>
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] font-semibold">
-            🌙 Wake window · usia {assessment.window.label}
+            🌙 Wake window · usia {win.label}
           </span>
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-semibold tabular-nums">
-              {assessment.awakeMin}m / {assessment.window.minMin}–
-              {assessment.window.maxMin}m
+              {awakeMin}m / {win.minMin}–{win.maxMin}m
             </span>
             <button
               type="button"
@@ -54,37 +73,41 @@ export function WakeWindowCard({ assessment }: { assessment: WakeAssessment }) {
         <div className="mt-1 text-[11px]">{assessment.statusLabel}</div>
       </div>
       {dark ? (
-        <WakeDarkOverlay assessment={assessment} onClose={() => setDark(false)} />
+        <WakeDarkOverlay
+          awakeMin={awakeMin}
+          window={win}
+          assessment={assessment}
+          onClose={() => setDark(false)}
+        />
       ) : null}
     </>
   );
 }
 
-/** Fullscreen dim countdown — easy to monitor saat malam, ngga silau. */
+/** Fullscreen dim countdown — easy to monitor saat malam, ngga silau.
+ *  Driven by the parent's live awakeMin (parent re-renders every 30s via
+ *  useNow), so the countdown actually counts down. */
 function WakeDarkOverlay({
+  awakeMin,
+  window: win,
   assessment,
   onClose,
 }: {
+  awakeMin: number;
+  window: WakeWindow;
   assessment: WakeAssessment;
   onClose: () => void;
 }) {
-  const [tick, setTick] = useState(0);
-
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onEsc);
-    const id = setInterval(() => setTick((t) => t + 1), 30_000);
-    return () => {
-      window.removeEventListener("keydown", onEsc);
-      clearInterval(id);
-    };
+    return () => window.removeEventListener("keydown", onEsc);
   }, [onClose]);
 
-  void tick;
-  const elapsed = assessment.awakeMin;
-  const max = assessment.window.maxMin;
+  const elapsed = awakeMin;
+  const max = win.maxMin;
   const remaining = max - elapsed;
   const overtiredBy = elapsed - max; // positive only when over
   const pct = Math.min(100, Math.round((elapsed / max) * 100));
@@ -116,14 +139,14 @@ function WakeDarkOverlay({
       </button>
       <div className="text-[11px] uppercase tracking-widest text-white/60">
         {remaining > 0 ? "Sebelum Overtired" : "Sudah Overtired"} · usia{" "}
-        {assessment.window.label}
+        {win.label}
       </div>
       <div className="mt-3 font-mono text-7xl font-bold tabular-nums">
         {remaining > 0 ? remaining : `+${overtiredBy}`}
         <span className="text-3xl text-white/50">m</span>
       </div>
       <div className="mt-2 text-sm text-white/60">
-        sudah bangun {elapsed}m · window {assessment.window.minMin}–{max}m
+        sudah bangun {elapsed}m · window {win.minMin}–{max}m
       </div>
       <div className="mt-6 h-2 w-64 overflow-hidden rounded-full bg-white/10">
         <div

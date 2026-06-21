@@ -18,6 +18,8 @@ import { LiveClock } from "@/components/LiveClock";
 import { SubmitButton } from "@/components/SubmitButton";
 import { FormCloser } from "@/components/FormCloser";
 import { useDbMeter, dbTone } from "@/components/DbMeter";
+import { useNow } from "@/lib/time/use-now";
+import { computeReminders, type ReminderInputs } from "@/lib/compute/reminders";
 
 type Subtype = "sleep" | "pumping" | "dbf" | "hiccup" | "tummy";
 
@@ -60,7 +62,8 @@ export function OngoingCard({
   dbfMlPerMin,
   autoOpenLamp,
   otherPumpingOngoing,
-  reminders,
+  reminderInputs,
+  initialNowMs,
   prevEndedGapLabel,
 }: {
   id: string;
@@ -79,8 +82,10 @@ export function OngoingCard({
   /** True if a separate pumping session is already ongoing — used by
    *  DBF card to hide "Sambil pumping" combo shortcut. */
   otherPumpingOngoing?: boolean;
-  /** Reminders to surface in NightLamp dark mode (feeding/diaper/pumping). */
-  reminders?: NightLampReminder[];
+  /** Raw inputs to compute live reminders in NightLamp dark mode. */
+  reminderInputs?: ReminderInputs;
+  /** Server render clock for hydration-safe live ticking. */
+  initialNowMs: number;
   /** Fixed gap from prev ended session of same subtype → this start.
    *  e.g. "11m setelah selesai sebelumnya" — confirms intended gap. */
   prevEndedGapLabel?: string | null;
@@ -219,7 +224,8 @@ export function OngoingCard({
           pumpStartRAt={pumpStartRAt ?? null}
           pumpEndRAt={pumpEndRAt ?? null}
           dbfMlPerMin={dbfMlPerMin ?? null}
-          reminders={reminders}
+          reminderInputs={reminderInputs}
+          initialNowMs={initialNowMs}
           onClose={() => setShowLamp(false)}
           onPumpStop={() => {
             setShowLamp(false);
@@ -259,7 +265,8 @@ function NightLamp({
   pumpStartRAt,
   pumpEndRAt,
   dbfMlPerMin,
-  reminders,
+  reminderInputs,
+  initialNowMs,
   onClose,
   onPumpStop,
 }: {
@@ -273,10 +280,23 @@ function NightLamp({
   pumpStartRAt: string | null;
   pumpEndRAt: string | null;
   dbfMlPerMin: number | null;
-  reminders?: NightLampReminder[];
+  reminderInputs?: ReminderInputs;
+  initialNowMs: number;
   onClose: () => void;
   onPumpStop: () => void;
 }) {
+  // Live reminders — kiosk/NightLamp stays open for hours; recompute on a
+  // client clock instead of freezing the server snapshot.
+  const lampNow = useNow(30_000, initialNowMs);
+  const reminders: NightLampReminder[] = (() => {
+    if (!reminderInputs) return [];
+    const rem = computeReminders(reminderInputs, lampNow);
+    const out: NightLampReminder[] = [];
+    if (rem.feeding) out.push({ ...rem.feeding, emoji: "🍼" });
+    if (rem.diaper) out.push({ ...rem.diaper, emoji: "🧷" });
+    if (rem.pumping) out.push({ ...rem.pumping, emoji: "💧" });
+    return out;
+  })();
   const [askingQuality, setAskingQuality] = useState(false);
   const [askingDbfEff, setAskingDbfEff] = useState(false);
   const [micEnabled, setMicEnabled] = useState(false);

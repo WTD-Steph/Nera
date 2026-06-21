@@ -30,7 +30,12 @@ import {
   endHandoverAction,
 } from "@/app/actions/handover";
 import { summarizeHandoverActivity } from "@/lib/compute/handover";
-import { assessWake, getWakeWindow, babyWakeOverride } from "@/lib/constants/wake-window";
+import {
+  assessWake,
+  getWakeWindow,
+  babyWakeOverride,
+  awakeMinutesSince,
+} from "@/lib/constants/wake-window";
 import { getCurrentRegression } from "@/lib/constants/sleep-regressions";
 import { computeCryCauses } from "@/lib/compute/cry-diagnostic";
 import { logDetail } from "@/lib/compute/log-detail";
@@ -41,9 +46,12 @@ import {
 } from "@/lib/compute/last-ended";
 import { CupFeedTrigger } from "@/components/CupFeedTrigger";
 import { getCupFeedPace, getBottleFeedPace } from "@/lib/constants/cup-feed";
-import { computeRealtimeAdvice } from "@/lib/compute/sleep-coach-realtime";
 import { CryDiagnostic } from "@/components/CryDiagnostic";
 import { WakeWindowCard } from "@/components/WakeWindowCard";
+import { SleepAdvicePill } from "@/components/SleepAdvicePill";
+import { DashboardReminders } from "@/components/DashboardReminders";
+import { TimeAgo } from "@/components/TimeAgo";
+import type { ReminderInputs } from "@/lib/compute/reminders";
 import {
   RoutineChecklist,
   type RoutineItem,
@@ -553,32 +561,30 @@ export default async function HomePage({
     };
   })();
 
-  // For Mode Jam + Sejak Terakhir cards: sleep "since" anchor = end
-  // time (waktu bangun), not start. For currently-ongoing sleep,
-  // surface "sedang berjalan". Aligns Mode Jam with regular SinceCard.
-  const sleepSinceText = (() => {
-    if (!last.sleep) return null;
-    if (last.sleep.end_timestamp == null) return "sedang berjalan";
-    return timeSince(last.sleep.end_timestamp);
-  })();
-  // Wake window assessment — counts minutes since last sleep ended,
-  // bucketed by baby age. Surfaces 'overtired risk' when awake too long.
-  const wakeAssessment = (() => {
-    if (!last.sleep || !last.sleep.end_timestamp) return null;
-    const awakeMin = Math.max(
-      0,
-      Math.round(
-        (Date.now() - new Date(last.sleep.end_timestamp).getTime()) / 60000,
-      ),
-    );
-    const window = getWakeWindow(baby.dob, babyWakeOverride(baby));
-    return assessWake(awakeMin, window);
-  })();
+  // Single render-time clock — passed to client components as the initial
+  // value so their live tickers start hydration-safe (see lib/time/use-now).
+  const nowMs = Date.now();
+  // Sleep "since" anchor for Mode Jam: end time (waktu bangun), not start.
+  // Ongoing → "sedang berjalan" (Mode Jam recomputes the elapsed live).
+  const sleepEndIso = last.sleep?.end_timestamp ?? null;
+  const sleepOngoing = !!last.sleep && last.sleep.end_timestamp == null;
+  // Wake window — the live minute-by-minute tick happens client-side in
+  // WakeWindowCard; here we resolve the anchor + window once (for first
+  // paint + the cry diagnostic, which consumes a snapshot).
+  const wakeOverride = babyWakeOverride(baby);
+  const wakeWindow = getWakeWindow(baby.dob, wakeOverride, nowMs);
+  const wakeAnchorIso =
+    last.sleep && last.sleep.end_timestamp ? last.sleep.end_timestamp : null;
+  const wakeAssessment = wakeAnchorIso
+    ? assessWake(awakeMinutesSince(wakeAnchorIso, nowMs), wakeWindow)
+    : null;
   // Sleep regression — banner saat in-window OR upcoming dalam 14 hari
   const sleepRegression = getCurrentRegression(baby.dob);
-  // Realtime sleep coach advice — compact pill di top, full detail di
-  // /sleep-coach page.
-  const realtimeAdvice = computeRealtimeAdvice(logsArray, baby.dob, babyWakeOverride(baby));
+  // Sleep coach pill recomputes live on the client (SleepAdvicePill) from
+  // this sleep+feeding subset — the only subtypes computeRealtimeAdvice reads.
+  const sleepFeedLogs = logsArray.filter(
+    (l) => l.subtype === "sleep" || l.subtype === "feeding",
+  );
   // Cry diagnostic — rank kemungkinan penyebab nangis dari log terbaru
   const lastTemp =
     logsArray.find((l) => l.subtype === "temp") ?? null;
@@ -665,22 +671,9 @@ export default async function HomePage({
     ? nameFromEmail(householdPartner.email)
     : null;
 
-  const feedingReminder = (() => {
-    if (!last.feeding) return null;
-    const minsSince =
-      (Date.now() - new Date(last.feeding.timestamp).getTime()) / 60000;
-    if (minsSince < 240) return null;
-    const hours = Math.floor(minsSince / 60);
-    const mins = Math.round(minsSince % 60);
-    const text = `Sudah ${hours}j ${mins}m belum minum`;
-    return {
-      text,
-      tone: minsSince >= 480 ? ("urgent" as const) : ("warning" as const),
-    };
-  })();
-  // Pumping reminder: 3j sejak last "breast emptying event" (pump OR DBF).
-  // Lactation rationale: DBF juga emptying + stimulates supply — kalau baru
-  // DBF, ibu nggak perlu pump segera. Reminder pakai max(lastPump, lastDbf).
+  // Breast-emptying anchors (pump OR DBF) for the live pumping reminder.
+  // DBF also empties + stimulates supply, so the reminder uses
+  // max(lastPump, lastDbf). All reminders recompute live (see below).
   const lastPumpEnded = (() => {
     const completed = logsArray.filter(
       (l) => l.subtype === "pumping" && l.end_timestamp != null,
@@ -704,74 +697,36 @@ export default async function HomePage({
       return t > latest ? t : latest;
     }, 0);
   })();
-  const pumpingReminder = (() => {
-    const lastBreastEmpty = Math.max(
-      lastPumpEnded ?? -1,
-      lastDbfEnded ?? -1,
-    );
-    if (lastBreastEmpty < 0) return null;
-    // Skip kalau ongoing pumping atau DBF (subtype "dbf" maps from feeding
-    // dengan duration > 0 di ongoingSubtypes set).
-    if (ongoingSubtypes.has("pumping") || ongoingSubtypes.has("dbf"))
-      return null;
-    const minsSince = (Date.now() - lastBreastEmpty) / 60000;
-    if (minsSince < 180) return null;
-    const hours = Math.floor(minsSince / 60);
-    const mins = Math.round(minsSince % 60);
-    const sourceLabel =
-      (lastDbfEnded ?? 0) > (lastPumpEnded ?? 0) ? "DBF" : "pump";
-    return {
-      text: `Sudah ${hours}j ${mins}m sejak ${sourceLabel} terakhir — supply maintain tiap 2-3j`,
-      tone: minsSince >= 270 ? ("urgent" as const) : ("warning" as const),
-    };
-  })();
-  // Active pumping check: kalau pumping ongoing lebih dari 30m, tampilkan
-  // confirmation banner. User bisa Selesai sekarang atau abaikan
-  // (pause/Selesai manual handled by OngoingCard).
-  const longPumpOngoing = (() => {
-    const ongoing = logsArray.find(
-      (l) =>
-        l.subtype === "pumping" &&
-        l.end_timestamp == null &&
-        l.started_with_stopwatch,
-    );
-    if (!ongoing) return null;
-    const minsRunning =
-      (Date.now() - new Date(ongoing.timestamp).getTime()) / 60000;
-    if (minsRunning < 30) return null;
-    return {
-      id: ongoing.id,
-      minsRunning: Math.round(minsRunning),
-    };
-  })();
-  // (diaper computed later)
-  // We'll assemble darkReminders below after diaperReminder is computed.
-  // Diaper reminder: warn at 4h, urgent at 6h. Newborn pee target ~6-8×
-  // per day → ~3-4h average gap. >4h is worth checking.
-  const diaperReminder = (() => {
-    if (!last.diaper) return null;
-    const minsSince =
-      (Date.now() - new Date(last.diaper.timestamp).getTime()) / 60000;
-    if (minsSince < 240) return null;
-    const hours = Math.floor(minsSince / 60);
-    const mins = Math.round(minsSince % 60);
-    const text = `Cek diaper — sudah ${hours}j ${mins}m`;
-    return {
-      text,
-      tone: minsSince >= 360 ? ("urgent" as const) : ("warning" as const),
-    };
-  })();
-  // Unified reminders array untuk dark mode (Mode Jam + NightLamp).
-  // Show feeding/diaper/pumping warnings supaya parent yang sedang
-  // monitoring dark mode tetap aware tanpa keluar mode.
-  const darkReminders: { text: string; tone: "warning" | "urgent"; emoji?: string }[] =
-    [];
-  if (feedingReminder)
-    darkReminders.push({ ...feedingReminder, emoji: "🍼" });
-  if (diaperReminder)
-    darkReminders.push({ ...diaperReminder, emoji: "🧷" });
-  if (pumpingReminder)
-    darkReminders.push({ ...pumpingReminder, emoji: "💧" });
+  // Raw inputs for the live reminder set. Reminders (feeding/diaper/pumping
+  // + long-pump) recompute on a client clock in DashboardReminders, Mode Jam
+  // and NightLamp via computeReminders — so they appear/escalate as
+  // thresholds are crossed without a server re-render. Thresholds + copy live
+  // in lib/compute/reminders.ts.
+  const lastBreastEmptyRaw = Math.max(lastPumpEnded ?? -1, lastDbfEnded ?? -1);
+  const longPumpRow = logsArray.find(
+    (l) =>
+      l.subtype === "pumping" &&
+      l.end_timestamp == null &&
+      l.started_with_stopwatch,
+  );
+  const reminderInputs: ReminderInputs = {
+    lastFeedingMs: last.feeding
+      ? new Date(last.feeding.timestamp).getTime()
+      : null,
+    lastDiaperMs: last.diaper
+      ? new Date(last.diaper.timestamp).getTime()
+      : null,
+    lastBreastEmptyMs: lastBreastEmptyRaw < 0 ? null : lastBreastEmptyRaw,
+    breastSource: (lastDbfEnded ?? 0) > (lastPumpEnded ?? 0) ? "DBF" : "pump",
+    pumpSuppressed:
+      ongoingSubtypes.has("pumping") || ongoingSubtypes.has("dbf"),
+    longPump: longPumpRow
+      ? {
+          id: longPumpRow.id,
+          startMs: new Date(longPumpRow.timestamp).getTime(),
+        }
+      : null,
+  };
   const activeAct = parseAct(searchParams.act);
   // Filter logs by selected day:
   // - Today + no filter: 36-hour rolling window (default home view)
@@ -821,13 +776,12 @@ export default async function HomePage({
         </div>
         <IdleClockToggle
           variant="icon"
-          sinceFeeding={
-            last.feeding ? timeSince(last.feeding.timestamp) : null
-          }
-          sinceSleep={sleepSinceText}
-          sinceDiaper={last.diaper ? timeSince(last.diaper.timestamp) : null}
-          reminder={feedingReminder}
-          reminders={darkReminders}
+          feedingIso={last.feeding?.timestamp ?? null}
+          diaperIso={last.diaper?.timestamp ?? null}
+          sleepEndIso={sleepEndIso}
+          sleepOngoing={sleepOngoing}
+          reminderInputs={reminderInputs}
+          initialNowMs={nowMs}
           stats={{
             milkTotalMl,
             milkTargetMin: milkTarget.min,
@@ -867,87 +821,20 @@ export default async function HomePage({
         asiBatches={asiBatchOptions}
         babyName={baby.name}
       />
-      <Link
-        href="/sleep-coach"
-        className={`mt-3 flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-xs shadow-sm hover:opacity-90 ${
-          realtimeAdvice.tone === "alert"
-            ? "border-red-200 bg-red-50/70 text-red-900"
-            : realtimeAdvice.tone === "warn"
-              ? "border-amber-200 bg-amber-50/70 text-amber-900"
-              : "border-emerald-200 bg-emerald-50/50 text-emerald-900"
-        }`}
-      >
-        <span className="text-base" aria-hidden>
-          {realtimeAdvice.emoji}
-        </span>
-        <span className="flex-1">
-          <span className="block text-[10px] font-semibold uppercase tracking-wider opacity-70">
-            Sleep Coach
-          </span>
-          <span className="block font-semibold">{realtimeAdvice.primary}</span>
-        </span>
-        <span className="text-[10px] opacity-60">→</span>
-      </Link>
-      {wakeAssessment ? <WakeWindowCard assessment={wakeAssessment} /> : null}
-      {feedingReminder ||
-      diaperReminder ||
-      pumpingReminder ||
-      longPumpOngoing ? (
-        <div className="mt-3 space-y-1.5">
-          {feedingReminder ? (
-            <div
-              className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium ${
-                feedingReminder.tone === "urgent"
-                  ? "border-red-200 bg-red-50 text-red-800"
-                  : "border-amber-200 bg-amber-50 text-amber-800"
-              }`}
-            >
-              <span aria-hidden>🍼</span>
-              <span>{feedingReminder.text}</span>
-            </div>
-          ) : null}
-          {diaperReminder ? (
-            <div
-              className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium ${
-                diaperReminder.tone === "urgent"
-                  ? "border-red-200 bg-red-50 text-red-800"
-                  : "border-amber-200 bg-amber-50 text-amber-800"
-              }`}
-            >
-              <span aria-hidden>🧷</span>
-              <span>{diaperReminder.text}</span>
-            </div>
-          ) : null}
-          {pumpingReminder ? (
-            <div
-              className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium ${
-                pumpingReminder.tone === "urgent"
-                  ? "border-red-200 bg-red-50 text-red-800"
-                  : "border-amber-200 bg-amber-50 text-amber-800"
-              }`}
-            >
-              <span aria-hidden>💧</span>
-              <span>{pumpingReminder.text}</span>
-            </div>
-          ) : null}
-          {longPumpOngoing ? (
-            <div className="flex items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
-              <span className="flex items-center gap-2">
-                <span aria-hidden>💧</span>
-                <span>
-                  Pumping sudah {longPumpOngoing.minsRunning}m · masih jalan?
-                </span>
-              </span>
-              <Link
-                href="#aktivitas"
-                className="rounded-full border border-blue-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100"
-              >
-                Selesai
-              </Link>
-            </div>
-          ) : null}
-        </div>
+      <SleepAdvicePill
+        logs={sleepFeedLogs}
+        dob={baby.dob}
+        wakeOverride={wakeOverride}
+        initialNowMs={nowMs}
+      />
+      {wakeAnchorIso ? (
+        <WakeWindowCard
+          anchorIso={wakeAnchorIso}
+          window={wakeWindow}
+          initialNowMs={nowMs}
+        />
       ) : null}
+      <DashboardReminders inputs={reminderInputs} initialNowMs={nowMs} />
       {sleepRegression ? (
         <details
           className={`mt-3 rounded-2xl border px-4 py-3 shadow-sm ${
@@ -1170,7 +1057,8 @@ export default async function HomePage({
                 dbfMlPerMin={dbfEst.mlPerMin}
                 autoOpenLamp={shouldAutoOpenLamp}
                 otherPumpingOngoing={ongoingSubtypes.has("pumping")}
-                reminders={darkReminders}
+                reminderInputs={reminderInputs}
+                initialNowMs={nowMs}
                 prevEndedGapLabel={prevEndedGapLabel}
               />
             );
@@ -1718,9 +1606,9 @@ export default async function HomePage({
           Sejak Terakhir
         </h2>
         <div className="grid grid-cols-3 gap-2">
-          <SinceCard label="Feeding" log={last.feeding} />
-          <SinceCard label="Diaper" log={last.diaper} />
-          <SinceCard label="Tidur" log={last.sleep} />
+          <SinceCard label="Feeding" log={last.feeding} nowMs={nowMs} />
+          <SinceCard label="Diaper" log={last.diaper} nowMs={nowMs} />
+          <SinceCard label="Tidur" log={last.sleep} nowMs={nowMs} />
         </div>
       </section>
 
@@ -2045,9 +1933,11 @@ export default async function HomePage({
 function SinceCard({
   label,
   log,
+  nowMs,
 }: {
   label: string;
   log: LogRow | null;
+  nowMs: number;
 }) {
   // Ongoing duration-based logs (sleep / pumping / feeding-with-start)
   // currently in progress → indicate "sedang berjalan" instead of
@@ -2088,11 +1978,13 @@ function SinceCard({
           isOngoing ? "text-rose-600" : "text-gray-800"
         }`}
       >
-        {!log
-          ? "—"
-          : isOngoing
-            ? "sedang berjalan"
-            : timeSince(anchorIso!)}
+        {!log ? (
+          "—"
+        ) : isOngoing ? (
+          "sedang berjalan"
+        ) : (
+          <TimeAgo iso={anchorIso!} initialNowMs={nowMs} />
+        )}
       </div>
       {subText ? (
         <div className="text-[11px] text-gray-400">{subText}</div>
