@@ -91,7 +91,7 @@ export default async function ReportPage() {
           LLM lain untuk dapat analisis berbasis data {baby.name}.
         </p>
         <div className="mt-4">
-          <PromptCopier context={aiContext} />
+          <PromptCopier context={aiContext} babyName={baby.name} />
         </div>
       </section>
 

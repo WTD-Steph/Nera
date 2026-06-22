@@ -38,9 +38,11 @@ type IncomingEvent = {
 
 export function CryRealtimeBanner({
   babyId,
+  babyName,
   householdId,
 }: {
   babyId: string;
+  babyName: string;
   householdId: string;
 }) {
   const router = useRouter();
@@ -114,7 +116,7 @@ export function CryRealtimeBanner({
           🚨
         </span>
         <div className="flex-1">
-          <div className="text-sm font-bold">Nera menangis</div>
+          <div className="text-sm font-bold">{babyName} menangis</div>
           <div className="mt-0.5 text-[11px] text-red-100">{elapsedText}</div>
           {context ? (
             <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-red-50">
