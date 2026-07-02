@@ -70,6 +70,51 @@ function isoOrNull(formData: FormData, key: string): string | null {
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+/** Later of two timestamps (any parseable format — DB "+00" text or ISO). */
+function isoMax(a: string, b: string): string {
+  return new Date(a).getTime() >= new Date(b).getTime() ? a : b;
+}
+
+// Semua field datetime-local yang bisa masuk lewat create/edit form.
+const FORM_DATETIME_KEYS = [
+  "timestamp",
+  "end_timestamp",
+  "start_l_at",
+  "end_l_at",
+  "start_r_at",
+  "end_r_at",
+  "dbf_start_l_at",
+  "dbf_end_l_at",
+  "dbf_start_r_at",
+  "dbf_end_r_at",
+] as const;
+
+// Toleransi clock-skew antar device. Di atas ini dianggap salah input
+// (kasus nyata: input jam 22:45 setelah lewat tengah malam — tanggal
+// datetime-local default ke HARI INI, hasilnya ~22 jam di masa depan,
+// dan row sleep jadi tidak bisa di-Selesai karena CHECK end >= start).
+const FUTURE_TOLERANCE_MS = 10 * 60_000;
+
+/**
+ * Scan semua field datetime di formData; return pesan error kalau ada
+ * yang di masa depan (melebihi toleransi). Dipanggil di awal
+ * createLogAction + updateLogAction — satu titik jaga untuk semua path.
+ */
+function findFutureDatetimeError(formData: FormData): string | null {
+  const limit = Date.now() + FUTURE_TOLERANCE_MS;
+  for (const key of FORM_DATETIME_KEYS) {
+    const iso = isoOrNull(formData, key);
+    if (iso && new Date(iso).getTime() > limit) {
+      return (
+        "Waktu tidak boleh di masa depan — periksa tanggalnya. " +
+        "(Sering kejadian setelah lewat tengah malam: tanggal default " +
+        "jadi hari ini, padahal maksudnya kemarin.)"
+      );
+    }
+  }
+  return null;
+}
+
 /**
  * Read optional spillage fields for bottle feeding rows. Mutates
  * payload with amount_spilled_ml + spilled_attribution when applicable.
@@ -104,6 +149,11 @@ export async function createLogAction(formData: FormData) {
 
   if (!isValidSubtype(subtype)) {
     redirect(`${returnTo}?logerror=${encodeURIComponent("Subtype tidak valid.")}`);
+  }
+
+  const futureErr = findFutureDatetimeError(formData);
+  if (futureErr) {
+    redirect(`${returnTo}?logerror=${encodeURIComponent(futureErr)}`);
   }
 
   const [user, baby] = await Promise.all([getCachedUser(), getCurrentBaby()]);
@@ -509,10 +559,14 @@ export async function endOngoingSleepAction(formData: FormData) {
   const supabase = createClient();
   const { data: row } = await supabase
     .from("logs")
-    .select("paused_at")
+    .select("timestamp, paused_at")
     .eq("id", id)
     .single();
-  const endIso = computeEndIso(formData, row?.paused_at ?? null);
+  // Clamp end >= start: offset "X menit lalu" yang lebih besar dari durasi
+  // sesi akan melanggar CHECK logs_sleep_end_chk → gagal cryptic. Lebih
+  // baik simpan durasi-nol daripada stuck.
+  let endIso = computeEndIso(formData, row?.paused_at ?? null);
+  if (row?.timestamp) endIso = isoMax(endIso, row.timestamp);
 
   const updates: Record<string, unknown> = {
     end_timestamp: endIso,
@@ -559,10 +613,14 @@ export async function endOngoingPumpingAction(formData: FormData) {
   // If paused, freeze end at paused_at so duration excludes pause time.
   const { data: existing } = await supabase
     .from("logs")
-    .select("start_l_at, end_l_at, start_r_at, end_r_at, paused_at")
+    .select("timestamp, start_l_at, end_l_at, start_r_at, end_r_at, paused_at")
     .eq("id", id)
     .single();
-  const now = computeEndIso(formData, existing?.paused_at ?? null);
+  // Clamp per-side + overall: end tidak boleh < start (CHECK constraints).
+  // Kasus nyata: pause → tambah/pindah sisi saat paused → Selesai pakai
+  // paused_at yang lebih tua dari start sisi baru → violation → stuck.
+  const rawEnd = computeEndIso(formData, existing?.paused_at ?? null);
+  const now = existing?.timestamp ? isoMax(rawEnd, existing.timestamp) : rawEnd;
   const lActive = l !== null && l > 0;
   const rActive = r !== null && r > 0;
   const updates: Record<string, unknown> = {
@@ -572,10 +630,10 @@ export async function endOngoingPumpingAction(formData: FormData) {
     paused_at: null,
   };
   if (existing?.start_l_at && !existing.end_l_at && lActive) {
-    updates.end_l_at = now;
+    updates.end_l_at = isoMax(rawEnd, existing.start_l_at);
   }
   if (existing?.start_r_at && !existing.end_r_at && rActive) {
-    updates.end_r_at = now;
+    updates.end_r_at = isoMax(rawEnd, existing.start_r_at);
   }
   // ml=0 → side wasn't actually pumped: scrub its start/end too
   if (!lActive) {
@@ -708,14 +766,23 @@ export async function endOngoingDbfAction(formData: FormData) {
   const supabase = createClient();
   const { data: existing } = await supabase
     .from("logs")
-    .select("start_l_at, end_l_at, start_r_at, end_r_at, paused_at")
+    .select("timestamp, start_l_at, end_l_at, start_r_at, end_r_at, paused_at")
     .eq("id", id)
     .single();
   if (!existing) redirect(returnTo);
 
-  const now = computeEndIso(formData, existing.paused_at ?? null);
-  const endL = existing.end_l_at ?? (existing.start_l_at ? now : null);
-  const endR = existing.end_r_at ?? (existing.start_r_at ? now : null);
+  // Clamp per-side end >= start. Kasus nyata di prod: pause DBF → pindah/
+  // tambah sisi saat masih paused → start_r_at lebih baru dari paused_at →
+  // Selesai menulis end_r_at = paused_at < start_r_at → CHECK violation →
+  // sesi stuck. isoMax memastikan worst case durasi-nol, bukan gagal.
+  const rawEnd = computeEndIso(formData, existing.paused_at ?? null);
+  const now = existing.timestamp ? isoMax(rawEnd, existing.timestamp) : rawEnd;
+  const endL =
+    existing.end_l_at ??
+    (existing.start_l_at ? isoMax(rawEnd, existing.start_l_at) : null);
+  const endR =
+    existing.end_r_at ??
+    (existing.start_r_at ? isoMax(rawEnd, existing.start_r_at) : null);
   // Effectiveness assessment (efektif / sedang / kurang_efektif).
   // NULL when user skipped → defaults to 100% (efektif) in computations.
   const effectivenessRaw = String(formData.get("effectiveness") ?? "").trim();
@@ -750,8 +817,8 @@ export async function endOngoingDbfAction(formData: FormData) {
     effectiveness,
     dbf_tube_content: dbfTubeContent,
   };
-  if (existing.start_l_at && !existing.end_l_at) updates.end_l_at = now;
-  if (existing.start_r_at && !existing.end_r_at) updates.end_r_at = now;
+  if (existing.start_l_at && !existing.end_l_at) updates.end_l_at = endL;
+  if (existing.start_r_at && !existing.end_r_at) updates.end_r_at = endR;
 
   const minutesBetween = (a: string, b: string) =>
     Math.max(
@@ -934,10 +1001,13 @@ export async function endOngoingHiccupAction(formData: FormData) {
   const supabase = createClient();
   const { data: row } = await supabase
     .from("logs")
-    .select("paused_at")
+    .select("timestamp, paused_at")
     .eq("id", id)
     .single();
-  const endIso = computeEndIso(formData, row?.paused_at ?? null);
+  // Clamp end >= start — hiccup sesinya pendek, offset chip 15-30m gampang
+  // melebihi durasi → tanpa clamp kena CHECK logs_sleep_end_chk.
+  let endIso = computeEndIso(formData, row?.paused_at ?? null);
+  if (row?.timestamp) endIso = isoMax(endIso, row.timestamp);
 
   const { error } = await supabase
     .from("logs")
@@ -965,10 +1035,12 @@ export async function endOngoingTummyAction(formData: FormData) {
   const supabase = createClient();
   const { data: row } = await supabase
     .from("logs")
-    .select("paused_at")
+    .select("timestamp, paused_at")
     .eq("id", id)
     .single();
-  const endIso = computeEndIso(formData, row?.paused_at ?? null);
+  // Clamp end >= start — same rationale as hiccup.
+  let endIso = computeEndIso(formData, row?.paused_at ?? null);
+  if (row?.timestamp) endIso = isoMax(endIso, row.timestamp);
 
   const { error } = await supabase
     .from("logs")
@@ -1085,7 +1157,9 @@ export async function expireStalePausedLogs(babyId: string) {
   // Skip feeding (DBF) juga supaya effectiveness picker tetap muncul.
   const { data: stale } = await supabase
     .from("logs")
-    .select("id, subtype, paused_at, start_l_at, end_l_at, start_r_at, end_r_at")
+    .select(
+      "id, subtype, timestamp, paused_at, start_l_at, end_l_at, start_r_at, end_r_at",
+    )
     .eq("baby_id", babyId)
     .is("end_timestamp", null)
     .not("paused_at", "is", null)
@@ -1094,15 +1168,28 @@ export async function expireStalePausedLogs(babyId: string) {
   if (!stale || stale.length === 0) return;
   for (const r of stale) {
     if (!r.paused_at) continue;
+    // Clamp end >= start supaya tidak kena CHECK. Tanpa ini, row dengan
+    // timestamp lebih baru dari paused_at (mis. hasil edit) gagal auto-
+    // close SETIAP page load tanpa error apapun — permanently stuck.
+    const end = r.timestamp ? isoMax(r.paused_at, r.timestamp) : r.paused_at;
     const updates: Record<string, unknown> = {
-      end_timestamp: r.paused_at,
+      end_timestamp: end,
     };
-    if (r.start_l_at && !r.end_l_at) updates.end_l_at = r.paused_at;
-    if (r.start_r_at && !r.end_r_at) updates.end_r_at = r.paused_at;
-    await supabase
+    if (r.start_l_at && !r.end_l_at)
+      updates.end_l_at = isoMax(end, r.start_l_at);
+    if (r.start_r_at && !r.end_r_at)
+      updates.end_r_at = isoMax(end, r.start_r_at);
+    const { error } = await supabase
       .from("logs")
       .update(updates as never)
       .eq("id", r.id);
+    if (error) {
+      // Sweep berjalan di background render — jangan crash page, tapi
+      // jangan juga silent: log supaya kelihatan di Vercel function logs.
+      console.error(
+        `expireStalePausedLogs failed for log ${r.id}: ${error.message}`,
+      );
+    }
   }
 }
 
@@ -1201,6 +1288,11 @@ export async function updateLogAction(formData: FormData) {
   const subtype = String(formData.get("subtype") ?? "");
   if (!isValidSubtype(subtype)) {
     redirect(`${returnTo}?logerror=${encodeURIComponent("Subtype tidak valid.")}`);
+  }
+
+  const futureErr = findFutureDatetimeError(formData);
+  if (futureErr) {
+    redirect(`${returnTo}?logerror=${encodeURIComponent(futureErr)}`);
   }
 
   const [user, baby] = await Promise.all([getCachedUser(), getCurrentBaby()]);
