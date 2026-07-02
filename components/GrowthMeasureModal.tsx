@@ -92,6 +92,7 @@ function Modal({
               type="datetime-local"
               name="measured_at"
               defaultValue={nowDatetimeLocal()}
+              max={nowDatetimeLocal()}
               required
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
             />

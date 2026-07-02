@@ -277,24 +277,27 @@ function LogModal({
         : "proporsional",
   );
 
-  // Pumping per-side timestamps. In create mode: Kiri now → now+15,
-  // Kanan sequentially after. In edit mode: pre-fill from existing row.
+  // Pumping per-side timestamps. Create mode assumes sesi BARU SELESAI
+  // (backfill): Kiri now-30 → now-15, Kanan now-15 → now. Semua di masa
+  // lalu — server sekarang menolak datetime masa depan (future guard),
+  // jadi default lama (end di now+15/now+30) akan gagal submit.
+  // In edit mode: pre-fill from existing row.
   const initialNow = nowDatetimeLocal();
   const editStartL = isoToDatetimeLocal(editLog?.start_l_at ?? null);
   const editEndL = isoToDatetimeLocal(editLog?.end_l_at ?? null);
   const editStartR = isoToDatetimeLocal(editLog?.start_r_at ?? null);
   const editEndR = isoToDatetimeLocal(editLog?.end_r_at ?? null);
   const [pumpStartL, setPumpStartL] = useState<string>(
-    editStartL || initialNow,
+    editStartL || addMinutesLocal(initialNow, -30),
   );
   const [pumpEndL, setPumpEndL] = useState<string>(
-    editEndL || addMinutesLocal(initialNow, 15),
+    editEndL || addMinutesLocal(initialNow, -15),
   );
   const [pumpStartR, setPumpStartR] = useState<string>(
-    editStartR || addMinutesLocal(initialNow, 15),
+    editStartR || addMinutesLocal(initialNow, -15),
   );
   const [pumpEndR, setPumpEndR] = useState<string>(
-    editEndR || addMinutesLocal(initialNow, 30),
+    editEndR || initialNow,
   );
   // In edit mode, treat Kanan as already touched so cascade doesn't
   // overwrite the existing per-side times when Kiri changes.
@@ -433,6 +436,7 @@ function LogModal({
                   isoToDatetimeLocal(editLog?.timestamp ?? null) ||
                   nowDatetimeLocal()
                 }
+                max={nowDatetimeLocal()}
                 required
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
               />
@@ -873,6 +877,7 @@ function LogModal({
                   defaultValue={isoToDatetimeLocal(
                     editLog?.end_timestamp ?? null,
                   )}
+                  max={nowDatetimeLocal()}
                   className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
                 />
                 <p className="mt-1 text-[11px] text-gray-400">
@@ -903,6 +908,7 @@ function LogModal({
                 defaultValue={isoToDatetimeLocal(
                   editLog?.end_timestamp ?? null,
                 )}
+                max={nowDatetimeLocal()}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
               />
             </Field>
@@ -1055,6 +1061,7 @@ function DbfEditPerSide({ editLog }: { editLog: EditLog }) {
               name="dbf_start_l_at"
               value={kiriMulai}
               onChange={(e) => setKiriMulai(e.target.value)}
+              max={nowDatetimeLocal()}
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
             />
           </Field>
@@ -1064,6 +1071,7 @@ function DbfEditPerSide({ editLog }: { editLog: EditLog }) {
               name="dbf_end_l_at"
               value={kiriSelesai}
               onChange={(e) => setKiriSelesai(e.target.value)}
+              max={nowDatetimeLocal()}
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
             />
           </Field>
@@ -1081,6 +1089,7 @@ function DbfEditPerSide({ editLog }: { editLog: EditLog }) {
               name="dbf_start_r_at"
               value={kananMulai}
               onChange={(e) => setKananMulai(e.target.value)}
+              max={nowDatetimeLocal()}
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
             />
           </Field>
@@ -1090,6 +1099,7 @@ function DbfEditPerSide({ editLog }: { editLog: EditLog }) {
               name="dbf_end_r_at"
               value={kananSelesai}
               onChange={(e) => setKananSelesai(e.target.value)}
+              max={nowDatetimeLocal()}
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-rose-400"
             />
           </Field>

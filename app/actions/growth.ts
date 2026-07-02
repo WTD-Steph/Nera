@@ -25,6 +25,13 @@ export async function createGrowthAction(formData: FormData) {
 
   const measuredAt =
     isoOrNull(formData, "measured_at") ?? new Date().toISOString();
+  // Guard masa depan (toleransi 10 menit clock skew). Jebakan lewat-
+  // tengah-malam: input jam saja → tanggal default hari ini → future.
+  if (new Date(measuredAt).getTime() > Date.now() + 10 * 60_000) {
+    redirect(
+      `${returnTo}?growtherror=${encodeURIComponent("Waktu pengukuran tidak boleh di masa depan — periksa tanggalnya.")}`,
+    );
+  }
   const weight = num(formData, "weight_kg");
   const height = num(formData, "height_cm");
   const headCirc = num(formData, "head_circ_cm");
