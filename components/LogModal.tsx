@@ -111,6 +111,14 @@ function addMinutesLocal(localStr: string, minutes: number): string {
   return new Date(next.getTime() - off * 60000).toISOString().slice(0, 16);
 }
 
+function clampToNowLocal(localStr: string): string {
+  // Jaga hasil cascade tidak melewati "sekarang" — server menolak
+  // datetime masa depan. Format "YYYY-MM-DDTHH:mm" sortable secara
+  // lexicographic, jadi perbandingan string aman.
+  const now = nowDatetimeLocal();
+  return localStr > now ? now : localStr;
+}
+
 export type AsiBatchOption = {
   id: string;
   startedAtIso: string;
@@ -306,17 +314,19 @@ function LogModal({
     setPumpEndL(v);
     if (!pumpRTouched) {
       setPumpStartR(v);
-      setPumpEndR(addMinutesLocal(v, 15));
+      setPumpEndR(clampToNowLocal(addMinutesLocal(v, 15)));
     }
   };
   const updatePumpStartL = (v: string) => {
     setPumpStartL(v);
-    // Bump endL by 15 min relative to new start, keeping cascade
-    const nextEndL = addMinutesLocal(v, 15);
+    // Bump endL by 15 min relative to new start, keeping cascade.
+    // Clamp ke sekarang: user yang set mulai "15 menit lalu" jangan
+    // sampai dapat auto-fill Kanan yang berakhir di masa depan.
+    const nextEndL = clampToNowLocal(addMinutesLocal(v, 15));
     setPumpEndL(nextEndL);
     if (!pumpRTouched) {
       setPumpStartR(nextEndL);
-      setPumpEndR(addMinutesLocal(nextEndL, 15));
+      setPumpEndR(clampToNowLocal(addMinutesLocal(nextEndL, 15)));
     }
   };
   const markPumpRTouched = () => setPumpRTouched(true);
