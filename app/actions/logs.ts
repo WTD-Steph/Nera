@@ -75,18 +75,14 @@ function isoMax(a: string, b: string): string {
   return new Date(a).getTime() >= new Date(b).getTime() ? a : b;
 }
 
-// Semua field datetime-local yang bisa masuk lewat create/edit form.
-const FORM_DATETIME_KEYS = [
+// Kolom datetime di payload logs yang harus divalidasi sebelum tersimpan.
+const PAYLOAD_DATETIME_KEYS = [
   "timestamp",
   "end_timestamp",
   "start_l_at",
   "end_l_at",
   "start_r_at",
   "end_r_at",
-  "dbf_start_l_at",
-  "dbf_end_l_at",
-  "dbf_start_r_at",
-  "dbf_end_r_at",
 ] as const;
 
 // Toleransi clock-skew antar device. Di atas ini dianggap salah input
@@ -96,15 +92,20 @@ const FORM_DATETIME_KEYS = [
 const FUTURE_TOLERANCE_MS = 10 * 60_000;
 
 /**
- * Scan semua field datetime di formData; return pesan error kalau ada
- * yang di masa depan (melebihi toleransi). Dipanggil di awal
- * createLogAction + updateLogAction — satu titik jaga untuk semua path.
+ * Validasi PAYLOAD final (bukan form mentah) sebelum insert/update:
+ * return pesan error kalau ada kolom datetime di masa depan melebihi
+ * toleransi. Penting: cek payload, bukan formData — form pumping selalu
+ * submit 4 field per-sisi walaupun sisi itu tidak dipakai (ml=0 →
+ * di-scrub dari payload), jadi validasi form mentah menolak submission
+ * yang sebenarnya valid.
  */
-function findFutureDatetimeError(formData: FormData): string | null {
+function findFuturePayloadError(
+  payload: Record<string, unknown>,
+): string | null {
   const limit = Date.now() + FUTURE_TOLERANCE_MS;
-  for (const key of FORM_DATETIME_KEYS) {
-    const iso = isoOrNull(formData, key);
-    if (iso && new Date(iso).getTime() > limit) {
+  for (const key of PAYLOAD_DATETIME_KEYS) {
+    const v = payload[key];
+    if (typeof v === "string" && v && new Date(v).getTime() > limit) {
       return (
         "Waktu tidak boleh di masa depan — periksa tanggalnya. " +
         "(Sering kejadian setelah lewat tengah malam: tanggal default " +
@@ -149,11 +150,6 @@ export async function createLogAction(formData: FormData) {
 
   if (!isValidSubtype(subtype)) {
     redirect(`${returnTo}?logerror=${encodeURIComponent("Subtype tidak valid.")}`);
-  }
-
-  const futureErr = findFutureDatetimeError(formData);
-  if (futureErr) {
-    redirect(`${returnTo}?logerror=${encodeURIComponent(futureErr)}`);
   }
 
   const [user, baby] = await Promise.all([getCachedUser(), getCurrentBaby()]);
@@ -344,6 +340,13 @@ export async function createLogAction(formData: FormData) {
       formData.get("bath_clean_tali_pusat") === "1";
   } else if (subtype === "hiccup" || subtype === "tummy") {
     payload.end_timestamp = isoOrNull(formData, "end_timestamp");
+  }
+
+  // Validasi masa depan di payload FINAL (setelah scrub sisi ml=0 dll)
+  // supaya field form yang tidak terpakai tidak bikin false reject.
+  const futureErr = findFuturePayloadError(payload);
+  if (futureErr) {
+    redirect(`${returnTo}?logerror=${encodeURIComponent(futureErr)}`);
   }
 
   const { error } = await supabase.from("logs").insert(payload as never);
@@ -1290,11 +1293,6 @@ export async function updateLogAction(formData: FormData) {
     redirect(`${returnTo}?logerror=${encodeURIComponent("Subtype tidak valid.")}`);
   }
 
-  const futureErr = findFutureDatetimeError(formData);
-  if (futureErr) {
-    redirect(`${returnTo}?logerror=${encodeURIComponent(futureErr)}`);
-  }
-
   const [user, baby] = await Promise.all([getCachedUser(), getCurrentBaby()]);
   if (!user) redirect("/login");
   if (!baby) redirect("/setup");
@@ -1581,6 +1579,13 @@ export async function updateLogAction(formData: FormData) {
         })
       : 0;
   const oldAsiMl = oldAsiDrunk + oldAsiSpilled;
+
+  // Validasi masa depan di payload final — SEBELUM side effect apapun
+  // (refund stock ASI di bawah). Lihat findFuturePayloadError.
+  const futureErr = findFuturePayloadError(payload);
+  if (futureErr) {
+    redirect(`${returnTo}?logerror=${encodeURIComponent(futureErr)}`);
+  }
 
   if (oldAsiMl > 0) {
     const { data: batches } = await supabase
